@@ -5,8 +5,10 @@ import android.app.Activity
 import android.app.ActivityOptions
 import android.app.role.RoleManager
 import android.content.ActivityNotFoundException
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.provider.AlarmClock
 import android.provider.CalendarContract
@@ -31,6 +33,25 @@ object SystemActions {
         Intent(MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA),
         ActivityOptions.makeScaleUpAnimation(source, 0, 0, source.width, source.height).toBundle(),
     )
+
+    fun openUsageAccess(activity: Activity) =
+        start(activity, Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS, Uri.parse("package:${activity.packageName}"))) ||
+            start(activity, Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
+
+    fun openNotificationAccess(activity: Activity) =
+        start(
+            activity,
+            Intent(Settings.ACTION_NOTIFICATION_LISTENER_DETAIL_SETTINGS).putExtra(
+                Settings.EXTRA_NOTIFICATION_LISTENER_COMPONENT_NAME,
+                ComponentName(activity, MediaListener::class.java).flattenToString(),
+            ),
+        ) || start(activity, Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+
+    fun openAccessibility(activity: Activity) = start(activity, Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+
+    /** Where Android hides "Allow restricted settings" for sideloaded apps. */
+    fun openAppInfo(activity: Activity) =
+        start(activity, Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${activity.packageName}")))
 
     fun openBatteryUsage(activity: Activity) = start(activity, Intent(Intent.ACTION_POWER_USAGE_SUMMARY))
 

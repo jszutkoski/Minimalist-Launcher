@@ -2,4 +2,7 @@
 <resources>
     <string name="app_name">Minimalist</string>
     <string name="settings">Settings</string>
+    <string name="lock_service_label">Minimalist screen lock</string>
+    <string name="lock_service_description">Lets Minimalist lock the screen when you double-tap an empty part of the home screen. It doesn\'t read or change anything on your screen.</string>
+    <string name="media_listener_label">Minimalist now playing</string>
 </resources>

@@ -18,7 +18,10 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Process
 import android.text.InputType
+import android.text.SpannableStringBuilder
+import android.text.Spanned
 import android.text.format.DateFormat
+import android.text.style.ForegroundColorSpan
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
@@ -40,6 +43,7 @@ import android.widget.Toast
 import android.window.OnBackInvokedDispatcher
 import java.text.NumberFormat
 import java.util.Locale
+import java.util.concurrent.Executors
 import kotlin.math.abs
 
 class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
@@ -60,11 +64,17 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
     private lateinit var dateRow: LinearLayout
     private lateinit var topSpace: Space
     private lateinit var bottomSpace: Space
-    private lateinit var shortcuts: List<DockShortcut>
-    private lateinit var camera: ImageView
-
-    /** A bottom icon that opens the first installed app among [packages]. */
-    private class DockShortcut(val packages: List<String>, val icon: ImageView)
+    private lateinit var dock: Dock
+    private lateinit var extras: LinearLayout
+    private lateinit var screenTimeText: TextView
+    private lateinit var nowPlayingBlock: LinearLayout
+    private lateinit var nowPlayingTitle: TextView
+    private lateinit var playPause: ImageView
+    private lateinit var previous: ImageView
+    private lateinit var next: ImageView
+    private lateinit var nowPlaying: NowPlaying
+    private var track: NowPlaying.Track? = null
+    private val background = Executors.newSingleThreadExecutor()
     private lateinit var drawer: AppDrawerView
 
     private var progress = 0f
@@ -84,7 +94,10 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
 
         repo = AppRepository(this, prefs)
         repo.onChanged = ::render
+        dock = Dock(this, prefs, repo, ::launch)
+        addDock()
         repo.start()
+        nowPlaying = NowPlaying(this, ::showTrack)
     }
 
     private val batteryReceiver = object : BroadcastReceiver() {
@@ -102,11 +115,14 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         // Settings may have changed text size, toggles or hidden apps.
         render()
         applyStatusBar()
+        updateScreenTime()
+        if (prefs.nowPlaying) nowPlaying.start() else nowPlaying.stop()
     }
 
     override fun onStop() {
         super.onStop()
         unregisterReceiver(batteryReceiver)
+        nowPlaying.stop()
         // Coming back home should always land on the clock, never a stale search.
         closeDrawer(animate = false)
     }
@@ -119,6 +135,7 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
 
     override fun onDestroy() {
         repo.stop()
+        background.shutdownNow()
         super.onDestroy()
     }
 
@@ -170,14 +187,36 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
             setPadding(0, dp(12), 0, dp(12))
             setOnClickListener { SystemActions.requestDefaultHome(this@MainActivity) }
         }
-        shortcuts = listOf(
-            DockShortcut(listOf("com.whatsapp", "com.whatsapp.w4b"), dockIcon(R.drawable.ic_chat, "WhatsApp")),
-            DockShortcut(listOf("com.waze"), dockIcon(R.drawable.ic_waze, "Waze")),
-            DockShortcut(listOf("com.google.android.apps.photos"), dockIcon(R.drawable.ic_photos, "Google Photos")),
-            DockShortcut(listOf("com.spotify.music"), dockIcon(R.drawable.ic_spotify, "Spotify")),
-        )
-        camera = dockIcon(R.drawable.ic_camera, "Camera").apply {
-            setOnClickListener { SystemActions.openCamera(this@MainActivity, it) }
+        screenTimeText = text("", 17f, Palette.SECONDARY, 400).apply {
+            letterSpacing = 0.02f
+            visibility = View.GONE
+        }
+        nowPlayingTitle = text("", 17f, Palette.TEXT, 400).apply {
+            setPadding(0, dp(4), 0, 0)
+            setOnClickListener { track?.let { openPlayer(it.packageName) } }
+        }
+        previous = mediaButton(R.drawable.ic_previous, "Previous") { track?.controls?.skipToPrevious() }
+        playPause = mediaButton(R.drawable.ic_play, "Play") {
+            track?.let { if (it.playing) it.controls.pause() else it.controls.play() }
+        }
+        next = mediaButton(R.drawable.ic_next, "Next") { track?.controls?.skipToNext() }
+        nowPlayingBlock = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            visibility = View.GONE
+            addView(nowPlayingTitle)
+            addView(
+                LinearLayout(context).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    addView(previous)
+                    addView(playPause)
+                    addView(next)
+                },
+                // Pulled out by the button padding, so the glyphs line up with the title.
+                LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                    leftMargin = -dp(MEDIA_BUTTON_PADDING_DP)
+                    rightMargin = -dp(MEDIA_BUTTON_PADDING_DP)
+                },
+            )
         }
 
         val wrap = ViewGroup.LayoutParams.WRAP_CONTENT
@@ -200,35 +239,24 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         }
         home.addView(clockBlock, LinearLayout.LayoutParams(wrap, wrap))
         home.addView(dateRow, LinearLayout.LayoutParams(wrap, wrap))
+        // Optional lines under the date: screen time, then the playing track.
+        extras = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            addView(screenTimeText)
+            addView(nowPlayingBlock, LinearLayout.LayoutParams(wrap, wrap).apply { topMargin = dp(12) })
+        }
+        home.addView(extras, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, wrap))
         topSpace = Space(this)
         bottomSpace = Space(this)
         home.addView(topSpace, LinearLayout.LayoutParams(0, 0, 1f))
         home.addView(favorites, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, wrap))
         home.addView(bottomSpace, LinearLayout.LayoutParams(0, dp(28)))
 
-        // Two line icons in the bottom corners, their glyphs lined up with the text margin.
-        val iconInset = dp(DOCK_ICON_PADDING_DP)
         home.addView(
             setDefault,
             LinearLayout.LayoutParams(wrap, wrap).apply {
                 gravity = Gravity.CENTER_HORIZONTAL
                 bottomMargin = dp(8)
-            },
-        )
-        // WhatsApp and the camera in the corners, the others spread evenly between them.
-        val dock = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            (shortcuts.map { it.icon } + camera).forEachIndexed { index, icon ->
-                if (index > 0) addView(Space(context), LinearLayout.LayoutParams(0, 0, 1f))
-                addView(icon)
-            }
-        }
-        home.addView(
-            dock,
-            LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, wrap).apply {
-                leftMargin = -iconInset
-                rightMargin = -iconInset
             },
         )
         root.addView(home)
@@ -260,7 +288,9 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         batteryDot.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f * scale)
         batteryText.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f * scale)
         renderFavorites(scale)
-        renderDock()
+        dock.render()
+        screenTimeText.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f * scale)
+        nowPlayingTitle.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f * scale)
         setDefault.visibility = if (SystemActions.isDefaultHome(this)) View.GONE else View.VISIBLE
 
         drawer.textScale = scale
@@ -326,28 +356,62 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         }
     }
 
-    private fun dockIcon(drawable: Int, description: String) = ImageView(this).apply {
-        setImageResource(drawable)
-        imageTintList = pressable(Palette.TEXT)
-        contentDescription = description
-        isClickable = true
-        val inset = dp(DOCK_ICON_PADDING_DP)
-        setPadding(inset, inset, inset, inset)
+    /** The dock goes last, below "Set as home app", once the app list exists. */
+    private fun addDock() {
+        home.addView(
+            dock.view,
+            LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                // Pulled out by the icon padding, so the glyphs line up with the text margin.
+                leftMargin = -dock.iconInset
+                rightMargin = -dock.iconInset
+            },
+        )
     }
 
-    private fun renderDock() {
-        shortcuts.forEach { shortcut ->
-            val app = shortcut.packages.firstNotNullOfOrNull { pkg ->
-                repo.apps.filter { it.component.packageName == pkg }.minByOrNull { if (it.user == Process.myUserHandle()) 0 else 1 }
-            }
-            // A missing app leaves an empty slot, so the other icons never shift.
-            shortcut.icon.visibility = if (app != null) View.VISIBLE else View.INVISIBLE
-            shortcut.icon.setOnClickListener { view -> app?.let { launch(it, view) } }
-            shortcut.icon.setOnLongClickListener {
-                app?.let(::showActions)
-                app != null
+    private fun updateScreenTime() {
+        if (!prefs.screenTime || !ScreenTime.hasAccess(this)) {
+            screenTimeText.visibility = View.GONE
+            return
+        }
+        background.execute {
+            val total = ScreenTime.today(this)
+            runOnUiThread {
+                screenTimeText.text = "${ScreenTime.format(total)} today"
+                screenTimeText.visibility = View.VISIBLE
             }
         }
+    }
+
+    private fun showTrack(track: NowPlaying.Track?) {
+        this.track = track
+        if (track == null) {
+            nowPlayingBlock.visibility = View.GONE
+            return
+        }
+        nowPlayingTitle.text = SpannableStringBuilder(track.title).apply {
+            if (track.artist != null) {
+                val start = length
+                append("  ·  ").append(track.artist)
+                setSpan(ForegroundColorSpan(Palette.SECONDARY), start, length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            }
+        }
+        playPause.setImageResource(if (track.playing) R.drawable.ic_pause else R.drawable.ic_play)
+        playPause.contentDescription = if (track.playing) "Pause" else "Play"
+        nowPlayingBlock.visibility = View.VISIBLE
+    }
+
+    private fun mediaButton(drawable: Int, description: String, action: () -> Unit) = ImageView(this).apply {
+        setImageResource(drawable)
+        imageTintList = pressable(Palette.SECONDARY)
+        contentDescription = description
+        val inset = dp(MEDIA_BUTTON_PADDING_DP)
+        setPadding(inset, inset, inset, inset)
+        setOnClickListener { action() }
+    }
+
+    private fun openPlayer(packageName: String) {
+        val app = repo.apps.firstOrNull { it.component.packageName == packageName } ?: return
+        launch(app, nowPlayingTitle)
     }
 
     private fun renderFavorites(scale: Float) {
@@ -355,6 +419,9 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         val center = prefs.centerFavorites
         val alignment = if (center) Gravity.CENTER_HORIZONTAL else Gravity.START
         favorites.gravity = alignment
+        extras.gravity = alignment
+        (nowPlayingBlock.getChildAt(1).layoutParams as LinearLayout.LayoutParams).gravity = alignment
+        nowPlayingBlock.gravity = alignment
         // The clock widget follows the same alignment as the pinned apps.
         (clockBlock.layoutParams as LinearLayout.LayoutParams).gravity = alignment
         (dateRow.layoutParams as LinearLayout.LayoutParams).gravity = alignment
@@ -471,6 +538,13 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
     }
 
     override fun onSwipeDown() = SystemActions.expandNotifications(this)
+
+    override fun onDoubleTapEmpty() {
+        if (!prefs.doubleTapLock) return
+        if (!LockService.lock()) {
+            Toast.makeText(this, "Turn on the screen lock in Minimalist settings", Toast.LENGTH_SHORT).show()
+        }
+    }
 
     override fun onLongPressEmpty() {
         startActivity(
@@ -610,6 +684,6 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
     private companion object {
         const val MAX_FAVORITES = 8
         const val LOW_BATTERY = 0.15f
-        const val DOCK_ICON_PADDING_DP = 14
+        const val MEDIA_BUTTON_PADDING_DP = 10
     }
 }

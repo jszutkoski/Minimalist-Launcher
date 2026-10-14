@@ -7,6 +7,7 @@ import android.view.VelocityTracker
 import android.view.ViewConfiguration
 import android.widget.FrameLayout
 import kotlin.math.abs
+import kotlin.math.hypot
 
 /**
  * Root of the home screen. Recognises swipes anywhere, even when they start on
@@ -18,6 +19,7 @@ class SwipeLayout(context: Context) : FrameLayout(context) {
         fun onDrawerDrag(progress: Float)
         fun onDrawerRelease(open: Boolean)
         fun onSwipeDown()
+        fun onDoubleTapEmpty()
         fun onLongPressEmpty()
     }
 
@@ -38,6 +40,9 @@ class SwipeLayout(context: Context) : FrameLayout(context) {
     private var active = false
     private var mode = Mode.NONE
     private var pulled = false
+    private var lastTapTime = 0L
+    private var lastTapX = 0f
+    private var lastTapY = 0f
     private var downX = 0f
     private var downY = 0f
     private var originY = 0f
@@ -115,10 +120,25 @@ class SwipeLayout(context: Context) : FrameLayout(context) {
                 listener?.onDrawerRelease(vy < -fling || (vy < fling && progress > 0.3f))
             }
             Mode.DOWN -> if (!pulled && (dy > swipeDistance || vy > fling)) listener?.onSwipeDown()
+            Mode.NONE -> detectDoubleTap(ev)
             // Sideways movement only cancels a long-press; it has no action of its own.
-            Mode.SIDE, Mode.NONE -> Unit
+            Mode.SIDE -> Unit
         }
         finish()
+    }
+
+    /** Two quick taps close together on empty space. A lone tap still does nothing. */
+    private fun detectDoubleTap(ev: MotionEvent) {
+        if (ev.eventTime - ev.downTime >= ViewConfiguration.getLongPressTimeout()) return
+        val near = hypot(ev.x - lastTapX, ev.y - lastTapY) < config.scaledDoubleTapSlop
+        if (ev.eventTime - lastTapTime <= ViewConfiguration.getDoubleTapTimeout() && near) {
+            lastTapTime = 0L
+            listener?.onDoubleTapEmpty()
+        } else {
+            lastTapTime = ev.eventTime
+            lastTapX = ev.x
+            lastTapY = ev.y
+        }
     }
 
     private fun finish() {

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Listens to nothing and reads nothing: the service only performs the lock action. -->
+<accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:accessibilityEventTypes="typeAnnouncement"
+    android:accessibilityFeedbackType="feedbackGeneric"
+    android:canRetrieveWindowContent="false"
+    android:description="@string/lock_service_description"
+    android:isAccessibilityTool="false"
+    android:notificationTimeout="0"
+    android:packageNames="com.jszutkoski.launcher" />

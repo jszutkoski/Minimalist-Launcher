@@ -45,6 +45,28 @@ class Prefs(context: Context) {
         get() = prefs.getBoolean(KEY_CENTER_FAVORITES, true)
         set(value) = prefs.edit().putBoolean(KEY_CENTER_FAVORITES, value).apply()
 
+    /** Show today's screen time under the date (needs usage access). */
+    var screenTime: Boolean
+        get() = prefs.getBoolean(KEY_SCREEN_TIME, false)
+        set(value) = prefs.edit().putBoolean(KEY_SCREEN_TIME, value).apply()
+
+    /** Show the playing track with controls under the date (needs notification access). */
+    var nowPlaying: Boolean
+        get() = prefs.getBoolean(KEY_NOW_PLAYING, false)
+        set(value) = prefs.edit().putBoolean(KEY_NOW_PLAYING, value).apply()
+
+    /** Lock the screen on a double-tap of empty space (needs the accessibility service). */
+    var doubleTapLock: Boolean
+        get() = prefs.getBoolean(KEY_DOUBLE_TAP_LOCK, false)
+        set(value) = prefs.edit().putBoolean(KEY_DOUBLE_TAP_LOCK, value).apply()
+
+    /** App chosen for a bottom icon, or null for that slot's default. */
+    fun dockApp(slot: Int): String? = prefs.getString("$KEY_DOCK$slot", null)
+
+    fun setDockApp(slot: Int, key: String?) {
+        prefs.edit().apply { if (key == null) remove("$KEY_DOCK$slot") else putString("$KEY_DOCK$slot", key) }.apply()
+    }
+
     fun customName(key: String): String? = names.getString(key, null)
 
     fun setCustomName(key: String, name: String?) {
@@ -61,5 +83,9 @@ class Prefs(context: Context) {
         const val KEY_SHOW_KEYBOARD = "show_keyboard"
         const val KEY_HIDE_STATUS_BAR = "hide_status_bar"
         const val KEY_CENTER_FAVORITES = "center_favorites"
+        const val KEY_SCREEN_TIME = "screen_time"
+        const val KEY_NOW_PLAYING = "now_playing"
+        const val KEY_DOUBLE_TAP_LOCK = "double_tap_lock"
+        const val KEY_DOCK = "dock_"
     }
 }

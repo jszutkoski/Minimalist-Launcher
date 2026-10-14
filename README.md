@@ -3,7 +3,7 @@
 A quiet, text-only Android home screen. Black background, a clock, the few apps
 you actually use, and everything else one swipe away.
 
-No app icons, no widgets, no ads, no tracking, no internet permission.
+No app icons, no widgets, no ads, no tracking, no internet permission. Nothing it reads ever leaves the phone.
 
 ## What it does
 
@@ -13,6 +13,8 @@ No app icons, no widgets, no ads, no tracking, no internet permission.
 | **App list** | Swipe up. The keyboard opens and search starts as you type; when only one app matches, it opens on its own. Press *Go* to open the top match. Accents are ignored, so `camera` finds *Câmera*. |
 | **Long-press an app** | Add to home, remove, reorder, rename, hide, app info, uninstall. |
 | **Gestures** | Swipe up for the app list, down for notifications. Drag the list down (or press back) to close it. |
+| **Bottom icons** | Long-press one to swap in any app. Apps with a hand-drawn glyph keep it; others show their initial in a thin circle. |
+| **Extras** (off by default, in Settings) | *Screen time*: today's time in apps under the date (usage access). *Now playing*: the song with ⏮ ⏯ ⏭ under the date (notification access). *Double-tap to lock*: double-tap empty space to turn the screen off (accessibility service). |
 | **Settings** | Long-press empty space on the home screen: text size, auto-open, keyboard, layout (centred or left aligned), hiding the status bar, hidden apps, default home app. |
 
 ## Install on your phone
@@ -27,6 +29,13 @@ Every push to `main` builds a new APK. Installing it over the previous one keeps
 your favourites and settings.
 
 From a computer, `adb install -r minimalist-launcher.apk` works too.
+
+### Restricted settings
+
+Android blocks notification access and accessibility services for apps installed
+outside an app store. If the switch is greyed out, open *Settings → Apps →
+Minimalist*, tap ⋮ and choose **Allow restricted settings**, then try again.
+Minimalist's settings screen has a shortcut to that page.
 
 ## Build it yourself
 

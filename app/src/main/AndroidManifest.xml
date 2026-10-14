@@ -1,10 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <!-- Swipe down on the home screen opens the notification shade. -->
     <uses-permission android:name="android.permission.EXPAND_STATUS_BAR" />
     <!-- "Uninstall" in the long-press menu. -->
     <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
+    <!-- Screen time under the date. Granted by the user in Settings, never at install. -->
+    <uses-permission
+        android:name="android.permission.PACKAGE_USAGE_STATS"
+        tools:ignore="ProtectedPermissions" />
 
     <!-- Lets the launcher see every app that has a launcher entry, without the
          restricted QUERY_ALL_PACKAGES permission. -->
@@ -49,5 +54,30 @@
             android:excludeFromRecents="true"
             android:exported="false"
             android:label="@string/settings" />
+
+        <!-- Double-tap to lock. -->
+        <service
+            android:name=".LockService"
+            android:exported="true"
+            android:label="@string/lock_service_label"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/lock_service" />
+        </service>
+
+        <!-- Now playing: gives access to media sessions; notifications themselves are ignored. -->
+        <service
+            android:name=".MediaListener"
+            android:exported="true"
+            android:label="@string/media_listener_label"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
     </application>
 </manifest>

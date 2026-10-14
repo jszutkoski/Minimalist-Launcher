@@ -58,6 +58,7 @@ class SettingsActivity : Activity() {
             text("Settings", 40f, fontWeight = 200).apply { setPadding(0, 0, 0, dp(32)) },
         )
 
+        section("Home screen")
         row("Text size", prefs.textSize.label) {
             prefs.textSize = TextSize.entries[(prefs.textSize.ordinal + 1) % TextSize.entries.size]
         }
@@ -73,6 +74,42 @@ class SettingsActivity : Activity() {
         row("Hide status bar", onOff(prefs.hideStatusBar), "On the home screen. Swipe from the top edge to see it briefly") {
             prefs.hideStatusBar = !prefs.hideStatusBar
         }
+        section("Extras")
+        permissionRow(
+            title = "Screen time",
+            description = "Today's time in apps, under the date",
+            enabled = prefs.screenTime,
+            granted = ScreenTime.hasAccess(this),
+            missing = "Tap to allow usage access",
+            setEnabled = { prefs.screenTime = it },
+            grant = { SystemActions.openUsageAccess(this) },
+        )
+        permissionRow(
+            title = "Now playing",
+            description = "The playing song and its controls, under the date",
+            enabled = prefs.nowPlaying,
+            granted = NowPlaying.hasAccess(this),
+            missing = "Tap to allow notification access",
+            setEnabled = { prefs.nowPlaying = it },
+            grant = { SystemActions.openNotificationAccess(this) },
+        )
+        permissionRow(
+            title = "Double-tap to lock",
+            description = "Double-tap an empty part of the home screen to turn the screen off",
+            enabled = prefs.doubleTapLock,
+            granted = LockService.isEnabled(this),
+            missing = "Tap to turn on Minimalist screen lock in Accessibility",
+            setEnabled = { prefs.doubleTapLock = it },
+            grant = { SystemActions.openAccessibility(this) },
+        )
+        row(
+            "Restricted setting?",
+            "Open app info",
+            "If Android won't let you turn on notification access or the screen lock, " +
+                "open app info, tap ⋮ and choose \"Allow restricted settings\".",
+        ) { SystemActions.openAppInfo(this) }
+
+        section("Apps")
         val hiddenCount = prefs.hidden.size
         row("Hidden apps", if (hiddenCount == 0) "None" else "$hiddenCount hidden") { showHidden() }
         val isDefault = SystemActions.isDefaultHome(this)
@@ -83,6 +120,7 @@ class SettingsActivity : Activity() {
         content.addView(
             text(
                 "Swipe up for apps · down for notifications\n" +
+                    "Long-press an icon at the bottom to change its app\n" +
                     "Long-press empty space for settings",
                 14f,
                 Palette.TERTIARY,
@@ -93,6 +131,46 @@ class SettingsActivity : Activity() {
                 setPadding(0, dp(40), 0, 0)
             },
         )
+    }
+
+    private fun section(title: String) {
+        content.addView(
+            text(title.uppercase(), 12f, Palette.TERTIARY, 500).apply {
+                letterSpacing = 0.12f
+                setPadding(0, dp(28), 0, dp(4))
+            },
+        )
+    }
+
+    /**
+     * A switch for a feature that also needs a permission from Android. Turning it on
+     * sends you to grant the permission when it is missing; while it stays missing the
+     * row says so, and tapping goes back there instead of switching off.
+     */
+    private fun permissionRow(
+        title: String,
+        description: String,
+        enabled: Boolean,
+        granted: Boolean,
+        missing: String,
+        setEnabled: (Boolean) -> Unit,
+        grant: () -> Unit,
+    ) {
+        val value = when {
+            !enabled -> "Off"
+            !granted -> missing
+            else -> "On"
+        }
+        row(title, value, description) {
+            when {
+                !enabled -> {
+                    setEnabled(true)
+                    if (!granted) grant()
+                }
+                !granted -> grant()
+                else -> setEnabled(false)
+            }
+        }
     }
 
     private fun row(title: String, value: String, description: String? = null, onClick: () -> Unit) {
@@ -109,6 +187,7 @@ class SettingsActivity : Activity() {
         row.addView(
             text(value, 15f, Palette.SECONDARY, 400).apply {
                 isDuplicateParentStateEnabled = true
+                isSingleLine = false
                 setPadding(0, dp(4), 0, 0)
             },
         )
