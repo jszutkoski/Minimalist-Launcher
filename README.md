@@ -32,10 +32,11 @@ From a computer, `adb install -r minimalist-launcher.apk` works too.
 
 ### Restricted settings
 
-Android blocks notification access and accessibility services for apps installed
-outside an app store. If the switch is greyed out, open *Settings → Apps →
-Minimalist*, tap ⋮ and choose **Allow restricted settings**, then try again.
-Minimalist's settings screen has a shortcut to that page.
+Android blocks usage access, notification access and accessibility services for
+apps installed outside an app store ("App was denied access"). After one blocked
+attempt, open *Settings → Apps → Minimalist*, tap ⋮ and choose **Allow restricted
+settings**, then try again. Minimalist's settings screen has a shortcut to that
+page.
 
 ## Build it yourself
 

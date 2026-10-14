@@ -110,8 +110,9 @@ class SettingsActivity : Activity() {
         row(
             "Restricted setting?",
             "Open app info",
-            "If Android won't let you turn on notification access or the screen lock, " +
-                "open app info, tap ⋮ and choose \"Allow restricted settings\".",
+            "If Android says \"App was denied access\" for usage access, notification access or " +
+                "the screen lock: try once, then open app info, tap ⋮ and choose " +
+                "\"Allow restricted settings\".",
         ) { SystemActions.openAppInfo(this) }
 
         section("Apps")
