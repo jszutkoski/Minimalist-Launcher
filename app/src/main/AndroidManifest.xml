@@ -23,7 +23,6 @@
     </queries>
 
     <application
-        android:name=".LauncherApplication"
         android:allowBackup="true"
         android:enableOnBackInvokedCallback="true"
         android:icon="@mipmap/ic_launcher"
@@ -59,15 +58,24 @@
             android:label="@string/settings" />
 
         <!-- Bedside clock; may show over the lock screen, nothing else of the launcher does.
-             Its own task, so that closing it returns to the app it covered, not to home. -->
+             Opened from home, it lives in the home task so it can fade in. -->
         <activity
             android:name=".StandbyActivity"
-            android:launchMode="singleTask"
-            android:taskAffinity="${applicationId}.standby"
             android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenSize|screenLayout|smallestScreenSize|uiMode"
             android:excludeFromRecents="true"
             android:exported="false"
             android:showWhenLocked="true" />
+
+        <!-- The same clock put on top at screen off, in its own task, so that closing it
+             returns to the app it covered rather than to home. -->
+        <activity
+            android:name=".StandbyOverAppsActivity"
+            android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenSize|screenLayout|smallestScreenSize|uiMode"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:showWhenLocked="true"
+            android:taskAffinity="${applicationId}.standby" />
 
         <!-- Double-tap to lock. -->
         <service

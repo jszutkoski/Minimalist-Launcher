@@ -22,7 +22,7 @@ import java.text.NumberFormat
  * only the time, date and battery: tapping asks for the PIN or fingerprint before anything
  * else, and unlocking by any means closes it.
  */
-class StandbyActivity : Activity() {
+open class StandbyActivity : Activity() {
     private lateinit var view: StandbyView
     private var charging = false
 
@@ -37,6 +37,7 @@ class StandbyActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        openCount++
         setShowWhenLocked(true)
         edgeToEdge()
         view = StandbyView(this, ::leave)
@@ -66,6 +67,7 @@ class StandbyActivity : Activity() {
     }
 
     override fun onDestroy() {
+        openCount--
         unregisterReceiver(batteryReceiver)
         unregisterReceiver(unlockReceiver)
         super.onDestroy()
@@ -113,15 +115,28 @@ class StandbyActivity : Activity() {
     }
 
     companion object {
-        /** From the screen-off receiver: above whatever app was open, which returns after unlock. */
+        /** Standby screens alive right now, of either kind. */
+        var openCount = 0
+            private set
+
+        /**
+         * From the screen-off receiver: in a task of its own above whatever app was open, so
+         * that app returns after unlocking. Nothing to do if standby is already up.
+         */
         fun startOnTop(context: Context) {
+            if (openCount > 0) return
             try {
-                context.startActivity(Intent(context, StandbyActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                context.startActivity(
+                    Intent(context, StandbyOverAppsActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                )
             } catch (_: RuntimeException) {
-                // Not the home app any more, so background starts are refused.
             }
         }
 
+        /**
+         * From the home screen: in the home task, so it fades in. A separate task would open
+         * with the system's sideways app animation instead.
+         */
         fun start(activity: Activity) {
             activity.startActivity(
                 Intent(activity, StandbyActivity::class.java),
@@ -130,3 +145,6 @@ class StandbyActivity : Activity() {
         }
     }
 }
+
+/** The same bedside clock in its own task, for when it covers another app at screen off. */
+class StandbyOverAppsActivity : StandbyActivity()

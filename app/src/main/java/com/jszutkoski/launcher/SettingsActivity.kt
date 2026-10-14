@@ -86,12 +86,16 @@ class SettingsActivity : Activity() {
             "A dim bedside clock after 20 seconds on the home screen while charging. " +
                 "Pinch the home screen with two fingers to open it any time; tap to leave",
         ) { prefs.standbyWhenCharging = !prefs.standbyWhenCharging }
-        row(
-            "Standby on every wake",
-            onOff(prefs.standbyOnWake),
-            "Each time the screen turns on, the bedside clock shows first, over the lock screen. " +
+        permissionRow(
+            title = "Standby on every wake",
+            description = "Each time the screen turns on, the bedside clock shows first, over the lock screen. " +
                 "Tap it to unlock, or unlock with your fingerprint or face; you return to the app you were in",
-        ) { prefs.standbyOnWake = !prefs.standbyOnWake }
+            enabled = prefs.standbyOnWake,
+            granted = LockService.isEnabled(this),
+            missing = "Tap to turn on Minimalist in Accessibility",
+            setEnabled = { prefs.standbyOnWake = it },
+            grant = { SystemActions.openAccessibility(this) },
+        )
         permissionRow(
             title = "Screen time",
             description = "Today's time in apps, under the date",
@@ -115,7 +119,7 @@ class SettingsActivity : Activity() {
             description = "Double-tap an empty part of the home screen to turn the screen off",
             enabled = prefs.doubleTapLock,
             granted = LockService.isEnabled(this),
-            missing = "Tap to turn on Minimalist screen lock in Accessibility",
+            missing = "Tap to turn on Minimalist in Accessibility",
             setEnabled = { prefs.doubleTapLock = it },
             grant = { SystemActions.openAccessibility(this) },
         )

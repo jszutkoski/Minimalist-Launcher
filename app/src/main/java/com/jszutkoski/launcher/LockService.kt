@@ -1,29 +1,58 @@
 package com.jszutkoski.launcher
 
 import android.accessibilityservice.AccessibilityService
+import android.content.BroadcastReceiver
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
+import android.media.AudioManager
 import android.provider.Settings
 import android.view.accessibility.AccessibilityEvent
 
 /**
- * The only way for an ordinary app to lock the screen. It asks for no events and
- * never reads what is on screen; it only performs the lock action on request.
+ * The only way for an ordinary app to lock the screen, and to open a screen from the
+ * background: Android lets an app whose accessibility service is on do both. It asks for no
+ * events and never reads what is on screen. It locks on request and, with "Standby on every
+ * wake", puts the bedside clock on top each time the screen turns off.
  */
 class LockService : AccessibilityService() {
+    private val screenOff = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            if (Prefs(context).standbyOnWake && !inCall()) StandbyActivity.startOnTop(context)
+        }
+    }
+    private var listening = false
+
     override fun onServiceConnected() {
         instance = this
+        // A system broadcast; only a receiver registered at runtime gets it.
+        registerReceiver(screenOff, IntentFilter(Intent.ACTION_SCREEN_OFF))
+        listening = true
     }
 
     override fun onUnbind(intent: Intent?): Boolean {
+        stopListening()
         instance = null
         return super.onUnbind(intent)
     }
 
     override fun onDestroy() {
+        stopListening()
         instance = null
         super.onDestroy()
+    }
+
+    private fun stopListening() {
+        if (listening) unregisterReceiver(screenOff)
+        listening = false
+    }
+
+    /** The proximity sensor turns the screen off during calls: never cover the call screen. */
+    private fun inCall(): Boolean {
+        val mode = getSystemService(AudioManager::class.java)?.mode ?: return false
+        return mode == AudioManager.MODE_IN_CALL || mode == AudioManager.MODE_IN_COMMUNICATION ||
+            mode == AudioManager.MODE_RINGTONE
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) = Unit
