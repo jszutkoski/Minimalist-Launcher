@@ -21,7 +21,6 @@ import android.text.InputType
 import android.text.format.DateFormat
 import android.util.TypedValue
 import android.view.Gravity
-import android.view.HapticFeedbackConstants
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowInsets
@@ -37,7 +36,6 @@ import android.widget.Space
 import android.widget.TextClock
 import android.widget.TextView
 import android.widget.Toast
-import android.window.OnBackInvokedCallback
 import android.window.OnBackInvokedDispatcher
 import java.text.NumberFormat
 import java.util.Locale
@@ -67,7 +65,6 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
 
     private var progress = 0f
     private var animator: ValueAnimator? = null
-    private var backCallback: Any? = null
     private val emphasized = PathInterpolator(0.2f, 0f, 0f, 1f)
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -78,6 +75,7 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
 
         buildViews()
         setContentView(root)
+        interceptBack()
 
         repo = AppRepository(this, prefs)
         repo.onChanged = ::render
@@ -378,13 +376,11 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
     }
 
     private fun openDrawer() {
-        setBackEnabled(true)
         if (prefs.showKeyboard) drawer.showKeyboard()
         animateTo(1f)
     }
 
     private fun closeDrawer(animate: Boolean) {
-        setBackEnabled(false)
         drawer.hideKeyboard()
         if (animate) {
             animateTo(0f) { drawer.reset() }
@@ -395,16 +391,15 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         }
     }
 
-    private fun setBackEnabled(enabled: Boolean) {
+    /**
+     * Back is always handled here, even with nothing to close. Otherwise Android 13+
+     * plays its predictive-back animation on the home screen itself, sliding it away
+     * as if it were an app that could be left.
+     */
+    private fun interceptBack() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
-        val dispatcher = onBackInvokedDispatcher
-        if (enabled && backCallback == null) {
-            val callback = OnBackInvokedCallback { closeDrawer(animate = true) }
-            dispatcher.registerOnBackInvokedCallback(OnBackInvokedDispatcher.PRIORITY_DEFAULT, callback)
-            backCallback = callback
-        } else if (!enabled && backCallback != null) {
-            dispatcher.unregisterOnBackInvokedCallback(backCallback as OnBackInvokedCallback)
-            backCallback = null
+        onBackInvokedDispatcher.registerOnBackInvokedCallback(OnBackInvokedDispatcher.PRIORITY_DEFAULT) {
+            if (progress > 0f) closeDrawer(animate = true)
         }
     }
 
@@ -419,10 +414,7 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         if (open) openDrawer() else animateTo(0f)
     }
 
-    override fun onSwipeDown() {
-        root.performHapticFeedback(HapticFeedbackConstants.GESTURE_END)
-        SystemActions.expandNotifications(this)
-    }
+    override fun onSwipeDown() = SystemActions.expandNotifications(this)
 
     override fun onLongPressEmpty() {
         startActivity(

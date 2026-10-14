@@ -33,9 +33,11 @@ class SwipeLayout(context: Context) : FrameLayout(context) {
     private val fling = context.dp(500f)
     private val dragDistance = context.dp(DRAG_DISTANCE_DP)
     private val swipeDistance = context.dp(80f)
+    private val pullDistance = context.dp(32f)
 
     private var active = false
     private var mode = Mode.NONE
+    private var pulled = false
     private var downX = 0f
     private var downY = 0f
     private var originY = 0f
@@ -71,6 +73,11 @@ class SwipeLayout(context: Context) : FrameLayout(context) {
             MotionEvent.ACTION_MOVE -> {
                 if (mode == Mode.NONE) detect(ev)
                 if (mode == Mode.UP) listener?.onDrawerDrag(((originY - ev.y) / dragDistance).coerceIn(0f, 1f))
+                // Open the shade mid-gesture, so it comes down with the finger instead of after it.
+                if (mode == Mode.DOWN && !pulled && ev.y - originY > pullDistance) {
+                    pulled = true
+                    listener?.onSwipeDown()
+                }
             }
             MotionEvent.ACTION_UP -> release(ev)
             MotionEvent.ACTION_CANCEL -> {
@@ -107,7 +114,7 @@ class SwipeLayout(context: Context) : FrameLayout(context) {
                 val progress = (originY - ev.y) / dragDistance
                 listener?.onDrawerRelease(vy < -fling || (vy < fling && progress > 0.3f))
             }
-            Mode.DOWN -> if (dy > swipeDistance || vy > fling) listener?.onSwipeDown()
+            Mode.DOWN -> if (!pulled && (dy > swipeDistance || vy > fling)) listener?.onSwipeDown()
             // Sideways movement only cancels a long-press; it has no action of its own.
             Mode.SIDE, Mode.NONE -> Unit
         }
@@ -117,6 +124,7 @@ class SwipeLayout(context: Context) : FrameLayout(context) {
     private fun finish() {
         removeCallbacks(longPress)
         mode = Mode.NONE
+        pulled = false
         velocity?.recycle()
         velocity = null
     }
