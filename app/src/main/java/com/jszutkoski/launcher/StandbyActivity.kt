@@ -42,7 +42,8 @@ class StandbyActivity : Activity() {
         view = StandbyView(this, ::leave)
         setContentView(view)
 
-        window.attributes = window.attributes.apply { screenBrightness = BRIGHTNESS }
+        // No brightness override: the screen would first light up at the system level and
+        // then visibly ramp down to it. The half-strength text on black keeps it dim enough.
         window.insetsController?.let {
             it.systemBarsBehavior = WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
             it.hide(WindowInsets.Type.systemBars())
@@ -106,8 +107,6 @@ class StandbyActivity : Activity() {
     }
 
     companion object {
-        private const val BRIGHTNESS = 0.05f
-
         fun start(activity: Activity) {
             activity.startActivity(
                 Intent(activity, StandbyActivity::class.java),
