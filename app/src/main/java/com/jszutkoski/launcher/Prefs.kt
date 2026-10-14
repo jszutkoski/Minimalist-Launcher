@@ -40,7 +40,7 @@ class Prefs(context: Context) {
         get() = prefs.getBoolean(KEY_HIDE_STATUS_BAR, false)
         set(value) = prefs.edit().putBoolean(KEY_HIDE_STATUS_BAR, value).apply()
 
-    /** Pinned apps centred on the home screen, or left aligned near the thumb. */
+    /** Clock and pinned apps centred on the home screen, or left aligned with the apps near the thumb. */
     var centerFavorites: Boolean
         get() = prefs.getBoolean(KEY_CENTER_FAVORITES, true)
         set(value) = prefs.edit().putBoolean(KEY_CENTER_FAVORITES, value).apply()

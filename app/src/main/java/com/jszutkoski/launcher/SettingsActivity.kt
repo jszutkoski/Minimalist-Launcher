@@ -67,7 +67,7 @@ class SettingsActivity : Activity() {
         row("Keyboard with app list", onOff(prefs.showKeyboard), "Start typing as soon as the list opens") {
             prefs.showKeyboard = !prefs.showKeyboard
         }
-        row("Pinned apps", if (prefs.centerFavorites) "Centred" else "Left aligned") {
+        row("Layout", if (prefs.centerFavorites) "Centred" else "Left aligned", "Clock and pinned apps") {
             prefs.centerFavorites = !prefs.centerFavorites
         }
         row("Hide status bar", onOff(prefs.hideStatusBar), "On the home screen. Swipe from the top edge to see it briefly") {

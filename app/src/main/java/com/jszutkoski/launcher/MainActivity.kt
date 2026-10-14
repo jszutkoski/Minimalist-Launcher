@@ -30,6 +30,7 @@ import android.view.WindowManager
 import android.view.animation.PathInterpolator
 import android.view.inputmethod.EditorInfo
 import android.widget.EditText
+import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.Space
@@ -56,6 +57,8 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
     private lateinit var batteryDot: TextView
     private lateinit var favorites: LinearLayout
     private lateinit var setDefault: TextView
+    private lateinit var clockBlock: LinearLayout
+    private lateinit var dateRow: LinearLayout
     private lateinit var topSpace: Space
     private lateinit var bottomSpace: Space
     private lateinit var whatsApp: ImageView
@@ -172,7 +175,7 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         val wrap = ViewGroup.LayoutParams.WRAP_CONTENT
         // The clock widget: time, a battery hairline exactly as wide as the time,
         // then the date and the battery percentage on one quiet line.
-        val clockBlock = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        clockBlock = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         clockBlock.addView(clock, LinearLayout.LayoutParams(wrap, wrap))
         clockBlock.addView(
             batteryBar,
@@ -181,7 +184,7 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
                 bottomMargin = dp(4)
             },
         )
-        val dateRow = LinearLayout(this).apply {
+        dateRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             addView(date)
             addView(batteryDot)
@@ -197,12 +200,12 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
 
         // Two line icons in the bottom corners, their glyphs lined up with the text margin.
         val iconInset = dp(DOCK_ICON_PADDING_DP)
-        val dock = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            addView(whatsApp)
-            addView(setDefault, LinearLayout.LayoutParams(0, wrap, 1f))
-            addView(camera)
+        // A frame rather than a row: each icon is pinned to its own corner whether or
+        // not "Set as home app" is showing between them.
+        val dock = FrameLayout(this).apply {
+            addView(whatsApp, FrameLayout.LayoutParams(wrap, wrap, Gravity.START or Gravity.CENTER_VERTICAL))
+            addView(setDefault, FrameLayout.LayoutParams(wrap, wrap, Gravity.CENTER))
+            addView(camera, FrameLayout.LayoutParams(wrap, wrap, Gravity.END or Gravity.CENTER_VERTICAL))
         }
         home.addView(
             dock,
@@ -298,6 +301,10 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         val center = prefs.centerFavorites
         val alignment = if (center) Gravity.CENTER_HORIZONTAL else Gravity.START
         favorites.gravity = alignment
+        // The clock widget follows the same alignment as the pinned apps.
+        (clockBlock.layoutParams as LinearLayout.LayoutParams).gravity = alignment
+        (dateRow.layoutParams as LinearLayout.LayoutParams).gravity = alignment
+        clockBlock.requestLayout()
         // Centred: in the middle of the free space. Left aligned: down near the thumb.
         bottomSpace.layoutParams = (bottomSpace.layoutParams as LinearLayout.LayoutParams).apply {
             weight = if (center) 1f else 0f
