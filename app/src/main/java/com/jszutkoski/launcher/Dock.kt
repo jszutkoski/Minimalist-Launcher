@@ -79,7 +79,7 @@ class Dock(
             icon.setOnClickListener { view ->
                 when {
                     app != null -> launch(app, view)
-                    slot.isCamera -> SystemActions.openCamera(activity)
+                    slot.isCamera -> SystemActions.openCamera(activity, view)
                 }
             }
             icon.setOnLongClickListener {

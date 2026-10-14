@@ -14,7 +14,7 @@ No app icons, no widgets, no ads, no tracking, no internet permission. Nothing i
 | **Long-press an app** | Add to home, remove, reorder, rename, hide, app info, uninstall. |
 | **Gestures** | Swipe up for the app list, down for notifications. Drag the list down (or press back) to close it. |
 | **Bottom icons** | Long-press one to swap in any app. Apps with a hand-drawn glyph keep it; others show their initial in a thin circle. |
-| **Extras** (off by default, in Settings) | *Screen time*: today's time in apps under the date (usage access). *Now playing*: the song with ⏮ ⏯ ⏭ under the date (notification access). *Double-tap to lock*: double-tap empty space to turn the screen off (accessibility service). |
+| **Extras** (off by default, in Settings) | *Screen time*: today's time in apps under the date (usage access). *Now playing*: the song, artist and ⏮ ⏯ ⏭ just above the bottom icons, only while music plays (notification access). *Double-tap to lock*: double-tap empty space to turn the screen off (accessibility service). |
 | **Settings** | Long-press empty space on the home screen: text size, auto-open, keyboard, layout (centred or left aligned), status bar (visible, dimmed or hidden), hidden apps, default home app. |
 
 ## Install on your phone

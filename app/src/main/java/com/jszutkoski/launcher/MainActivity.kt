@@ -16,12 +16,8 @@ import android.net.Uri
 import android.os.BatteryManager
 import android.os.Build
 import android.os.Bundle
-import android.os.Process
 import android.text.InputType
-import android.text.SpannableStringBuilder
-import android.text.Spanned
 import android.text.format.DateFormat
-import android.text.style.ForegroundColorSpan
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
@@ -32,7 +28,6 @@ import android.view.WindowManager
 import android.view.animation.PathInterpolator
 import android.view.inputmethod.EditorInfo
 import android.widget.EditText
-import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.Space
 import android.widget.TextClock
@@ -63,15 +58,9 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
     private lateinit var topSpace: Space
     private lateinit var bottomSpace: Space
     private lateinit var dock: Dock
-    private lateinit var extras: LinearLayout
     private lateinit var screenTimeText: TextView
-    private lateinit var nowPlayingBlock: LinearLayout
-    private lateinit var nowPlayingTitle: TextView
-    private lateinit var playPause: ImageView
-    private lateinit var previous: ImageView
-    private lateinit var next: ImageView
+    private lateinit var player: PlayerView
     private lateinit var nowPlaying: NowPlaying
-    private var track: NowPlaying.Track? = null
     private val background = Executors.newSingleThreadExecutor()
     private lateinit var drawer: AppDrawerView
 
@@ -188,33 +177,7 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
             letterSpacing = 0.02f
             visibility = View.GONE
         }
-        nowPlayingTitle = text("", 17f, Palette.TEXT, 400).apply {
-            setPadding(0, dp(4), 0, 0)
-            setOnClickListener { track?.let { openPlayer(it.packageName) } }
-        }
-        previous = mediaButton(R.drawable.ic_previous, "Previous") { track?.controls?.skipToPrevious() }
-        playPause = mediaButton(R.drawable.ic_play, "Play") {
-            track?.let { if (it.playing) it.controls.pause() else it.controls.play() }
-        }
-        next = mediaButton(R.drawable.ic_next, "Next") { track?.controls?.skipToNext() }
-        nowPlayingBlock = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            visibility = View.GONE
-            addView(nowPlayingTitle)
-            addView(
-                LinearLayout(context).apply {
-                    orientation = LinearLayout.HORIZONTAL
-                    addView(previous)
-                    addView(playPause)
-                    addView(next)
-                },
-                // Pulled out by the button padding, so the glyphs line up with the title.
-                LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
-                    leftMargin = -dp(MEDIA_BUTTON_PADDING_DP)
-                    rightMargin = -dp(MEDIA_BUTTON_PADDING_DP)
-                },
-            )
-        }
+        player = PlayerView(this, ::openPlayer)
 
         val wrap = ViewGroup.LayoutParams.WRAP_CONTENT
         // The clock widget: time, a battery hairline exactly as wide as the time,
@@ -236,13 +199,8 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         }
         home.addView(clockBlock, LinearLayout.LayoutParams(wrap, wrap))
         home.addView(dateRow, LinearLayout.LayoutParams(wrap, wrap))
-        // Optional lines under the date: screen time, then the playing track.
-        extras = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            addView(screenTimeText)
-            addView(nowPlayingBlock, LinearLayout.LayoutParams(wrap, wrap).apply { topMargin = dp(12) })
-        }
-        home.addView(extras, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, wrap))
+        // Optional: today's screen time, a quiet line under the date.
+        home.addView(screenTimeText, LinearLayout.LayoutParams(wrap, wrap))
         topSpace = Space(this)
         bottomSpace = Space(this)
         home.addView(topSpace, LinearLayout.LayoutParams(0, 0, 1f))
@@ -287,7 +245,7 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         renderFavorites(scale)
         dock.render()
         screenTimeText.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f * scale)
-        nowPlayingTitle.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f * scale)
+        player.setTextScale(scale)
         setDefault.visibility = if (SystemActions.isDefaultHome(this)) View.GONE else View.VISIBLE
 
         drawer.textScale = scale
@@ -328,8 +286,15 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         }
     }
 
-    /** The dock goes last, below "Set as home app", once the app list exists. */
+    /** The player and the dock go last, below "Set as home app", once the app list exists. */
     private fun addDock() {
+        // Away from the clock: the player sits just above the icons, and only while music plays.
+        home.addView(
+            player,
+            LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                bottomMargin = dp(20)
+            },
+        )
         home.addView(
             dock.view,
             LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
@@ -354,36 +319,11 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         }
     }
 
-    private fun showTrack(track: NowPlaying.Track?) {
-        this.track = track
-        if (track == null) {
-            nowPlayingBlock.visibility = View.GONE
-            return
-        }
-        nowPlayingTitle.text = SpannableStringBuilder(track.title).apply {
-            if (track.artist != null) {
-                val start = length
-                append("  ·  ").append(track.artist)
-                setSpan(ForegroundColorSpan(Palette.SECONDARY), start, length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-            }
-        }
-        playPause.setImageResource(if (track.playing) R.drawable.ic_pause else R.drawable.ic_play)
-        playPause.contentDescription = if (track.playing) "Pause" else "Play"
-        nowPlayingBlock.visibility = View.VISIBLE
-    }
-
-    private fun mediaButton(drawable: Int, description: String, action: () -> Unit) = ImageView(this).apply {
-        setImageResource(drawable)
-        imageTintList = pressable(Palette.SECONDARY)
-        contentDescription = description
-        val inset = dp(MEDIA_BUTTON_PADDING_DP)
-        setPadding(inset, inset, inset, inset)
-        setOnClickListener { action() }
-    }
+    private fun showTrack(track: NowPlaying.Track?) = player.show(track)
 
     private fun openPlayer(packageName: String) {
         val app = repo.apps.firstOrNull { it.component.packageName == packageName } ?: return
-        launch(app, nowPlayingTitle)
+        launch(app, player)
     }
 
     private fun renderFavorites(scale: Float) {
@@ -391,9 +331,8 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         val center = prefs.centerFavorites
         val alignment = if (center) Gravity.CENTER_HORIZONTAL else Gravity.START
         favorites.gravity = alignment
-        extras.gravity = alignment
-        (nowPlayingBlock.getChildAt(1).layoutParams as LinearLayout.LayoutParams).gravity = alignment
-        nowPlayingBlock.gravity = alignment
+        (screenTimeText.layoutParams as LinearLayout.LayoutParams).gravity = alignment
+        player.setAlignment(alignment)
         // The clock widget follows the same alignment as the pinned apps.
         (clockBlock.layoutParams as LinearLayout.LayoutParams).gravity = alignment
         (dateRow.layoutParams as LinearLayout.LayoutParams).gravity = alignment
@@ -541,7 +480,7 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
 
     private fun launch(app: App, source: View) {
         val bounds = Rect().also { source.getGlobalVisibleRect(it) }
-        val options = SystemActions.appOpenOptions(this)
+        val options = SystemActions.appOpenOptions(source)
         try {
             launcherApps.startMainActivity(app.component, app.user, bounds, options)
         } catch (_: RuntimeException) {
@@ -656,6 +595,5 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
     private companion object {
         const val MAX_FAVORITES = 8
         const val LOW_BATTERY = 0.15f
-        const val MEDIA_BUTTON_PADDING_DP = 10
     }
 }

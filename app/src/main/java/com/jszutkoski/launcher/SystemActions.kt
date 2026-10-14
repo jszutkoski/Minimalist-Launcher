@@ -14,6 +14,7 @@ import android.provider.AlarmClock
 import android.provider.CalendarContract
 import android.provider.MediaStore
 import android.provider.Settings
+import android.view.View
 
 object SystemActions {
     /** There is no public API for this; every third-party launcher uses the same call. */
@@ -27,15 +28,15 @@ object SystemActions {
     }
 
     /**
-     * Apps rise from the bottom centre while home recedes. Android 14+ ignores the
-     * scale-up-from-a-view animation and falls back to its sideways slide; custom
-     * animations are still honoured.
+     * The app opens out of the view that was tapped. Android ignores custom animations
+     * when another app's task opens from a home screen it didn't ship with, so this is the
+     * last kind left to try; where it is ignored too, the system's own animation plays.
      */
-    fun appOpenOptions(activity: Activity): Bundle =
-        ActivityOptions.makeCustomAnimation(activity, R.anim.app_open, R.anim.home_exit).toBundle()
+    fun appOpenOptions(source: View): Bundle =
+        ActivityOptions.makeClipRevealAnimation(source, 0, 0, source.width, source.height).toBundle()
 
-    fun openCamera(activity: Activity) =
-        start(activity, Intent(MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA), appOpenOptions(activity))
+    fun openCamera(activity: Activity, source: View) =
+        start(activity, Intent(MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA), appOpenOptions(source))
 
     fun openUsageAccess(activity: Activity) =
         start(activity, Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS, Uri.parse("package:${activity.packageName}"))) ||
