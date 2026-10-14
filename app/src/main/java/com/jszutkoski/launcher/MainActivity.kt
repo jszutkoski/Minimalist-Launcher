@@ -68,6 +68,7 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
     private lateinit var drawer: AppDrawerView
 
     private var progress = 0f
+    private var stale = true
     private var animator: ValueAnimator? = null
     private val emphasized = PathInterpolator(0.2f, 0f, 0f, 1f)
 
@@ -83,6 +84,7 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
 
         repo = AppRepository(this, prefs)
         repo.onChanged = ::render
+        prefs.onChange { stale = true }
         dock = Dock(this, prefs, repo, ::launch)
         addDock()
         repo.start()
@@ -101,12 +103,17 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
 
     override fun onResume() {
         super.onResume()
-        // Settings may have changed text size, toggles or hidden apps.
-        render()
+        // Only rebuilt when a setting, name or pinned app changed since the last time, so
+        // coming back from an app costs next to nothing before home can draw.
+        if (stale) render()
+        setDefault.visibility = if (SystemActions.isDefaultHome(this)) View.GONE else View.VISIBLE
         applyStatusBar()
-        updateScreenTime()
         player.reserveSpace = prefs.nowPlaying
-        if (prefs.nowPlaying) nowPlaying.start() else nowPlaying.stop()
+        // Lookups that can wait for the first frame.
+        root.post {
+            updateScreenTime()
+            if (prefs.nowPlaying) nowPlaying.start() else nowPlaying.stop()
+        }
         scheduleStandby()
     }
 
@@ -187,7 +194,7 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         screenTimeText = text("", 17f, Palette.SECONDARY, 400).apply {
             letterSpacing = 0.02f
             visibility = View.GONE
-            setPadding(0, dp(4), 0, dp(4))
+            setPadding(0, dp(8), 0, dp(8))
             setOnClickListener { SystemActions.openDigitalWellbeing(this@MainActivity) }
         }
         player = PlayerView(this, ::openPlayer)
@@ -200,8 +207,8 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         clockBlock.addView(
             batteryBar,
             LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, wrap).apply {
-                topMargin = dp(12)
-                bottomMargin = dp(4)
+                topMargin = dp(16)
+                bottomMargin = dp(14)
             },
         )
         dateRow = LinearLayout(this).apply {
@@ -213,7 +220,7 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         home.addView(clockBlock, LinearLayout.LayoutParams(wrap, wrap))
         home.addView(dateRow, LinearLayout.LayoutParams(wrap, wrap))
         // Optional: today's screen time, a quiet line under the date.
-        home.addView(screenTimeText, LinearLayout.LayoutParams(wrap, wrap))
+        home.addView(screenTimeText, LinearLayout.LayoutParams(wrap, wrap).apply { topMargin = dp(8) })
         topSpace = Space(this)
         bottomSpace = Space(this)
         home.addView(topSpace, LinearLayout.LayoutParams(0, 0, 1f))
@@ -250,6 +257,7 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
     }
 
     private fun render() {
+        stale = false
         val scale = prefs.textSize.scale
         clock.setTextSize(TypedValue.COMPLEX_UNIT_SP, 92f * scale)
         date.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f * scale)

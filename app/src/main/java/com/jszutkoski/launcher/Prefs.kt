@@ -1,6 +1,7 @@
 package com.jszutkoski.launcher
 
 import android.content.Context
+import android.content.SharedPreferences
 
 enum class TextSize(val label: String, val scale: Float) {
     SMALL("Small", 0.86f),
@@ -21,6 +22,17 @@ enum class StatusBarMode(val label: String) {
 class Prefs(context: Context) {
     private val prefs = context.getSharedPreferences("launcher", Context.MODE_PRIVATE)
     private val names = context.getSharedPreferences("names", Context.MODE_PRIVATE)
+
+    // Kept here: SharedPreferences only holds its listeners weakly.
+    private var changeListener: SharedPreferences.OnSharedPreferenceChangeListener? = null
+
+    /** Calls [listener] after any setting, name or pinned app changes, in this or another screen. */
+    fun onChange(listener: () -> Unit) {
+        val wrapped = SharedPreferences.OnSharedPreferenceChangeListener { _, _ -> listener() }
+        changeListener = wrapped
+        prefs.registerOnSharedPreferenceChangeListener(wrapped)
+        names.registerOnSharedPreferenceChangeListener(wrapped)
+    }
 
     /** Keys of the apps pinned to the home screen, in display order. */
     var favorites: List<String>
