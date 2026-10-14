@@ -71,8 +71,13 @@ class SettingsActivity : Activity() {
         row("Layout", if (prefs.centerFavorites) "Centred" else "Left aligned", "Clock and pinned apps") {
             prefs.centerFavorites = !prefs.centerFavorites
         }
-        row("Hide status bar", onOff(prefs.hideStatusBar), "On the home screen. Swipe from the top edge to see it briefly") {
-            prefs.hideStatusBar = !prefs.hideStatusBar
+        row(
+            "Status bar",
+            prefs.statusBar.label,
+            "Dimmed: dark icons on black, almost invisible and never jumps. " +
+                "Hidden: gone, but Android slides it in and out with the notifications",
+        ) {
+            prefs.statusBar = StatusBarMode.entries[(prefs.statusBar.ordinal + 1) % StatusBarMode.entries.size]
         }
         section("Extras")
         permissionRow(

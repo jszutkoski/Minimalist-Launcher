@@ -27,8 +27,6 @@ import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowInsets
-import android.view.WindowInsetsAnimationControlListener
-import android.view.WindowInsetsAnimationController
 import android.view.WindowInsetsController
 import android.view.WindowManager
 import android.view.animation.PathInterpolator
@@ -90,7 +88,6 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         buildViews()
         setContentView(root)
         interceptBack()
-        watchStatusBarControl()
 
         repo = AppRepository(this, prefs)
         repo.onChanged = ::render
@@ -318,37 +315,12 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         if (hasFocus) applyStatusBar()
     }
 
-    /**
-     * While the notification shade is open the system owns the status bar. When control
-     * comes back the bar is still on screen, and since this window already asked for it
-     * hidden, hide() changes nothing: the system slides it away with its own ~300ms
-     * animation. Snap it away the moment control returns instead.
-     */
-    private fun watchStatusBarControl() {
-        window.insetsController?.addOnControllableInsetsChangedListener { _, types ->
-            if (prefs.hideStatusBar && types and WindowInsets.Type.statusBars() != 0) hideStatusBarNow()
-        }
-    }
-
-    private fun hideStatusBarNow() {
-        val controller = window.insetsController ?: return
-        controller.hide(WindowInsets.Type.statusBars())
-        controller.controlWindowInsetsAnimation(
-            WindowInsets.Type.statusBars(),
-            0,
-            null,
-            null,
-            object : WindowInsetsAnimationControlListener {
-                override fun onReady(animation: WindowInsetsAnimationController, types: Int) = animation.finish(false)
-                override fun onFinished(animation: WindowInsetsAnimationController) = Unit
-                override fun onCancelled(animation: WindowInsetsAnimationController?) = Unit
-            },
-        )
-    }
-
     private fun applyStatusBar() {
         val controller = window.insetsController ?: return
-        if (prefs.hideStatusBar) {
+        val mode = prefs.statusBar
+        val darkIcons = if (mode == StatusBarMode.DIMMED) WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS else 0
+        controller.setSystemBarsAppearance(darkIcons, WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS)
+        if (mode == StatusBarMode.HIDDEN) {
             controller.systemBarsBehavior = WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
             controller.hide(WindowInsets.Type.statusBars())
         } else {
@@ -569,7 +541,7 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
 
     private fun launch(app: App, source: View) {
         val bounds = Rect().also { source.getGlobalVisibleRect(it) }
-        val options = ActivityOptions.makeScaleUpAnimation(source, 0, 0, source.width, source.height).toBundle()
+        val options = SystemActions.appOpenOptions(this)
         try {
             launcherApps.startMainActivity(app.component, app.user, bounds, options)
         } catch (_: RuntimeException) {

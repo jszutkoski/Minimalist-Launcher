@@ -8,6 +8,16 @@ enum class TextSize(val label: String, val scale: Float) {
     LARGE("Large", 1.16f),
 }
 
+enum class StatusBarMode(val label: String) {
+    VISIBLE("Visible"),
+
+    /** Dark icons on the black background: nearly invisible, but never animates away and back. */
+    DIMMED("Dimmed"),
+
+    /** Gone; Android slides it back briefly with the notification shade or a swipe from the top. */
+    HIDDEN("Hidden"),
+}
+
 class Prefs(context: Context) {
     private val prefs = context.getSharedPreferences("launcher", Context.MODE_PRIVATE)
     private val names = context.getSharedPreferences("names", Context.MODE_PRIVATE)
@@ -35,10 +45,17 @@ class Prefs(context: Context) {
         get() = prefs.getBoolean(KEY_SHOW_KEYBOARD, true)
         set(value) = prefs.edit().putBoolean(KEY_SHOW_KEYBOARD, value).apply()
 
-    /** Hide the status bar on the home screen; a swipe from the top edge shows it briefly. */
-    var hideStatusBar: Boolean
-        get() = prefs.getBoolean(KEY_HIDE_STATUS_BAR, false)
-        set(value) = prefs.edit().putBoolean(KEY_HIDE_STATUS_BAR, value).apply()
+    /** How the status bar looks on the home screen. */
+    var statusBar: StatusBarMode
+        get() {
+            val stored = prefs.getInt(KEY_STATUS_BAR, -1)
+            if (stored < 0) {
+                // Carried over from the earlier on/off "hide status bar" switch.
+                return if (prefs.getBoolean(KEY_HIDE_STATUS_BAR, false)) StatusBarMode.HIDDEN else StatusBarMode.VISIBLE
+            }
+            return StatusBarMode.entries.getOrElse(stored) { StatusBarMode.VISIBLE }
+        }
+        set(value) = prefs.edit().putInt(KEY_STATUS_BAR, value.ordinal).apply()
 
     /** Clock and pinned apps centred on the home screen, or left aligned with the apps near the thumb. */
     var centerFavorites: Boolean
@@ -82,6 +99,7 @@ class Prefs(context: Context) {
         const val KEY_AUTO_LAUNCH = "auto_launch"
         const val KEY_SHOW_KEYBOARD = "show_keyboard"
         const val KEY_HIDE_STATUS_BAR = "hide_status_bar"
+        const val KEY_STATUS_BAR = "status_bar"
         const val KEY_CENTER_FAVORITES = "center_favorites"
         const val KEY_SCREEN_TIME = "screen_time"
         const val KEY_NOW_PLAYING = "now_playing"

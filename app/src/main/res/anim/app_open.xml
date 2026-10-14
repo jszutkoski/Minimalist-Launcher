@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Apps rise out of the bottom centre of the screen, where the thumb is. -->
+<set xmlns:android="http://schemas.android.com/apk/res/android"
+    android:duration="320"
+    android:interpolator="@android:interpolator/fast_out_slow_in"
+    android:zAdjustment="top">
+    <scale
+        android:fromXScale="0.86"
+        android:fromYScale="0.86"
+        android:pivotX="50%"
+        android:pivotY="100%"
+        android:toXScale="1"
+        android:toYScale="1" />
+    <translate android:fromYDelta="6%" android:toYDelta="0" />
+    <alpha
+        android:duration="200"
+        android:fromAlpha="0"
+        android:toAlpha="1" />
+</set>

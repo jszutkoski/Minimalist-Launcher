@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Home recedes slightly while an app rises over it. -->
+<set xmlns:android="http://schemas.android.com/apk/res/android"
+    android:duration="320"
+    android:interpolator="@android:interpolator/fast_out_slow_in">
+    <scale
+        android:fromXScale="1"
+        android:fromYScale="1"
+        android:pivotX="50%"
+        android:pivotY="50%"
+        android:toXScale="0.96"
+        android:toYScale="0.96" />
+    <alpha android:fromAlpha="1" android:toAlpha="0" />
+</set>

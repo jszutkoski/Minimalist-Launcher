@@ -14,7 +14,6 @@ import android.provider.AlarmClock
 import android.provider.CalendarContract
 import android.provider.MediaStore
 import android.provider.Settings
-import android.view.View
 
 object SystemActions {
     /** There is no public API for this; every third-party launcher uses the same call. */
@@ -27,12 +26,16 @@ object SystemActions {
         }
     }
 
-    /** The camera grows out of the icon that was tapped. */
-    fun openCamera(activity: Activity, source: View) = start(
-        activity,
-        Intent(MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA),
-        ActivityOptions.makeScaleUpAnimation(source, 0, 0, source.width, source.height).toBundle(),
-    )
+    /**
+     * Apps rise from the bottom centre while home recedes. Android 14+ ignores the
+     * scale-up-from-a-view animation and falls back to its sideways slide; custom
+     * animations are still honoured.
+     */
+    fun appOpenOptions(activity: Activity): Bundle =
+        ActivityOptions.makeCustomAnimation(activity, R.anim.app_open, R.anim.home_exit).toBundle()
+
+    fun openCamera(activity: Activity) =
+        start(activity, Intent(MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA), appOpenOptions(activity))
 
     fun openUsageAccess(activity: Activity) =
         start(activity, Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS, Uri.parse("package:${activity.packageName}"))) ||
