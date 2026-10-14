@@ -57,6 +57,14 @@
             android:exported="false"
             android:label="@string/settings" />
 
+        <!-- Bedside clock; may show over the lock screen, nothing else of the launcher does. -->
+        <activity
+            android:name=".StandbyActivity"
+            android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenSize|screenLayout|smallestScreenSize|uiMode"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:showWhenLocked="true" />
+
         <!-- Double-tap to lock. -->
         <service
             android:name=".LockService"

@@ -6,6 +6,9 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.view.View
 
+/** Below this charge, and not charging, the battery shows in red. */
+const val LOW_BATTERY = 0.15f
+
 /**
  * A hairline under the clock, as wide as the time, filled to the battery level.
  * It breathes slowly while charging and turns red when the battery runs low.

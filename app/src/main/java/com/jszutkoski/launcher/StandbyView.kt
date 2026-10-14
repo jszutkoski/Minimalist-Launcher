@@ -14,7 +14,7 @@ import kotlin.random.Random
 
 /**
  * A bedside clock: time, battery line, date and charge, dimmed on black. The group drifts
- * to a new spot every minute so no pixel stays lit in the same place. Any touch leaves.
+ * to a new spot every minute so no pixel stays lit in the same place. A tap calls [onExit].
  */
 class StandbyView(context: Context, private val onExit: () -> Unit) : FrameLayout(context) {
     private val battery = BatteryBar(context)
@@ -74,8 +74,6 @@ class StandbyView(context: Context, private val onExit: () -> Unit) : FrameLayou
         addView(content, LayoutParams(wrap, wrap, Gravity.CENTER))
     }
 
-    val isShowing get() = visibility == VISIBLE
-
     fun updateBattery(fraction: Float, charging: Boolean, low: Boolean, label: CharSequence) {
         battery.update(fraction, charging, low)
         percent.text = label
@@ -83,22 +81,11 @@ class StandbyView(context: Context, private val onExit: () -> Unit) : FrameLayou
     }
 
     fun show() {
-        if (isShowing) return
+        if (visibility == VISIBLE) return
         animate().cancel()
         visibility = VISIBLE
         moveContent()
         animate().alpha(1f).setDuration(600).start()
-    }
-
-    fun hide(animate: Boolean) {
-        removeCallbacks(drift)
-        animate().cancel()
-        if (!animate) {
-            alpha = 0f
-            visibility = GONE
-            return
-        }
-        animate().alpha(0f).setDuration(220).withEndAction { visibility = GONE }.start()
     }
 
     /** Somewhere new within the middle of the screen, once a minute. */
