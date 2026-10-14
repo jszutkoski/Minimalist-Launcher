@@ -24,6 +24,8 @@ import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowInsets
+import android.view.WindowInsetsAnimationControlListener
+import android.view.WindowInsetsAnimationController
 import android.view.WindowInsetsController
 import android.view.WindowManager
 import android.view.animation.PathInterpolator
@@ -78,6 +80,7 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         buildViews()
         setContentView(root)
         interceptBack()
+        watchStatusBarControl()
 
         repo = AppRepository(this, prefs)
         repo.onChanged = ::render
@@ -281,9 +284,36 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
         // The notification shade only takes focus away; it never pauses this activity, so
-        // onResume doesn't run when it closes. Without this, the status bar it brought along
-        // lingers until the system's own transient-bar timeout hides it.
+        // onResume doesn't run when it closes.
         if (hasFocus) applyStatusBar()
+    }
+
+    /**
+     * While the notification shade is open the system owns the status bar. When control
+     * comes back the bar is still on screen, and since this window already asked for it
+     * hidden, hide() changes nothing: the system slides it away with its own ~300ms
+     * animation. Snap it away the moment control returns instead.
+     */
+    private fun watchStatusBarControl() {
+        window.insetsController?.addOnControllableInsetsChangedListener { _, types ->
+            if (prefs.hideStatusBar && types and WindowInsets.Type.statusBars() != 0) hideStatusBarNow()
+        }
+    }
+
+    private fun hideStatusBarNow() {
+        val controller = window.insetsController ?: return
+        controller.hide(WindowInsets.Type.statusBars())
+        controller.controlWindowInsetsAnimation(
+            WindowInsets.Type.statusBars(),
+            0,
+            null,
+            null,
+            object : WindowInsetsAnimationControlListener {
+                override fun onReady(animation: WindowInsetsAnimationController, types: Int) = animation.finish(false)
+                override fun onFinished(animation: WindowInsetsAnimationController) = Unit
+                override fun onCancelled(animation: WindowInsetsAnimationController?) = Unit
+            },
+        )
     }
 
     private fun applyStatusBar() {
