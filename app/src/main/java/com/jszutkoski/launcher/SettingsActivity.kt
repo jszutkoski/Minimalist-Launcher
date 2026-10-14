@@ -1,0 +1,135 @@
+package com.jszutkoski.launcher
+
+import android.app.Activity
+import android.os.Bundle
+import android.view.ViewGroup
+import android.view.WindowInsets
+import android.widget.LinearLayout
+import android.widget.ScrollView
+
+class SettingsActivity : Activity() {
+    private lateinit var prefs: Prefs
+    private lateinit var repo: AppRepository
+    private lateinit var content: LinearLayout
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        prefs = Prefs(this)
+        edgeToEdge()
+
+        content = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        val scroll = ScrollView(this).apply {
+            setBackgroundColor(Palette.BACKGROUND)
+            isVerticalScrollBarEnabled = false
+            addView(content)
+            setOnApplyWindowInsetsListener { _, insets ->
+                val bars = insets.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout())
+                val side = dp(SIDE_MARGIN_DP)
+                content.setPadding(bars.left + side, bars.top + dp(56), bars.right + side, bars.bottom + dp(40))
+                WindowInsets.CONSUMED
+            }
+        }
+        setContentView(scroll)
+
+        repo = AppRepository(this, prefs)
+        repo.onChanged = ::render
+        repo.start()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        render()
+    }
+
+    override fun onDestroy() {
+        repo.stop()
+        super.onDestroy()
+    }
+
+    private fun render() {
+        content.removeAllViews()
+        content.addView(
+            text("Settings", 40f, fontWeight = 200).apply { setPadding(0, 0, 0, dp(32)) },
+        )
+
+        row("Text size", prefs.textSize.label) {
+            prefs.textSize = TextSize.entries[(prefs.textSize.ordinal + 1) % TextSize.entries.size]
+        }
+        row("Open single match", onOff(prefs.autoLaunch), "Launch an app as soon as the search finds only one") {
+            prefs.autoLaunch = !prefs.autoLaunch
+        }
+        row("Keyboard with app list", onOff(prefs.showKeyboard), "Start typing as soon as the list opens") {
+            prefs.showKeyboard = !prefs.showKeyboard
+        }
+        val hiddenCount = prefs.hidden.size
+        row("Hidden apps", if (hiddenCount == 0) "None" else "$hiddenCount hidden") { showHidden() }
+        val isDefault = SystemActions.isDefaultHome(this)
+        row("Home app", if (isDefault) "Minimalist is your home app" else "Not your home app yet") {
+            if (isDefault) SystemActions.openHomeSettings(this) else SystemActions.requestDefaultHome(this)
+        }
+
+        content.addView(
+            text(
+                "Swipe up for apps · down for notifications\n" +
+                    "Swipe left for camera · right for phone\n" +
+                    "Long-press empty space for settings",
+                14f,
+                Palette.TERTIARY,
+                400,
+            ).apply {
+                isSingleLine = false
+                setLineSpacing(dp(6f), 1f)
+                setPadding(0, dp(40), 0, 0)
+            },
+        )
+    }
+
+    private fun row(title: String, value: String, description: String? = null, onClick: () -> Unit) {
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(0, dp(14), 0, dp(14))
+            isClickable = true
+            setOnClickListener {
+                onClick()
+                render()
+            }
+        }
+        row.addView(text(title, 20f).apply { isDuplicateParentStateEnabled = true })
+        row.addView(
+            text(value, 15f, Palette.SECONDARY, 400).apply {
+                isDuplicateParentStateEnabled = true
+                setPadding(0, dp(4), 0, 0)
+            },
+        )
+        if (description != null) {
+            row.addView(
+                text(description, 13f, Palette.TERTIARY, 400).apply {
+                    isDuplicateParentStateEnabled = true
+                    isSingleLine = false
+                    setPadding(0, dp(2), 0, 0)
+                },
+            )
+        }
+        content.addView(row, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+    }
+
+    private fun showHidden() {
+        val sheet = Sheet(this, "Tap an app to show it again")
+        val hidden = prefs.hidden
+        if (hidden.isEmpty()) {
+            sheet.column.addView(text("No hidden apps", 19f, Palette.TERTIARY).apply { setPadding(0, dp(13), 0, dp(13)) })
+        }
+        hidden
+            .map { key -> key to (repo.find(key)?.label ?: "Uninstalled app") }
+            .sortedBy { it.second.lowercase() }
+            .forEach { (key, label) ->
+                sheet.option(label) {
+                    prefs.hidden = prefs.hidden - key
+                    render()
+                }
+            }
+        sheet.show()
+    }
+
+    private fun onOff(value: Boolean) = if (value) "On" else "Off"
+}
