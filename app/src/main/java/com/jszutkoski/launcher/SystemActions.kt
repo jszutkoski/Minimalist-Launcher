@@ -2,7 +2,6 @@ package com.jszutkoski.launcher
 
 import android.annotation.SuppressLint
 import android.app.Activity
-import android.app.ActivityOptions
 import android.app.role.RoleManager
 import android.content.ActivityNotFoundException
 import android.content.ComponentName
@@ -14,7 +13,6 @@ import android.provider.AlarmClock
 import android.provider.CalendarContract
 import android.provider.MediaStore
 import android.provider.Settings
-import android.view.View
 
 object SystemActions {
     /** There is no public API for this; every third-party launcher uses the same call. */
@@ -27,16 +25,9 @@ object SystemActions {
         }
     }
 
-    /**
-     * The app opens out of the view that was tapped. Android ignores custom animations
-     * when another app's task opens from a home screen it didn't ship with, so this is the
-     * last kind left to try; where it is ignored too, the system's own animation plays.
-     */
-    fun appOpenOptions(source: View): Bundle =
-        ActivityOptions.makeClipRevealAnimation(source, 0, 0, source.width, source.height).toBundle()
-
-    fun openCamera(activity: Activity, source: View) =
-        start(activity, Intent(MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA), appOpenOptions(source))
+    // Opening another app always uses the system's animation: Android ignores every kind of
+    // launch animation (custom, scale-up, clip reveal) asked for by a third-party home screen.
+    fun openCamera(activity: Activity) = start(activity, Intent(MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA))
 
     fun openUsageAccess(activity: Activity) =
         start(activity, Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS, Uri.parse("package:${activity.packageName}"))) ||

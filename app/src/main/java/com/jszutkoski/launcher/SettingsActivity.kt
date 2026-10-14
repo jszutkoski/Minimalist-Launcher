@@ -80,6 +80,12 @@ class SettingsActivity : Activity() {
             prefs.statusBar = StatusBarMode.entries[(prefs.statusBar.ordinal + 1) % StatusBarMode.entries.size]
         }
         section("Extras")
+        row(
+            "Standby while charging",
+            onOff(prefs.standbyWhenCharging),
+            "A dim bedside clock after 20 seconds on the home screen while charging. " +
+                "Pinch the home screen with two fingers to open it any time; tap to leave",
+        ) { prefs.standbyWhenCharging = !prefs.standbyWhenCharging }
         permissionRow(
             title = "Screen time",
             description = "Today's time in apps, under the date",
@@ -127,6 +133,7 @@ class SettingsActivity : Activity() {
             text(
                 "Swipe up for apps · down for notifications\n" +
                     "Long-press an icon at the bottom to change its app\n" +
+                    "Pinch for the bedside clock · double-tap to lock (if on)\n" +
                     "Long-press empty space for settings",
                 14f,
                 Palette.TERTIARY,

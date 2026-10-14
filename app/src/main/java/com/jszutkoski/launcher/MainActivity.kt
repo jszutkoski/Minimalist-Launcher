@@ -62,6 +62,10 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
     private lateinit var player: PlayerView
     private lateinit var nowPlaying: NowPlaying
     private val background = Executors.newSingleThreadExecutor()
+    private lateinit var standby: StandbyView
+    private var charging = false
+    // Focus is checked when the countdown ends: a menu or the shade may have opened since.
+    private val idleStandby = Runnable { if (canAutoStandby() && hasWindowFocus()) enterStandby() }
     private lateinit var drawer: AppDrawerView
 
     private var progress = 0f
@@ -103,6 +107,12 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         applyStatusBar()
         updateScreenTime()
         if (prefs.nowPlaying) nowPlaying.start() else nowPlaying.stop()
+        scheduleStandby()
+    }
+
+    override fun onUserInteraction() {
+        super.onUserInteraction()
+        scheduleStandby()
     }
 
     override fun onStop() {
@@ -111,11 +121,14 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         nowPlaying.stop()
         // Coming back home should always land on the clock, never a stale search.
         closeDrawer(animate = false)
+        root.removeCallbacks(idleStandby)
+        if (standby.isShowing) exitStandby(animate = false)
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         // Home pressed while already home.
+        if (standby.isShowing) exitStandby(animate = true)
         if (progress > 0f) closeDrawer(animate = true)
     }
 
@@ -128,7 +141,7 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
     @Deprecated("Only reached below Android 13; newer versions use OnBackInvokedCallback.")
     override fun onBackPressed() {
         // A home screen never finishes itself.
-        if (progress > 0f) closeDrawer(animate = true)
+        if (standby.isShowing) exitStandby(animate = true) else if (progress > 0f) closeDrawer(animate = true)
     }
 
     private fun buildViews() {
@@ -222,6 +235,9 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         }
         root.addView(drawer)
 
+        standby = StandbyView(this) { exitStandby(animate = true) }
+        root.addView(standby)
+
         root.setOnApplyWindowInsetsListener { _, insets ->
             // Ignoring visibility keeps the layout still when the status bar is hidden or peeks in.
             val bars = Insets.max(
@@ -261,16 +277,71 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         val status = intent.getIntExtra(BatteryManager.EXTRA_STATUS, BatteryManager.BATTERY_STATUS_UNKNOWN)
         val charging = status == BatteryManager.BATTERY_STATUS_CHARGING || status == BatteryManager.BATTERY_STATUS_FULL
         val low = !charging && fraction <= LOW_BATTERY
+        val label = NumberFormat.getPercentInstance().format(fraction.toDouble())
         batteryBar.update(fraction, charging, low)
-        batteryText.text = NumberFormat.getPercentInstance().format(fraction.toDouble())
+        batteryText.text = label
         batteryText.setTextColor(pressable(if (low) Palette.LOW else Palette.SECONDARY))
+        standby.updateBattery(fraction, charging, low, label)
+        if (charging != this.charging) {
+            this.charging = charging
+            if (standby.isShowing) keepScreenOn(charging)
+            scheduleStandby()
+        }
+    }
+
+    // Standby ------------------------------------------------------------------
+
+    /** Restarts the countdown to standby; called on every touch. */
+    private fun scheduleStandby() {
+        root.removeCallbacks(idleStandby)
+        if (canAutoStandby()) root.postDelayed(idleStandby, STANDBY_DELAY_MS)
+    }
+
+    /** Charging, on the bare home screen, with the app list closed. */
+    private fun canAutoStandby() =
+        prefs.standbyWhenCharging && charging && !standby.isShowing && progress == 0f
+
+    private fun enterStandby() {
+        root.removeCallbacks(idleStandby)
+        if (progress > 0f) closeDrawer(animate = false)
+        standby.show()
+        // The home gestures underneath stay off until standby is left.
+        root.gesturesEnabled = false
+        // Only kept awake on the charger; otherwise the screen times out as usual.
+        keepScreenOn(charging)
+        window.attributes = window.attributes.apply { screenBrightness = STANDBY_BRIGHTNESS }
+        window.insetsController?.let {
+            it.systemBarsBehavior = WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            it.hide(WindowInsets.Type.systemBars())
+        }
+    }
+
+    private fun exitStandby(animate: Boolean) {
+        standby.hide(animate)
+        root.gesturesEnabled = progress == 0f
+        keepScreenOn(false)
+        window.attributes = window.attributes.apply {
+            screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+        }
+        window.insetsController?.show(WindowInsets.Type.navigationBars())
+        applyStatusBar()
+        scheduleStandby()
+    }
+
+    private fun keepScreenOn(on: Boolean) {
+        if (on) {
+            window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        } else {
+            window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
         // The notification shade only takes focus away; it never pauses this activity, so
         // onResume doesn't run when it closes.
-        if (hasFocus) applyStatusBar()
+        if (hasFocus && !standby.isShowing) applyStatusBar()
+        if (hasFocus) scheduleStandby()
     }
 
     private fun applyStatusBar() {
@@ -433,7 +504,7 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
     private fun interceptBack() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
         onBackInvokedDispatcher.registerOnBackInvokedCallback(OnBackInvokedDispatcher.PRIORITY_DEFAULT) {
-            if (progress > 0f) closeDrawer(animate = true)
+            if (standby.isShowing) exitStandby(animate = true) else if (progress > 0f) closeDrawer(animate = true)
         }
     }
 
@@ -449,6 +520,8 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
     }
 
     override fun onSwipeDown() = SystemActions.expandNotifications(this)
+
+    override fun onPinchIn() = enterStandby()
 
     override fun onDoubleTapEmpty() {
         if (!prefs.doubleTapLock) return
@@ -480,9 +553,8 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
 
     private fun launch(app: App, source: View) {
         val bounds = Rect().also { source.getGlobalVisibleRect(it) }
-        val options = SystemActions.appOpenOptions(source)
         try {
-            launcherApps.startMainActivity(app.component, app.user, bounds, options)
+            launcherApps.startMainActivity(app.component, app.user, bounds, null)
         } catch (_: RuntimeException) {
             // ActivityNotFoundException or SecurityException: the app went away under us.
             Toast.makeText(this, "Can't open ${app.label}", Toast.LENGTH_SHORT).show()
@@ -594,6 +666,8 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
 
     private companion object {
         const val MAX_FAVORITES = 8
+        const val STANDBY_DELAY_MS = 20_000L
+        const val STANDBY_BRIGHTNESS = 0.05f
         const val LOW_BATTERY = 0.15f
     }
 }

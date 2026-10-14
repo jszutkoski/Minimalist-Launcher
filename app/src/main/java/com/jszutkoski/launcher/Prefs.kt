@@ -77,6 +77,11 @@ class Prefs(context: Context) {
         get() = prefs.getBoolean(KEY_DOUBLE_TAP_LOCK, false)
         set(value) = prefs.edit().putBoolean(KEY_DOUBLE_TAP_LOCK, value).apply()
 
+    /** Bedside clock after a short idle on the home screen while charging. */
+    var standbyWhenCharging: Boolean
+        get() = prefs.getBoolean(KEY_STANDBY, true)
+        set(value) = prefs.edit().putBoolean(KEY_STANDBY, value).apply()
+
     /** App chosen for a bottom icon, or null for that slot's default. */
     fun dockApp(slot: Int): String? = prefs.getString("$KEY_DOCK$slot", null)
 
@@ -105,5 +110,6 @@ class Prefs(context: Context) {
         const val KEY_NOW_PLAYING = "now_playing"
         const val KEY_DOUBLE_TAP_LOCK = "double_tap_lock"
         const val KEY_DOCK = "dock_"
+        const val KEY_STANDBY = "standby"
     }
 }

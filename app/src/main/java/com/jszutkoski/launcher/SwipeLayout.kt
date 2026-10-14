@@ -20,10 +20,11 @@ class SwipeLayout(context: Context) : FrameLayout(context) {
         fun onDrawerRelease(open: Boolean)
         fun onSwipeDown()
         fun onDoubleTapEmpty()
+        fun onPinchIn()
         fun onLongPressEmpty()
     }
 
-    private enum class Mode { NONE, UP, DOWN, SIDE }
+    private enum class Mode { NONE, UP, DOWN, SIDE, PINCH }
 
     var listener: Listener? = null
 
@@ -40,6 +41,8 @@ class SwipeLayout(context: Context) : FrameLayout(context) {
     private var active = false
     private var mode = Mode.NONE
     private var pulled = false
+    private var pinched = false
+    private var pinchStart = 0f
     private var lastTapTime = 0L
     private var lastTapX = 0f
     private var lastTapY = 0f
@@ -65,8 +68,32 @@ class SwipeLayout(context: Context) : FrameLayout(context) {
             velocity = VelocityTracker.obtain()
         }
         velocity?.addMovement(ev)
+        trackPinch(ev)
         return super.dispatchTouchEvent(ev)
     }
+
+    /**
+     * Two fingers drawing together, anywhere on the home screen. Watched here, before
+     * children see the touch, so it also works when the first finger lands on an app name.
+     */
+    private fun trackPinch(ev: MotionEvent) {
+        if (!active) return
+        when (ev.actionMasked) {
+            MotionEvent.ACTION_POINTER_DOWN -> if (ev.pointerCount == 2 && mode == Mode.NONE) {
+                mode = Mode.PINCH
+                pinchStart = span(ev)
+                removeCallbacks(longPress)
+            }
+            MotionEvent.ACTION_MOVE -> if (mode == Mode.PINCH && !pinched && ev.pointerCount >= 2 &&
+                span(ev) < pinchStart * PINCH_RATIO
+            ) {
+                pinched = true
+                listener?.onPinchIn()
+            }
+        }
+    }
+
+    private fun span(ev: MotionEvent) = hypot(ev.getX(0) - ev.getX(1), ev.getY(0) - ev.getY(1))
 
     override fun onInterceptTouchEvent(ev: MotionEvent): Boolean =
         active && ev.actionMasked == MotionEvent.ACTION_MOVE && detect(ev)
@@ -122,7 +149,7 @@ class SwipeLayout(context: Context) : FrameLayout(context) {
             Mode.DOWN -> if (!pulled && (dy > swipeDistance || vy > fling)) listener?.onSwipeDown()
             Mode.NONE -> detectDoubleTap(ev)
             // Sideways movement only cancels a long-press; it has no action of its own.
-            Mode.SIDE -> Unit
+            Mode.SIDE, Mode.PINCH -> Unit
         }
         finish()
     }
@@ -145,7 +172,13 @@ class SwipeLayout(context: Context) : FrameLayout(context) {
         removeCallbacks(longPress)
         mode = Mode.NONE
         pulled = false
+        pinched = false
         velocity?.recycle()
         velocity = null
+    }
+
+    private companion object {
+        /** How far the fingers must close, relative to where they started. */
+        const val PINCH_RATIO = 0.65f
     }
 }
