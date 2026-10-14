@@ -7,8 +7,9 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 
 /**
- * Title, artist and three controls. Shown only while something plays; after a pause it
- * lingers a few seconds, so playback can be resumed, then fades away.
+ * Title, artist and three controls. Shown while a player app holds a track, paused or
+ * playing, and gone once the app closes it. While enabled it always keeps its height, so
+ * nothing on the home screen moves when it appears or fades out.
  */
 class PlayerView(context: Context, private val onOpen: (packageName: String) -> Unit) : LinearLayout(context) {
     private val title = context.text("", 17f, Palette.TEXT, 400)
@@ -16,12 +17,20 @@ class PlayerView(context: Context, private val onOpen: (packageName: String) -> 
     private val controls = LinearLayout(context)
     private val playPause: ImageView
     private var track: NowPlaying.Track? = null
-    private val hide = Runnable { fade(visible = false) }
+
+    /** Holds the player's space even with nothing playing. Off when the feature is turned off. */
+    var reserveSpace = false
+        set(value) {
+            field = value
+            if (track == null) visibility = if (value) INVISIBLE else GONE
+        }
 
     init {
         orientation = VERTICAL
         visibility = GONE
         alpha = 0f
+        // Two lines' worth of height even when a track has no artist.
+        artist.text = " "
 
         val full = LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
         title.setOnClickListener { track?.let { onOpen(it.packageName) } }
@@ -69,17 +78,16 @@ class PlayerView(context: Context, private val onOpen: (packageName: String) -> 
 
     fun show(track: NowPlaying.Track?) {
         this.track = track
-        removeCallbacks(hide)
         if (track == null) {
             fade(visible = false)
             return
         }
         title.text = track.title
-        artist.text = track.artist.orEmpty()
-        artist.visibility = if (track.artist != null) VISIBLE else GONE
+        // A blank line rather than none, so the height never changes.
+        artist.text = track.artist ?: " "
         playPause.setImageResource(if (track.playing) R.drawable.ic_pause else R.drawable.ic_play)
         playPause.contentDescription = if (track.playing) "Pause" else "Play"
-        if (track.playing) fade(visible = true) else if (visibility == VISIBLE) postDelayed(hide, LINGER_MS)
+        fade(visible = true)
     }
 
     private fun fade(visible: Boolean) {
@@ -91,7 +99,10 @@ class PlayerView(context: Context, private val onOpen: (packageName: String) -> 
             }
             animate().alpha(1f).setDuration(220).start()
         } else if (visibility == VISIBLE) {
-            animate().alpha(0f).setDuration(220).withEndAction { visibility = GONE }.start()
+            val hidden = if (reserveSpace) INVISIBLE else GONE
+            animate().alpha(0f).setDuration(220).withEndAction { visibility = hidden }.start()
+        } else {
+            visibility = if (reserveSpace) INVISIBLE else GONE
         }
     }
 
@@ -104,14 +115,8 @@ class PlayerView(context: Context, private val onOpen: (packageName: String) -> 
         setOnClickListener { action() }
     }
 
-    override fun onDetachedFromWindow() {
-        removeCallbacks(hide)
-        super.onDetachedFromWindow()
-    }
-
     private companion object {
         const val BUTTON_PADDING_DP = 10
         const val BUTTON_GAP_DP = 20
-        const val LINGER_MS = 4000L
     }
 }

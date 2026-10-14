@@ -98,6 +98,13 @@ class NowPlaying(private val context: Context, private val onChange: (Track?) ->
         val artist = metadata.getString(MediaMetadata.METADATA_KEY_ARTIST)
             ?: metadata.getString(MediaMetadata.METADATA_KEY_ALBUM_ARTIST)
         val state = current.playbackState?.state
+        // Stopped or never started: the player app is open but has nothing loaded.
+        if (state == null || state == PlaybackState.STATE_NONE || state == PlaybackState.STATE_STOPPED ||
+            state == PlaybackState.STATE_ERROR
+        ) {
+            onChange(null)
+            return
+        }
         val playing = state == PlaybackState.STATE_PLAYING || state == PlaybackState.STATE_BUFFERING
         onChange(Track(title, artist?.takeIf { it.isNotBlank() }, playing, current.packageName, current.transportControls))
     }

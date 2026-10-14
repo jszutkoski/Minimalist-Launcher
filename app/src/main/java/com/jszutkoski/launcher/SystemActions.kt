@@ -48,6 +48,15 @@ object SystemActions {
     fun openAppInfo(activity: Activity) =
         start(activity, Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${activity.packageName}")))
 
+    /** Digital Wellbeing's dashboard; it usually has no launcher icon, so it is opened by name. */
+    fun openDigitalWellbeing(activity: Activity): Boolean {
+        val pkg = "com.google.android.apps.wellbeing"
+        val launch = activity.packageManager.getLaunchIntentForPackage(pkg)
+        return (launch != null && start(activity, launch)) ||
+            start(activity, Intent().setClassName(pkg, "$pkg.settings.TopLevelSettingsActivity")) ||
+            start(activity, Intent(Settings.ACTION_SETTINGS))
+    }
+
     fun openBatteryUsage(activity: Activity) = start(activity, Intent(Intent.ACTION_POWER_USAGE_SUMMARY))
 
     fun openAlarms(activity: Activity) = start(activity, Intent(AlarmClock.ACTION_SHOW_ALARMS))

@@ -15,7 +15,7 @@ No app icons, no widgets, no ads, no tracking, no internet permission. Nothing i
 | **Gestures** | Swipe up for the app list, down for notifications. Drag the list down (or press back) to close it. |
 | **Standby** | A dim bedside clock (time, battery line, date and charge) that drifts a little every minute. Opens after 20 seconds on the home screen while charging, or with a two-finger pinch; tap to leave. Keeps the screen on only while charging. |
 | **Bottom icons** | Long-press one to swap in any app. Apps with a hand-drawn glyph keep it; others show their initial in a thin circle. |
-| **Extras** (off by default, in Settings) | *Screen time*: today's time in apps under the date (usage access). *Now playing*: the song, artist and ⏮ ⏯ ⏭ just above the bottom icons, only while music plays (notification access). *Double-tap to lock*: double-tap empty space to turn the screen off (accessibility service). |
+| **Extras** (off by default, in Settings) | *Screen time*: today's time in apps under the date (usage access). *Now playing*: the song, artist and ⏮ ⏯ ⏭ just above the bottom icons while a player holds a track, paused or playing; its space stays reserved so nothing moves (notification access). Tap screen time to open Digital Wellbeing. *Double-tap to lock*: double-tap empty space to turn the screen off (accessibility service). |
 | **Settings** | Long-press empty space on the home screen: text size, auto-open, keyboard, layout (centred or left aligned), status bar (visible, dimmed or hidden), hidden apps, default home app. |
 
 ## Install on your phone

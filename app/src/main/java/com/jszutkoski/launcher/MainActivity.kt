@@ -106,6 +106,7 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         render()
         applyStatusBar()
         updateScreenTime()
+        player.reserveSpace = prefs.nowPlaying
         if (prefs.nowPlaying) nowPlaying.start() else nowPlaying.stop()
         scheduleStandby()
     }
@@ -189,6 +190,8 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         screenTimeText = text("", 17f, Palette.SECONDARY, 400).apply {
             letterSpacing = 0.02f
             visibility = View.GONE
+            setPadding(0, dp(4), 0, dp(4))
+            setOnClickListener { SystemActions.openDigitalWellbeing(this@MainActivity) }
         }
         player = PlayerView(this, ::openPlayer)
 
