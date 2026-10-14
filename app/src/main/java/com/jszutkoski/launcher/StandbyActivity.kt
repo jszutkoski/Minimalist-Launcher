@@ -71,6 +71,12 @@ class StandbyActivity : Activity() {
         super.onDestroy()
     }
 
+    /** Home pressed while unlocked: done, rather than lingering in a background task. */
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        finish()
+    }
+
     @Deprecated("Only reached below Android 13; newer versions use OnBackInvokedCallback.")
     override fun onBackPressed() = finish()
 
@@ -107,6 +113,15 @@ class StandbyActivity : Activity() {
     }
 
     companion object {
+        /** From the screen-off receiver: above whatever app was open, which returns after unlock. */
+        fun startOnTop(context: Context) {
+            try {
+                context.startActivity(Intent(context, StandbyActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            } catch (_: RuntimeException) {
+                // Not the home app any more, so background starts are refused.
+            }
+        }
+
         fun start(activity: Activity) {
             activity.startActivity(
                 Intent(activity, StandbyActivity::class.java),

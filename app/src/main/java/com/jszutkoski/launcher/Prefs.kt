@@ -82,6 +82,11 @@ class Prefs(context: Context) {
         get() = prefs.getBoolean(KEY_STANDBY, true)
         set(value) = prefs.edit().putBoolean(KEY_STANDBY, value).apply()
 
+    /** Put standby on top whenever the screen turns off, so it is the first thing on wake. */
+    var standbyOnWake: Boolean
+        get() = prefs.getBoolean(KEY_STANDBY_ON_WAKE, false)
+        set(value) = prefs.edit().putBoolean(KEY_STANDBY_ON_WAKE, value).apply()
+
     /** App chosen for a bottom icon, or null for that slot's default. */
     fun dockApp(slot: Int): String? = prefs.getString("$KEY_DOCK$slot", null)
 
@@ -111,5 +116,6 @@ class Prefs(context: Context) {
         const val KEY_DOUBLE_TAP_LOCK = "double_tap_lock"
         const val KEY_DOCK = "dock_"
         const val KEY_STANDBY = "standby"
+        const val KEY_STANDBY_ON_WAKE = "standby_on_wake"
     }
 }

@@ -23,6 +23,7 @@
     </queries>
 
     <application
+        android:name=".LauncherApplication"
         android:allowBackup="true"
         android:enableOnBackInvokedCallback="true"
         android:icon="@mipmap/ic_launcher"
@@ -57,9 +58,12 @@
             android:exported="false"
             android:label="@string/settings" />
 
-        <!-- Bedside clock; may show over the lock screen, nothing else of the launcher does. -->
+        <!-- Bedside clock; may show over the lock screen, nothing else of the launcher does.
+             Its own task, so that closing it returns to the app it covered, not to home. -->
         <activity
             android:name=".StandbyActivity"
+            android:launchMode="singleTask"
+            android:taskAffinity="${applicationId}.standby"
             android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenSize|screenLayout|smallestScreenSize|uiMode"
             android:excludeFromRecents="true"
             android:exported="false"
