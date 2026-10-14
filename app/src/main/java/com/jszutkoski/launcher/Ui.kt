@@ -19,6 +19,9 @@ object Palette {
     const val SECONDARY = 0xFF8A8A8A.toInt()
     const val TERTIARY = 0xFF4D4D4D.toInt()
     const val HAIRLINE = 0xFF1F1F1F.toInt()
+    const val TRACK = 0xFF262626.toInt()
+    /** Only used to warn about a low battery. */
+    const val LOW = 0xFFE5484D.toInt()
 }
 
 /** Distance a finger travels to fully open or close the app list. */

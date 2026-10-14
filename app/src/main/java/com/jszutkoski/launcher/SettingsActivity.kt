@@ -1,6 +1,7 @@
 package com.jszutkoski.launcher
 
 import android.app.Activity
+import android.os.Build
 import android.os.Bundle
 import android.view.ViewGroup
 import android.view.WindowInsets
@@ -31,6 +32,11 @@ class SettingsActivity : Activity() {
         }
         setContentView(scroll)
 
+        // Leaves the way it came in: sinking back down over the home screen.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            overrideActivityTransition(OVERRIDE_TRANSITION_CLOSE, R.anim.hold, R.anim.sink_out)
+        }
+
         repo = AppRepository(this, prefs)
         repo.onChanged = ::render
         repo.start()
@@ -60,6 +66,9 @@ class SettingsActivity : Activity() {
         }
         row("Keyboard with app list", onOff(prefs.showKeyboard), "Start typing as soon as the list opens") {
             prefs.showKeyboard = !prefs.showKeyboard
+        }
+        row("Hide status bar", onOff(prefs.hideStatusBar), "On the home screen. Swipe from the top edge to see it briefly") {
+            prefs.hideStatusBar = !prefs.hideStatusBar
         }
         val hiddenCount = prefs.hidden.size
         row("Hidden apps", if (hiddenCount == 0) "None" else "$hiddenCount hidden") { showHidden() }

@@ -2,10 +2,12 @@ package com.jszutkoski.launcher
 
 import android.annotation.SuppressLint
 import android.app.Activity
+import android.app.ActivityOptions
 import android.app.role.RoleManager
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
+import android.os.Bundle
 import android.provider.AlarmClock
 import android.provider.CalendarContract
 import android.provider.MediaStore
@@ -22,9 +24,21 @@ object SystemActions {
         }
     }
 
-    fun openCamera(activity: Activity) = start(activity, Intent(MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA))
+    /** Swipe left: the camera slides in from the right, following the finger. */
+    fun openCamera(activity: Activity) = start(
+        activity,
+        Intent(MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA),
+        ActivityOptions.makeCustomAnimation(activity, R.anim.slide_in_right, R.anim.home_out_left).toBundle(),
+    )
 
-    fun openDialer(activity: Activity) = start(activity, Intent(Intent.ACTION_DIAL))
+    /** Swipe right: the phone slides in from the left, following the finger. */
+    fun openDialer(activity: Activity) = start(
+        activity,
+        Intent(Intent.ACTION_DIAL),
+        ActivityOptions.makeCustomAnimation(activity, R.anim.slide_in_left, R.anim.home_out_right).toBundle(),
+    )
+
+    fun openBatteryUsage(activity: Activity) = start(activity, Intent(Intent.ACTION_POWER_USAGE_SUMMARY))
 
     fun openAlarms(activity: Activity) = start(activity, Intent(AlarmClock.ACTION_SHOW_ALARMS))
 
@@ -58,8 +72,8 @@ object SystemActions {
         openHomeSettings(activity)
     }
 
-    fun start(activity: Activity, intent: Intent): Boolean = try {
-        activity.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+    fun start(activity: Activity, intent: Intent, options: Bundle? = null): Boolean = try {
+        activity.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), options)
         true
     } catch (_: ActivityNotFoundException) {
         false

@@ -35,6 +35,11 @@ class Prefs(context: Context) {
         get() = prefs.getBoolean(KEY_SHOW_KEYBOARD, true)
         set(value) = prefs.edit().putBoolean(KEY_SHOW_KEYBOARD, value).apply()
 
+    /** Hide the status bar on the home screen; a swipe from the top edge shows it briefly. */
+    var hideStatusBar: Boolean
+        get() = prefs.getBoolean(KEY_HIDE_STATUS_BAR, false)
+        set(value) = prefs.edit().putBoolean(KEY_HIDE_STATUS_BAR, value).apply()
+
     fun customName(key: String): String? = names.getString(key, null)
 
     fun setCustomName(key: String, name: String?) {
@@ -49,5 +54,6 @@ class Prefs(context: Context) {
         const val KEY_TEXT_SIZE = "text_size"
         const val KEY_AUTO_LAUNCH = "auto_launch"
         const val KEY_SHOW_KEYBOARD = "show_keyboard"
+        const val KEY_HIDE_STATUS_BAR = "hide_status_bar"
     }
 }

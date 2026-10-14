@@ -9,11 +9,11 @@ No icons, no widgets, no ads, no tracking, no internet permission.
 
 | | |
 |---|---|
-| **Home** | Clock and date at the top, up to 8 pinned apps near your thumb. Tap the clock for alarms, the date for your calendar. |
+| **Home** | Clock, a battery line as wide as the time, then the date and battery percentage. Up to 8 pinned apps near your thumb. Tap the clock for alarms, the date for your calendar, the battery for battery usage. The line breathes while charging and turns red below 15%. |
 | **App list** | Swipe up. The keyboard opens and search starts as you type; when only one app matches, it opens on its own. Press *Go* to open the top match. Accents are ignored, so `camera` finds *Câmera*. |
 | **Long-press an app** | Add to home, remove, reorder, rename, hide, app info, uninstall. |
-| **Gestures** | Swipe down for notifications, left for the camera, right for the phone. Drag the list down (or press back) to close it. |
-| **Settings** | Long-press empty space on the home screen: text size, auto-open, keyboard, hidden apps, default home app. |
+| **Gestures** | Swipe down for notifications, left for the camera, right for the phone. The camera and phone slide in from the side your finger moves toward. Drag the list down (or press back) to close it. |
+| **Settings** | Long-press empty space on the home screen: text size, auto-open, keyboard, hiding the status bar, hidden apps, default home app. |
 
 ## Install on your phone
 

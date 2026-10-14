@@ -5,10 +5,15 @@ import android.animation.AnimatorListenerAdapter
 import android.animation.ValueAnimator
 import android.app.Activity
 import android.app.ActivityOptions
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.LauncherApps
+import android.graphics.Insets
 import android.graphics.Rect
 import android.net.Uri
+import android.os.BatteryManager
 import android.os.Build
 import android.os.Bundle
 import android.text.InputType
@@ -19,6 +24,7 @@ import android.view.HapticFeedbackConstants
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowInsets
+import android.view.WindowInsetsController
 import android.view.WindowManager
 import android.view.animation.PathInterpolator
 import android.view.inputmethod.EditorInfo
@@ -30,6 +36,7 @@ import android.widget.TextView
 import android.widget.Toast
 import android.window.OnBackInvokedCallback
 import android.window.OnBackInvokedDispatcher
+import java.text.NumberFormat
 import java.util.Locale
 import kotlin.math.abs
 
@@ -42,6 +49,9 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
     private lateinit var home: LinearLayout
     private lateinit var clock: TextClock
     private lateinit var date: TextClock
+    private lateinit var batteryBar: BatteryBar
+    private lateinit var batteryText: TextView
+    private lateinit var batteryDot: TextView
     private lateinit var favorites: LinearLayout
     private lateinit var setDefault: TextView
     private lateinit var drawer: AppDrawerView
@@ -65,14 +75,26 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         repo.start()
     }
 
+    private val batteryReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) = updateBattery(intent)
+    }
+
+    override fun onStart() {
+        super.onStart()
+        // A sticky broadcast: registering returns the current state right away.
+        registerReceiver(batteryReceiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED))?.let(::updateBattery)
+    }
+
     override fun onResume() {
         super.onResume()
         // Settings may have changed text size, toggles or hidden apps.
         render()
+        applyStatusBar()
     }
 
     override fun onStop() {
         super.onStop()
+        unregisterReceiver(batteryReceiver)
         // Coming back home should always land on the clock, never a stale search.
         closeDrawer(animate = false)
     }
@@ -111,6 +133,9 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
             includeFontPadding = false
             setOnClickListener { SystemActions.openAlarms(this@MainActivity) }
         }
+        batteryBar = BatteryBar(this).apply {
+            setOnClickListener { SystemActions.openBatteryUsage(this@MainActivity) }
+        }
         val datePattern = DateFormat.getBestDateTimePattern(Locale.getDefault(), "EEEEdMMMM")
         date = TextClock(this).apply {
             format12Hour = datePattern
@@ -121,6 +146,12 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
             setPadding(0, dp(10), 0, dp(10))
             setOnClickListener { SystemActions.openCalendar(this@MainActivity) }
         }
+        batteryDot = text("·", 15f, Palette.TERTIARY, 400).apply { setPadding(dp(10), dp(10), dp(10), dp(10)) }
+        batteryText = text("", 15f, Palette.SECONDARY, 400).apply {
+            letterSpacing = 0.02f
+            setPadding(0, dp(10), dp(8), dp(10))
+            setOnClickListener { SystemActions.openBatteryUsage(this@MainActivity) }
+        }
         favorites = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         setDefault = text("Set as home app", 14f, Palette.SECONDARY, 400).apply {
             setPadding(0, dp(12), 0, dp(12))
@@ -128,8 +159,25 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         }
 
         val wrap = ViewGroup.LayoutParams.WRAP_CONTENT
-        home.addView(clock, LinearLayout.LayoutParams(wrap, wrap))
-        home.addView(date, LinearLayout.LayoutParams(wrap, wrap))
+        // The clock widget: time, a battery hairline exactly as wide as the time,
+        // then the date and the battery percentage on one quiet line.
+        val clockBlock = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        clockBlock.addView(clock, LinearLayout.LayoutParams(wrap, wrap))
+        clockBlock.addView(
+            batteryBar,
+            LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, wrap).apply {
+                topMargin = dp(10)
+                bottomMargin = dp(4)
+            },
+        )
+        val dateRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            addView(date)
+            addView(batteryDot)
+            addView(batteryText)
+        }
+        home.addView(clockBlock, LinearLayout.LayoutParams(wrap, wrap))
+        home.addView(dateRow, LinearLayout.LayoutParams(wrap, wrap))
         home.addView(Space(this), LinearLayout.LayoutParams(0, 0, 1f))
         home.addView(favorites, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, wrap))
         home.addView(setDefault, LinearLayout.LayoutParams(wrap, wrap).apply { topMargin = dp(28) })
@@ -142,7 +190,11 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         root.addView(drawer)
 
         root.setOnApplyWindowInsetsListener { _, insets ->
-            val bars = insets.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout())
+            // Ignoring visibility keeps the layout still when the status bar is hidden or peeks in.
+            val bars = Insets.max(
+                insets.getInsetsIgnoringVisibility(WindowInsets.Type.systemBars()),
+                insets.getInsets(WindowInsets.Type.displayCutout()),
+            )
             val ime = insets.getInsets(WindowInsets.Type.ime())
             val side = dp(SIDE_MARGIN_DP)
             home.setPadding(bars.left + side, bars.top + dp(56), bars.right + side, bars.bottom + dp(36))
@@ -155,12 +207,37 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         val scale = prefs.textSize.scale
         clock.setTextSize(TypedValue.COMPLEX_UNIT_SP, 80f * scale)
         date.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f * scale)
+        batteryDot.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f * scale)
+        batteryText.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f * scale)
         renderFavorites(scale)
         setDefault.visibility = if (SystemActions.isDefaultHome(this)) View.GONE else View.VISIBLE
 
         drawer.textScale = scale
         drawer.autoLaunch = prefs.autoLaunch
         drawer.setApps(repo.visibleApps())
+    }
+
+    private fun updateBattery(intent: Intent) {
+        val level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
+        val scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, 100)
+        if (level < 0 || scale <= 0) return
+        val fraction = level / scale.toFloat()
+        val status = intent.getIntExtra(BatteryManager.EXTRA_STATUS, BatteryManager.BATTERY_STATUS_UNKNOWN)
+        val charging = status == BatteryManager.BATTERY_STATUS_CHARGING || status == BatteryManager.BATTERY_STATUS_FULL
+        val low = !charging && fraction <= LOW_BATTERY
+        batteryBar.update(fraction, charging, low)
+        batteryText.text = NumberFormat.getPercentInstance().format(fraction.toDouble())
+        batteryText.setTextColor(pressable(if (low) Palette.LOW else Palette.SECONDARY))
+    }
+
+    private fun applyStatusBar() {
+        val controller = window.insetsController ?: return
+        if (prefs.hideStatusBar) {
+            controller.systemBarsBehavior = WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            controller.hide(WindowInsets.Type.statusBars())
+        } else {
+            controller.show(WindowInsets.Type.statusBars())
+        }
     }
 
     private fun renderFavorites(scale: Float) {
@@ -289,7 +366,10 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
     }
 
     override fun onLongPressEmpty() {
-        startActivity(Intent(this, SettingsActivity::class.java))
+        startActivity(
+            Intent(this, SettingsActivity::class.java),
+            ActivityOptions.makeCustomAnimation(this, R.anim.rise_in, R.anim.hold).toBundle(),
+        )
     }
 
     // Drawer callbacks ----------------------------------------------------------
@@ -422,5 +502,6 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
 
     private companion object {
         const val MAX_FAVORITES = 8
+        const val LOW_BATTERY = 0.15f
     }
 }
