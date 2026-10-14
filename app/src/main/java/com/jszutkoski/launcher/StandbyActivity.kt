@@ -38,6 +38,7 @@ open class StandbyActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         openCount++
+        Prefs(this).logStandby("standby opened (${if (this is StandbyOverAppsActivity) "over apps" else "from home"})")
         setShowWhenLocked(true)
         edgeToEdge()
         view = StandbyView(this, ::leave)
@@ -68,6 +69,7 @@ open class StandbyActivity : Activity() {
 
     override fun onDestroy() {
         openCount--
+        Prefs(this).logStandby("standby closed")
         unregisterReceiver(batteryReceiver)
         unregisterReceiver(unlockReceiver)
         super.onDestroy()
@@ -129,7 +131,8 @@ open class StandbyActivity : Activity() {
                 context.startActivity(
                     Intent(context, StandbyOverAppsActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
                 )
-            } catch (_: RuntimeException) {
+            } catch (e: RuntimeException) {
+                Prefs(context).logStandby("could not open: ${e.javaClass.simpleName}")
             }
         }
 

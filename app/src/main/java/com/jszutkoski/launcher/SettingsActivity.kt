@@ -96,6 +96,17 @@ class SettingsActivity : Activity() {
             setEnabled = { prefs.standbyOnWake = it },
             grant = { SystemActions.openAccessibility(this) },
         )
+        // What happened on recent wakes: tells a blocked start from a missing screen-off signal.
+        if (prefs.standbyOnWake && prefs.standbyLog.isNotEmpty()) {
+            content.addView(
+                text(prefs.standbyLog.joinToString("\n"), 12f, Palette.TERTIARY, 400).apply {
+                    isSingleLine = false
+                    typeface = android.graphics.Typeface.MONOSPACE
+                    setLineSpacing(dp(3f), 1f)
+                    setPadding(0, 0, 0, dp(14))
+                },
+            )
+        }
         permissionRow(
             title = "Screen time",
             description = "Today's time in apps, under the date",

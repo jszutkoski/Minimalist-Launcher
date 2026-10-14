@@ -28,7 +28,10 @@ class Prefs(context: Context) {
 
     /** Calls [listener] after any setting, name or pinned app changes, in this or another screen. */
     fun onChange(listener: () -> Unit) {
-        val wrapped = SharedPreferences.OnSharedPreferenceChangeListener { _, _ -> listener() }
+        val wrapped = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            // The diagnostic log changes on every screen off; nothing on screen depends on it.
+            if (key != KEY_STANDBY_LOG) listener()
+        }
         changeListener = wrapped
         prefs.registerOnSharedPreferenceChangeListener(wrapped)
         names.registerOnSharedPreferenceChangeListener(wrapped)
@@ -99,6 +102,16 @@ class Prefs(context: Context) {
         get() = prefs.getBoolean(KEY_STANDBY_ON_WAKE, false)
         set(value) = prefs.edit().putBoolean(KEY_STANDBY_ON_WAKE, value).apply()
 
+    /** Recent standby events, newest first, shown in Settings to tell what happened on a wake. */
+    val standbyLog: List<String>
+        get() = prefs.getString(KEY_STANDBY_LOG, null)?.split('\n')?.filter { it.isNotEmpty() }.orEmpty()
+
+    fun logStandby(event: String) {
+        val time = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.ROOT).format(java.util.Date())
+        val lines = (listOf("$time  $event") + standbyLog).take(STANDBY_LOG_LINES)
+        prefs.edit().putString(KEY_STANDBY_LOG, lines.joinToString("\n")).apply()
+    }
+
     /** App chosen for a bottom icon, or null for that slot's default. */
     fun dockApp(slot: Int): String? = prefs.getString("$KEY_DOCK$slot", null)
 
@@ -129,5 +142,7 @@ class Prefs(context: Context) {
         const val KEY_DOCK = "dock_"
         const val KEY_STANDBY = "standby"
         const val KEY_STANDBY_ON_WAKE = "standby_on_wake"
+        const val KEY_STANDBY_LOG = "standby_log"
+        const val STANDBY_LOG_LINES = 8
     }
 }

@@ -19,13 +19,23 @@ import android.view.accessibility.AccessibilityEvent
 class LockService : AccessibilityService() {
     private val screenOff = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
-            if (Prefs(context).standbyOnWake && !inCall()) StandbyActivity.startOnTop(context)
+            val prefs = Prefs(context)
+            if (!prefs.standbyOnWake) return
+            when {
+                inCall() -> prefs.logStandby("screen off, in a call: skipped")
+                StandbyActivity.openCount > 0 -> prefs.logStandby("screen off, standby already open")
+                else -> {
+                    prefs.logStandby("screen off, opening standby")
+                    StandbyActivity.startOnTop(context)
+                }
+            }
         }
     }
     private var listening = false
 
     override fun onServiceConnected() {
         instance = this
+        Prefs(this).logStandby("accessibility service on")
         // A system broadcast; only a receiver registered at runtime gets it.
         registerReceiver(screenOff, IntentFilter(Intent.ACTION_SCREEN_OFF))
         listening = true
