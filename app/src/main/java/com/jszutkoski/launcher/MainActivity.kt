@@ -29,7 +29,6 @@ import android.view.WindowManager
 import android.view.animation.PathInterpolator
 import android.view.inputmethod.EditorInfo
 import android.widget.EditText
-import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.Space
@@ -59,8 +58,11 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
     private lateinit var dateRow: LinearLayout
     private lateinit var topSpace: Space
     private lateinit var bottomSpace: Space
-    private lateinit var whatsApp: ImageView
+    private lateinit var shortcuts: List<DockShortcut>
     private lateinit var camera: ImageView
+
+    /** A bottom icon that opens the first installed app among [packages]. */
+    private class DockShortcut(val packages: List<String>, val icon: ImageView)
     private lateinit var drawer: AppDrawerView
 
     private var progress = 0f
@@ -165,7 +167,12 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
             setPadding(0, dp(12), 0, dp(12))
             setOnClickListener { SystemActions.requestDefaultHome(this@MainActivity) }
         }
-        whatsApp = dockIcon(R.drawable.ic_chat, "WhatsApp")
+        shortcuts = listOf(
+            DockShortcut(listOf("com.whatsapp", "com.whatsapp.w4b"), dockIcon(R.drawable.ic_chat, "WhatsApp")),
+            DockShortcut(listOf("com.waze"), dockIcon(R.drawable.ic_waze, "Waze")),
+            DockShortcut(listOf("com.google.android.apps.photos"), dockIcon(R.drawable.ic_photos, "Google Photos")),
+            DockShortcut(listOf("com.spotify.music"), dockIcon(R.drawable.ic_spotify, "Spotify")),
+        )
         camera = dockIcon(R.drawable.ic_camera, "Camera").apply {
             setOnClickListener { SystemActions.openCamera(this@MainActivity, it) }
         }
@@ -178,7 +185,7 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         clockBlock.addView(
             batteryBar,
             LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, wrap).apply {
-                topMargin = dp(10)
+                topMargin = dp(12)
                 bottomMargin = dp(4)
             },
         )
@@ -198,12 +205,21 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
 
         // Two line icons in the bottom corners, their glyphs lined up with the text margin.
         val iconInset = dp(DOCK_ICON_PADDING_DP)
-        // A frame rather than a row: each icon is pinned to its own corner whether or
-        // not "Set as home app" is showing between them.
-        val dock = FrameLayout(this).apply {
-            addView(whatsApp, FrameLayout.LayoutParams(wrap, wrap, Gravity.START or Gravity.CENTER_VERTICAL))
-            addView(setDefault, FrameLayout.LayoutParams(wrap, wrap, Gravity.CENTER))
-            addView(camera, FrameLayout.LayoutParams(wrap, wrap, Gravity.END or Gravity.CENTER_VERTICAL))
+        home.addView(
+            setDefault,
+            LinearLayout.LayoutParams(wrap, wrap).apply {
+                gravity = Gravity.CENTER_HORIZONTAL
+                bottomMargin = dp(8)
+            },
+        )
+        // WhatsApp and the camera in the corners, the others spread evenly between them.
+        val dock = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            (shortcuts.map { it.icon } + camera).forEachIndexed { index, icon ->
+                if (index > 0) addView(Space(context), LinearLayout.LayoutParams(0, 0, 1f))
+                addView(icon)
+            }
         }
         home.addView(
             dock,
@@ -236,10 +252,10 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
 
     private fun render() {
         val scale = prefs.textSize.scale
-        clock.setTextSize(TypedValue.COMPLEX_UNIT_SP, 80f * scale)
-        date.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f * scale)
-        batteryDot.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f * scale)
-        batteryText.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f * scale)
+        clock.setTextSize(TypedValue.COMPLEX_UNIT_SP, 92f * scale)
+        date.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f * scale)
+        batteryDot.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f * scale)
+        batteryText.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f * scale)
         renderFavorites(scale)
         renderDock()
         setDefault.visibility = if (SystemActions.isDefaultHome(this)) View.GONE else View.VISIBLE
@@ -282,15 +298,17 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
     }
 
     private fun renderDock() {
-        val app = WHATSAPP_PACKAGES.firstNotNullOfOrNull { pkg ->
-            repo.apps.filter { it.component.packageName == pkg }.minByOrNull { if (it.user == Process.myUserHandle()) 0 else 1 }
-        }
-        // Keeps its place when WhatsApp is missing, so the camera never jumps to the middle.
-        whatsApp.visibility = if (app != null) View.VISIBLE else View.INVISIBLE
-        whatsApp.setOnClickListener { view -> app?.let { launch(it, view) } }
-        whatsApp.setOnLongClickListener {
-            app?.let(::showActions)
-            app != null
+        shortcuts.forEach { shortcut ->
+            val app = shortcut.packages.firstNotNullOfOrNull { pkg ->
+                repo.apps.filter { it.component.packageName == pkg }.minByOrNull { if (it.user == Process.myUserHandle()) 0 else 1 }
+            }
+            // A missing app leaves an empty slot, so the other icons never shift.
+            shortcut.icon.visibility = if (app != null) View.VISIBLE else View.INVISIBLE
+            shortcut.icon.setOnClickListener { view -> app?.let { launch(it, view) } }
+            shortcut.icon.setOnLongClickListener {
+                app?.let(::showActions)
+                app != null
+            }
         }
     }
 
@@ -555,6 +573,5 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         const val MAX_FAVORITES = 8
         const val LOW_BATTERY = 0.15f
         const val DOCK_ICON_PADDING_DP = 14
-        val WHATSAPP_PACKAGES = listOf("com.whatsapp", "com.whatsapp.w4b")
     }
 }

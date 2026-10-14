@@ -11,7 +11,7 @@ import android.view.View
  * It breathes slowly while charging and turns red when the battery runs low.
  */
 class BatteryBar(context: Context) : View(context) {
-    private val thickness = context.dp(2f)
+    private val thickness = context.dp(3f)
     private val trackPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Palette.TRACK }
     private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private var level = 1f
