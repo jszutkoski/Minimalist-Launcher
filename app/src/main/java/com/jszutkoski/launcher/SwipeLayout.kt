@@ -18,8 +18,6 @@ class SwipeLayout(context: Context) : FrameLayout(context) {
         fun onDrawerDrag(progress: Float)
         fun onDrawerRelease(open: Boolean)
         fun onSwipeDown()
-        fun onSwipeLeft()
-        fun onSwipeRight()
         fun onLongPressEmpty()
     }
 
@@ -102,9 +100,7 @@ class SwipeLayout(context: Context) : FrameLayout(context) {
     private fun release(ev: MotionEvent) {
         val tracker = velocity
         tracker?.computeCurrentVelocity(1000)
-        val vx = tracker?.xVelocity ?: 0f
         val vy = tracker?.yVelocity ?: 0f
-        val dx = ev.x - downX
         val dy = ev.y - downY
         when (mode) {
             Mode.UP -> {
@@ -112,10 +108,8 @@ class SwipeLayout(context: Context) : FrameLayout(context) {
                 listener?.onDrawerRelease(vy < -fling || (vy < fling && progress > 0.3f))
             }
             Mode.DOWN -> if (dy > swipeDistance || vy > fling) listener?.onSwipeDown()
-            Mode.SIDE -> if (abs(dx) > swipeDistance || abs(vx) > fling) {
-                if (dx < 0) listener?.onSwipeLeft() else listener?.onSwipeRight()
-            }
-            Mode.NONE -> Unit
+            // Sideways movement only cancels a long-press; it has no action of its own.
+            Mode.SIDE, Mode.NONE -> Unit
         }
         finish()
     }

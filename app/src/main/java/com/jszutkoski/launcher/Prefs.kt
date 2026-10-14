@@ -40,6 +40,11 @@ class Prefs(context: Context) {
         get() = prefs.getBoolean(KEY_HIDE_STATUS_BAR, false)
         set(value) = prefs.edit().putBoolean(KEY_HIDE_STATUS_BAR, value).apply()
 
+    /** Pinned apps centred on the home screen, or left aligned near the thumb. */
+    var centerFavorites: Boolean
+        get() = prefs.getBoolean(KEY_CENTER_FAVORITES, true)
+        set(value) = prefs.edit().putBoolean(KEY_CENTER_FAVORITES, value).apply()
+
     fun customName(key: String): String? = names.getString(key, null)
 
     fun setCustomName(key: String, name: String?) {
@@ -55,5 +60,6 @@ class Prefs(context: Context) {
         const val KEY_AUTO_LAUNCH = "auto_launch"
         const val KEY_SHOW_KEYBOARD = "show_keyboard"
         const val KEY_HIDE_STATUS_BAR = "hide_status_bar"
+        const val KEY_CENTER_FAVORITES = "center_favorites"
     }
 }

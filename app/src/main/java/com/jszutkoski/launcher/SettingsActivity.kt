@@ -67,6 +67,9 @@ class SettingsActivity : Activity() {
         row("Keyboard with app list", onOff(prefs.showKeyboard), "Start typing as soon as the list opens") {
             prefs.showKeyboard = !prefs.showKeyboard
         }
+        row("Pinned apps", if (prefs.centerFavorites) "Centred" else "Left aligned") {
+            prefs.centerFavorites = !prefs.centerFavorites
+        }
         row("Hide status bar", onOff(prefs.hideStatusBar), "On the home screen. Swipe from the top edge to see it briefly") {
             prefs.hideStatusBar = !prefs.hideStatusBar
         }
@@ -80,7 +83,6 @@ class SettingsActivity : Activity() {
         content.addView(
             text(
                 "Swipe up for apps · down for notifications\n" +
-                    "Swipe left for camera · right for phone\n" +
                     "Long-press empty space for settings",
                 14f,
                 Palette.TERTIARY,

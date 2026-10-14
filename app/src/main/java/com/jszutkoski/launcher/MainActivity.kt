@@ -16,6 +16,7 @@ import android.net.Uri
 import android.os.BatteryManager
 import android.os.Build
 import android.os.Bundle
+import android.os.Process
 import android.text.InputType
 import android.text.format.DateFormat
 import android.util.TypedValue
@@ -29,6 +30,7 @@ import android.view.WindowManager
 import android.view.animation.PathInterpolator
 import android.view.inputmethod.EditorInfo
 import android.widget.EditText
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.Space
 import android.widget.TextClock
@@ -54,6 +56,10 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
     private lateinit var batteryDot: TextView
     private lateinit var favorites: LinearLayout
     private lateinit var setDefault: TextView
+    private lateinit var topSpace: Space
+    private lateinit var bottomSpace: Space
+    private lateinit var whatsApp: ImageView
+    private lateinit var camera: ImageView
     private lateinit var drawer: AppDrawerView
 
     private var progress = 0f
@@ -154,8 +160,13 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         }
         favorites = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         setDefault = text("Set as home app", 14f, Palette.SECONDARY, 400).apply {
+            gravity = Gravity.CENTER
             setPadding(0, dp(12), 0, dp(12))
             setOnClickListener { SystemActions.requestDefaultHome(this@MainActivity) }
+        }
+        whatsApp = dockIcon(R.drawable.ic_chat, "WhatsApp")
+        camera = dockIcon(R.drawable.ic_camera, "Camera").apply {
+            setOnClickListener { SystemActions.openCamera(this@MainActivity, it) }
         }
 
         val wrap = ViewGroup.LayoutParams.WRAP_CONTENT
@@ -178,9 +189,28 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         }
         home.addView(clockBlock, LinearLayout.LayoutParams(wrap, wrap))
         home.addView(dateRow, LinearLayout.LayoutParams(wrap, wrap))
-        home.addView(Space(this), LinearLayout.LayoutParams(0, 0, 1f))
+        topSpace = Space(this)
+        bottomSpace = Space(this)
+        home.addView(topSpace, LinearLayout.LayoutParams(0, 0, 1f))
         home.addView(favorites, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, wrap))
-        home.addView(setDefault, LinearLayout.LayoutParams(wrap, wrap).apply { topMargin = dp(28) })
+        home.addView(bottomSpace, LinearLayout.LayoutParams(0, dp(28)))
+
+        // Two line icons in the bottom corners, their glyphs lined up with the text margin.
+        val iconInset = dp(DOCK_ICON_PADDING_DP)
+        val dock = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            addView(whatsApp)
+            addView(setDefault, LinearLayout.LayoutParams(0, wrap, 1f))
+            addView(camera)
+        }
+        home.addView(
+            dock,
+            LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, wrap).apply {
+                leftMargin = -iconInset
+                rightMargin = -iconInset
+            },
+        )
         root.addView(home)
 
         drawer = AppDrawerView(this, this).apply {
@@ -210,6 +240,7 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         batteryDot.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f * scale)
         batteryText.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f * scale)
         renderFavorites(scale)
+        renderDock()
         setDefault.visibility = if (SystemActions.isDefaultHome(this)) View.GONE else View.VISIBLE
 
         drawer.textScale = scale
@@ -240,13 +271,44 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         }
     }
 
+    private fun dockIcon(drawable: Int, description: String) = ImageView(this).apply {
+        setImageResource(drawable)
+        imageTintList = pressable(Palette.TEXT)
+        contentDescription = description
+        isClickable = true
+        val inset = dp(DOCK_ICON_PADDING_DP)
+        setPadding(inset, inset, inset, inset)
+    }
+
+    private fun renderDock() {
+        val app = WHATSAPP_PACKAGES.firstNotNullOfOrNull { pkg ->
+            repo.apps.filter { it.component.packageName == pkg }.minByOrNull { if (it.user == Process.myUserHandle()) 0 else 1 }
+        }
+        // Keeps its place when WhatsApp is missing, so the camera never jumps to the middle.
+        whatsApp.visibility = if (app != null) View.VISIBLE else View.INVISIBLE
+        whatsApp.setOnClickListener { view -> app?.let { launch(it, view) } }
+        whatsApp.setOnLongClickListener {
+            app?.let(::showActions)
+            app != null
+        }
+    }
+
     private fun renderFavorites(scale: Float) {
         favorites.removeAllViews()
+        val center = prefs.centerFavorites
+        val alignment = if (center) Gravity.CENTER_HORIZONTAL else Gravity.START
+        favorites.gravity = alignment
+        // Centred: in the middle of the free space. Left aligned: down near the thumb.
+        bottomSpace.layoutParams = (bottomSpace.layoutParams as LinearLayout.LayoutParams).apply {
+            weight = if (center) 1f else 0f
+            height = if (center) 0 else dp(28)
+        }
         val apps = prefs.favorites.mapNotNull(repo::find)
         if (apps.isEmpty()) {
             if (repo.loaded) {
                 favorites.addView(
                     text("Swipe up for your apps.\nLong-press one to keep it here.", 17f * scale, Palette.SECONDARY).apply {
+                        gravity = alignment
                         isSingleLine = false
                         setLineSpacing(dp(6f), 1f)
                     },
@@ -353,16 +415,6 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
     override fun onSwipeDown() {
         root.performHapticFeedback(HapticFeedbackConstants.GESTURE_END)
         SystemActions.expandNotifications(this)
-    }
-
-    override fun onSwipeLeft() {
-        root.performHapticFeedback(HapticFeedbackConstants.GESTURE_END)
-        SystemActions.openCamera(this)
-    }
-
-    override fun onSwipeRight() {
-        root.performHapticFeedback(HapticFeedbackConstants.GESTURE_END)
-        SystemActions.openDialer(this)
     }
 
     override fun onLongPressEmpty() {
@@ -503,5 +555,7 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
     private companion object {
         const val MAX_FAVORITES = 8
         const val LOW_BATTERY = 0.15f
+        const val DOCK_ICON_PADDING_DP = 14
+        val WHATSAPP_PACKAGES = listOf("com.whatsapp", "com.whatsapp.w4b")
     }
 }

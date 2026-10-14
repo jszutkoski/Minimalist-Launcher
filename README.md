@@ -3,17 +3,17 @@
 A quiet, text-only Android home screen. Black background, a clock, the few apps
 you actually use, and everything else one swipe away.
 
-No icons, no widgets, no ads, no tracking, no internet permission.
+No app icons, no widgets, no ads, no tracking, no internet permission.
 
 ## What it does
 
 | | |
 |---|---|
-| **Home** | Clock, a battery line as wide as the time, then the date and battery percentage. Up to 8 pinned apps near your thumb. Tap the clock for alarms, the date for your calendar, the battery for battery usage. The line breathes while charging and turns red below 15%. |
+| **Home** | Clock, a battery line as wide as the time, then the date and battery percentage. Up to 8 pinned apps, centred or left aligned. WhatsApp and camera icons in the bottom corners. Tap the clock for alarms, the date for your calendar, the battery for battery usage. The line breathes while charging and turns red below 15%. |
 | **App list** | Swipe up. The keyboard opens and search starts as you type; when only one app matches, it opens on its own. Press *Go* to open the top match. Accents are ignored, so `camera` finds *Câmera*. |
 | **Long-press an app** | Add to home, remove, reorder, rename, hide, app info, uninstall. |
-| **Gestures** | Swipe down for notifications, left for the camera, right for the phone. The camera and phone slide in from the side your finger moves toward. Drag the list down (or press back) to close it. |
-| **Settings** | Long-press empty space on the home screen: text size, auto-open, keyboard, hiding the status bar, hidden apps, default home app. |
+| **Gestures** | Swipe up for the app list, down for notifications. Drag the list down (or press back) to close it. |
+| **Settings** | Long-press empty space on the home screen: text size, auto-open, keyboard, pinned app alignment, hiding the status bar, hidden apps, default home app. |
 
 ## Install on your phone
 

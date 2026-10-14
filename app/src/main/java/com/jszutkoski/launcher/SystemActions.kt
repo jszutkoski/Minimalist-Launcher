@@ -12,6 +12,7 @@ import android.provider.AlarmClock
 import android.provider.CalendarContract
 import android.provider.MediaStore
 import android.provider.Settings
+import android.view.View
 
 object SystemActions {
     /** There is no public API for this; every third-party launcher uses the same call. */
@@ -24,18 +25,11 @@ object SystemActions {
         }
     }
 
-    /** Swipe left: the camera slides in from the right, following the finger. */
-    fun openCamera(activity: Activity) = start(
+    /** The camera grows out of the icon that was tapped. */
+    fun openCamera(activity: Activity, source: View) = start(
         activity,
         Intent(MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA),
-        ActivityOptions.makeCustomAnimation(activity, R.anim.slide_in_right, R.anim.home_out_left).toBundle(),
-    )
-
-    /** Swipe right: the phone slides in from the left, following the finger. */
-    fun openDialer(activity: Activity) = start(
-        activity,
-        Intent(Intent.ACTION_DIAL),
-        ActivityOptions.makeCustomAnimation(activity, R.anim.slide_in_left, R.anim.home_out_right).toBundle(),
+        ActivityOptions.makeScaleUpAnimation(source, 0, 0, source.width, source.height).toBundle(),
     )
 
     fun openBatteryUsage(activity: Activity) = start(activity, Intent(Intent.ACTION_POWER_USAGE_SUMMARY))
