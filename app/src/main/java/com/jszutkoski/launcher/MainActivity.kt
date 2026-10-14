@@ -278,6 +278,14 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         batteryText.setTextColor(pressable(if (low) Palette.LOW else Palette.SECONDARY))
     }
 
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        // The notification shade only takes focus away; it never pauses this activity, so
+        // onResume doesn't run when it closes. Without this, the status bar it brought along
+        // lingers until the system's own transient-bar timeout hides it.
+        if (hasFocus) applyStatusBar()
+    }
+
     private fun applyStatusBar() {
         val controller = window.insetsController ?: return
         if (prefs.hideStatusBar) {
