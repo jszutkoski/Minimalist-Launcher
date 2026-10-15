@@ -17,6 +17,7 @@ import android.net.Uri
 import android.os.BatteryManager
 import android.os.Build
 import android.os.Bundle
+import android.os.PowerManager
 import android.text.InputType
 import android.text.format.DateFormat
 import android.util.TypedValue
@@ -116,6 +117,7 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
 
     override fun onResume() {
         super.onResume()
+        inFront = true
         // Only rebuilt when a setting, name or pinned app changed since the last time, so
         // coming back from an app costs next to nothing before home can draw.
         if (stale) render()
@@ -137,6 +139,8 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
 
     override fun onStop() {
         super.onStop()
+        // Stopped because the screen went off: home is still what the user was looking at.
+        inFront = getSystemService(PowerManager::class.java)?.isInteractive == false
         unregisterReceiver(batteryReceiver)
         unregisterReceiver(alarmReceiver)
         nowPlaying.stop()
@@ -742,9 +746,13 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         input.requestFocus()
     }
 
-    private companion object {
-        const val MAX_FAVORITES = 8
-        const val STANDBY_DELAY_MS = 20_000L
-        const val DAY_MS = 24 * 60 * 60 * 1000L
+    companion object {
+        /** Home was on screen, or was when the screen went off. */
+        var inFront = false
+            private set
+
+        private const val MAX_FAVORITES = 8
+        private const val STANDBY_DELAY_MS = 20_000L
+        private const val DAY_MS = 24 * 60 * 60 * 1000L
     }
 }

@@ -10,6 +10,7 @@ import android.content.IntentFilter
 import android.os.BatteryManager
 import android.os.Build
 import android.os.Bundle
+import android.os.PowerManager
 import android.view.WindowInsets
 import android.view.WindowInsetsController
 import android.view.WindowManager
@@ -26,12 +27,27 @@ open class StandbyActivity : Activity() {
     private lateinit var view: StandbyView
     private var charging = false
     private var closing = false
+    private var unlockAsked = false
+    private var resumed = false
+    private var askOnResume = false
 
     private val batteryReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) = updateBattery(intent)
     }
 
     /** Unlocked with the fingerprint or face while showing: the phone is wanted, so step aside. */
+    /**
+     * The screen just lit up over the lock screen. While standby covers it, Android keeps the
+     * fingerprint sensor off; asking to unlock right away brings it up with no extra tap.
+     */
+    private val screenOn = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            if (!Prefs(context).fingerprintOnWake) return
+            // The unlock prompt needs standby on screen; the broadcast can arrive just before.
+            if (resumed) leave() else askOnResume = true
+        }
+    }
+
     private val unlockReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) = close("unlocked")
     }
@@ -60,12 +76,23 @@ open class StandbyActivity : Activity() {
         // Sticky: registering returns the current charge right away.
         registerReceiver(batteryReceiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED))?.let(::updateBattery)
         registerReceiver(unlockReceiver, IntentFilter(Intent.ACTION_USER_PRESENT))
+        registerReceiver(screenOn, IntentFilter(Intent.ACTION_SCREEN_ON))
     }
 
     override fun onResume() {
         super.onResume()
         inFront = true
+        resumed = true
         view.show()
+        if (askOnResume) {
+            askOnResume = false
+            leave()
+        }
+    }
+
+    override fun onPause() {
+        resumed = false
+        super.onPause()
     }
 
     override fun onDestroy() {
@@ -73,6 +100,7 @@ open class StandbyActivity : Activity() {
         if (!closing) Prefs(this).logStandby("standby closed by Android")
         unregisterReceiver(batteryReceiver)
         unregisterReceiver(unlockReceiver)
+        unregisterReceiver(screenOn)
         super.onDestroy()
     }
 
@@ -84,6 +112,8 @@ open class StandbyActivity : Activity() {
      */
     override fun onUserLeaveHint() {
         super.onUserLeaveHint()
+        // With the screen off this is just the launch at screen off, not the user leaving.
+        if (getSystemService(PowerManager::class.java)?.isInteractive == false) return
         inFront = false
         if (this !is StandbyOverAppsActivity) close("left for home")
     }
@@ -102,10 +132,21 @@ open class StandbyActivity : Activity() {
     private fun leave() {
         val keyguard = getSystemService(KeyguardManager::class.java)
         if (keyguard?.isKeyguardLocked == true) {
+            if (unlockAsked) return
+            unlockAsked = true
             keyguard.requestDismissKeyguard(
                 this,
                 object : KeyguardManager.KeyguardDismissCallback() {
-                    override fun onDismissSucceeded() = close("tap, then unlock")
+                    override fun onDismissSucceeded() = close("unlocked from standby")
+
+                    // Back out of the PIN pad: standby stays, and the next tap or wake asks again.
+                    override fun onDismissCancelled() {
+                        unlockAsked = false
+                    }
+
+                    override fun onDismissError() {
+                        unlockAsked = false
+                    }
                 },
             )
         } else {
@@ -145,6 +186,15 @@ open class StandbyActivity : Activity() {
                 context.startActivity(
                     Intent(context, StandbyOverAppsActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
                 )
+            } catch (e: RuntimeException) {
+                Prefs(context).logStandby("could not open: ${e.javaClass.simpleName}")
+            }
+        }
+
+        /** From the screen-off receiver when home was showing: into the home task, on top of home. */
+        fun startOverHome(context: Context) {
+            try {
+                context.startActivity(Intent(context, StandbyActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             } catch (e: RuntimeException) {
                 Prefs(context).logStandby("could not open: ${e.javaClass.simpleName}")
             }

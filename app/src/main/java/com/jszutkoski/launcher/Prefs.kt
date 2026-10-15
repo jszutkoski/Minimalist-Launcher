@@ -102,6 +102,11 @@ class Prefs(context: Context) {
         get() = prefs.getBoolean(KEY_STANDBY_ON_WAKE, false)
         set(value) = prefs.edit().putBoolean(KEY_STANDBY_ON_WAKE, value).apply()
 
+    /** On wake over the lock screen, ask to unlock at once so the fingerprint sensor is ready. */
+    var fingerprintOnWake: Boolean
+        get() = prefs.getBoolean(KEY_FINGERPRINT_ON_WAKE, true)
+        set(value) = prefs.edit().putBoolean(KEY_FINGERPRINT_ON_WAKE, value).apply()
+
     /** Recent standby events, newest first, shown in Settings to tell what happened on a wake. */
     val standbyLog: List<String>
         get() = prefs.getString(KEY_STANDBY_LOG, null)?.split('\n')?.filter { it.isNotEmpty() }.orEmpty()
@@ -155,6 +160,7 @@ class Prefs(context: Context) {
         const val KEY_STANDBY_LOG = "standby_log"
         const val KEY_NOTIFICATION_DOTS = "notification_dots"
         const val KEY_PAUSE_APPS = "pause_apps"
+        const val KEY_FINGERPRINT_ON_WAKE = "fingerprint_on_wake"
         const val STANDBY_LOG_LINES = 8
     }
 }

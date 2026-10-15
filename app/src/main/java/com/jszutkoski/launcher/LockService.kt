@@ -24,8 +24,14 @@ class LockService : AccessibilityService() {
             when {
                 inCall() -> prefs.logStandby("screen off, in a call: skipped")
                 StandbyActivity.inFront -> prefs.logStandby("screen off, standby already showing")
+                // Home was on screen: standby joins the home task, so unlocking fades back to home
+                // instead of the system's sideways task animation.
+                MainActivity.inFront -> {
+                    prefs.logStandby("screen off, opening standby over home")
+                    StandbyActivity.startOverHome(context)
+                }
                 else -> {
-                    prefs.logStandby("screen off, opening standby")
+                    prefs.logStandby("screen off, opening standby over app")
                     StandbyActivity.startOnTop(context)
                 }
             }
