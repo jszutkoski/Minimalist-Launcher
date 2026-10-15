@@ -26,6 +26,7 @@ open class StandbyActivity : Activity() {
     private lateinit var view: StandbyView
     private var charging = false
     private var unlockAsked = false
+    private val notificationsChanged: () -> Unit = { showWaiting() }
 
     private val batteryReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) = updateBattery(intent)
@@ -42,6 +43,8 @@ open class StandbyActivity : Activity() {
         edgeToEdge()
         view = StandbyView(this, ::leave)
         setContentView(view)
+        Notifications.addListener(notificationsChanged)
+        showWaiting()
 
         // No brightness override: the screen would first light up at the system level and
         // then visibly ramp down to it. The half-strength text on black keeps it dim enough.
@@ -68,6 +71,7 @@ open class StandbyActivity : Activity() {
     }
 
     override fun onDestroy() {
+        Notifications.removeListener(notificationsChanged)
         inFront = false
         unregisterReceiver(batteryReceiver)
         unregisterReceiver(unlockReceiver)
@@ -116,6 +120,14 @@ open class StandbyActivity : Activity() {
         }
     }
 
+    /** WhatsApp or email waiting: a glyph each under the date, from the notification listener. */
+    private fun showWaiting() {
+        view.showWaiting(
+            whatsApp = WHATSAPP.any(Notifications::has),
+            email = EMAIL.any(Notifications::has),
+        )
+    }
+
     private fun updateBattery(intent: Intent) {
         val level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
         val scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, 100)
@@ -134,6 +146,15 @@ open class StandbyActivity : Activity() {
     }
 
     companion object {
+        private val WHATSAPP = listOf("com.whatsapp", "com.whatsapp.w4b")
+        private val EMAIL = listOf(
+            "com.google.android.gm",
+            "com.microsoft.office.outlook",
+            "ch.protonmail.android",
+            "com.yahoo.mobile.client.android.mail",
+            "com.samsung.android.email.provider",
+        )
+
         /** Standby screens alive right now, of either kind. */
         /** A standby screen is showing, or was when the screen went off. */
         var inFront = false

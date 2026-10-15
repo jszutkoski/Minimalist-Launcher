@@ -1,11 +1,13 @@
 package com.jszutkoski.launcher
 
 import android.content.Context
+import android.content.res.ColorStateList
 import android.text.format.DateFormat
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.ViewGroup
 import android.widget.FrameLayout
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextClock
 import android.widget.TextView
@@ -20,6 +22,12 @@ class StandbyView(context: Context, private val onExit: () -> Unit) : FrameLayou
     private val battery = BatteryBar(context)
     private val percent: TextView = context.text("", 17f, Palette.SECONDARY, 400)
     private val content = LinearLayout(context)
+    private val chat = glyph(R.drawable.ic_chat, "WhatsApp")
+    private val mail = glyph(R.drawable.ic_mail, "Email")
+    private val waiting = LinearLayout(context).apply {
+        orientation = LinearLayout.HORIZONTAL
+        visibility = GONE
+    }
     private val drift = Runnable { moveContent() }
 
     init {
@@ -70,8 +78,25 @@ class StandbyView(context: Context, private val onExit: () -> Unit) : FrameLayou
             alpha = 0.55f
             addView(clockBlock, LinearLayout.LayoutParams(wrap, wrap))
             addView(dateRow, LinearLayout.LayoutParams(wrap, wrap).apply { topMargin = dp(14) })
+            addView(waiting, LinearLayout.LayoutParams(wrap, wrap).apply { topMargin = dp(22) })
         }
+        waiting.addView(chat)
+        waiting.addView(mail, LinearLayout.LayoutParams(wrap, wrap).apply { leftMargin = dp(22) })
         addView(content, LayoutParams(wrap, wrap, Gravity.CENTER))
+    }
+
+    /** A line glyph for each kind of message waiting; the row goes when there is nothing. */
+    fun showWaiting(whatsApp: Boolean, email: Boolean) {
+        chat.visibility = if (whatsApp) VISIBLE else GONE
+        mail.visibility = if (email) VISIBLE else GONE
+        waiting.visibility = if (whatsApp || email) VISIBLE else GONE
+    }
+
+    private fun glyph(drawable: Int, description: String) = ImageView(context).apply {
+        setImageResource(drawable)
+        imageTintList = ColorStateList.valueOf(Palette.TEXT)
+        contentDescription = description
+        visibility = GONE
     }
 
     fun updateBattery(fraction: Float, charging: Boolean, low: Boolean, label: CharSequence) {
