@@ -25,6 +25,7 @@ import java.text.NumberFormat
 open class StandbyActivity : Activity() {
     private lateinit var view: StandbyView
     private var charging = false
+    private var closing = false
 
     private val batteryReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) = updateBattery(intent)
@@ -32,12 +33,11 @@ open class StandbyActivity : Activity() {
 
     /** Unlocked with the fingerprint or face while showing: the phone is wanted, so step aside. */
     private val unlockReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context, intent: Intent) = finish()
+        override fun onReceive(context: Context, intent: Intent) = close("unlocked")
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        openCount++
         Prefs(this).logStandby("standby opened (${if (this is StandbyOverAppsActivity) "over apps" else "from home"})")
         setShowWhenLocked(true)
         edgeToEdge()
@@ -51,7 +51,7 @@ open class StandbyActivity : Activity() {
             it.hide(WindowInsets.Type.systemBars())
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            onBackInvokedDispatcher.registerOnBackInvokedCallback(OnBackInvokedDispatcher.PRIORITY_DEFAULT) { finish() }
+            onBackInvokedDispatcher.registerOnBackInvokedCallback(OnBackInvokedDispatcher.PRIORITY_DEFAULT) { close("back") }
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             overrideActivityTransition(OVERRIDE_TRANSITION_CLOSE, R.anim.hold, R.anim.fade_out)
@@ -64,25 +64,39 @@ open class StandbyActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
+        inFront = true
         view.show()
     }
 
     override fun onDestroy() {
-        openCount--
-        Prefs(this).logStandby("standby closed")
+        inFront = false
+        if (!closing) Prefs(this).logStandby("standby closed by Android")
         unregisterReceiver(batteryReceiver)
         unregisterReceiver(unlockReceiver)
         super.onDestroy()
     }
 
     /** Home pressed while unlocked: done, rather than lingering in a background task. */
+    /**
+     * Android calls this when the user leaves for home, but also right after standby is put
+     * on top at screen off. The copy over other apps must survive that, or it closes before
+     * the screen ever wakes; it simply waits behind until the next screen off brings it back.
+     */
     override fun onUserLeaveHint() {
         super.onUserLeaveHint()
+        inFront = false
+        if (this !is StandbyOverAppsActivity) close("left for home")
+    }
+
+    /** Every way out goes through here, so the diagnostic log says why standby closed. */
+    private fun close(reason: String) {
+        Prefs(this).logStandby("standby closed: $reason")
+        closing = true
         finish()
     }
 
     @Deprecated("Only reached below Android 13; newer versions use OnBackInvokedCallback.")
-    override fun onBackPressed() = finish()
+    override fun onBackPressed() = close("back")
 
     /** A tap: straight home when unlocked, otherwise through the PIN or fingerprint first. */
     private fun leave() {
@@ -91,11 +105,11 @@ open class StandbyActivity : Activity() {
             keyguard.requestDismissKeyguard(
                 this,
                 object : KeyguardManager.KeyguardDismissCallback() {
-                    override fun onDismissSucceeded() = finish()
+                    override fun onDismissSucceeded() = close("tap, then unlock")
                 },
             )
         } else {
-            finish()
+            close("tap")
         }
     }
 
@@ -118,7 +132,8 @@ open class StandbyActivity : Activity() {
 
     companion object {
         /** Standby screens alive right now, of either kind. */
-        var openCount = 0
+        /** A standby screen is showing, or was when the screen went off. */
+        var inFront = false
             private set
 
         /**
@@ -126,7 +141,6 @@ open class StandbyActivity : Activity() {
          * that app returns after unlocking. Nothing to do if standby is already up.
          */
         fun startOnTop(context: Context) {
-            if (openCount > 0) return
             try {
                 context.startActivity(
                     Intent(context, StandbyOverAppsActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),

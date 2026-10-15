@@ -23,7 +23,7 @@ class LockService : AccessibilityService() {
             if (!prefs.standbyOnWake) return
             when {
                 inCall() -> prefs.logStandby("screen off, in a call: skipped")
-                StandbyActivity.openCount > 0 -> prefs.logStandby("screen off, standby already open")
+                StandbyActivity.inFront -> prefs.logStandby("screen off, standby already showing")
                 else -> {
                     prefs.logStandby("screen off, opening standby")
                     StandbyActivity.startOnTop(context)
