@@ -11,7 +11,6 @@ import android.os.BatteryManager
 import android.os.Build
 import android.os.Bundle
 import android.os.PowerManager
-import android.view.WindowInsets
 import android.view.WindowInsetsController
 import android.view.WindowManager
 import android.window.OnBackInvokedDispatcher
@@ -62,10 +61,10 @@ open class StandbyActivity : Activity() {
 
         // No brightness override: the screen would first light up at the system level and
         // then visibly ramp down to it. The half-strength text on black keeps it dim enough.
-        window.insetsController?.let {
-            it.systemBarsBehavior = WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-            it.hide(WindowInsets.Type.systemBars())
-        }
+        // Bars stay, with dark icons on black: nearly invisible. Hidden bars flash in for a
+        // moment on every wake before Android applies the request again.
+        val dark = WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS or WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS
+        window.insetsController?.setSystemBarsAppearance(dark, dark)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             onBackInvokedDispatcher.registerOnBackInvokedCallback(OnBackInvokedDispatcher.PRIORITY_DEFAULT) { close("back") }
         }
