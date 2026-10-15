@@ -89,6 +89,9 @@ class StandbyView(context: Context, private val onExit: () -> Unit) : FrameLayou
     fun showWaiting(whatsApp: Boolean, email: Boolean) {
         chat.visibility = if (whatsApp) VISIBLE else GONE
         mail.visibility = if (email) VISIBLE else GONE
+        // The gap only between two glyphs: a lone one sits exactly under the centre.
+        (mail.layoutParams as LinearLayout.LayoutParams).leftMargin = if (whatsApp) dp(22) else 0
+        mail.requestLayout()
         waiting.visibility = if (whatsApp || email) VISIBLE else GONE
     }
 
