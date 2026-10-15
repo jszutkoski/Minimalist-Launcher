@@ -1,12 +1,17 @@
 package com.jszutkoski.launcher
 
 import android.app.Activity
+import android.graphics.drawable.ColorDrawable
 import android.os.Build
 import android.os.Bundle
+import android.view.View
 import android.view.ViewGroup
 import android.view.WindowInsets
+import android.widget.ArrayAdapter
 import android.widget.LinearLayout
+import android.widget.ListView
 import android.widget.ScrollView
+import android.widget.TextView
 
 class SettingsActivity : Activity() {
     private lateinit var prefs: Prefs
@@ -117,8 +122,23 @@ class SettingsActivity : Activity() {
             grant = { SystemActions.openUsageAccess(this) },
         )
         permissionRow(
+            title = "Notification dots",
+            description = "A small dot beside apps that have notifications waiting",
+            enabled = prefs.notificationDots,
+            granted = NowPlaying.hasAccess(this),
+            missing = "Tap to allow notification access",
+            setEnabled = { prefs.notificationDots = it },
+            grant = { SystemActions.openNotificationAccess(this) },
+        )
+        val paused = prefs.pauseApps.mapNotNull { repo.find(it)?.label }.sorted()
+        row(
+            "Mindful pause",
+            if (paused.isEmpty()) "Off" else paused.joinToString(", "),
+            "A breath before these apps open. Choose here, or long-press an app → Pause before opening",
+        ) { pickPauseApps() }
+        permissionRow(
             title = "Now playing",
-            description = "The playing song and its controls, under the date",
+            description = "The playing song and its controls, just above the bottom icons",
             enabled = prefs.nowPlaying,
             granted = NowPlaying.hasAccess(this),
             missing = "Tap to allow notification access",
@@ -252,6 +272,40 @@ class SettingsActivity : Activity() {
                     render()
                 }
             }
+        sheet.show()
+    }
+
+    /** Every visible app; tapping one adds or removes it. Chosen apps are bright, the rest dim. */
+    private fun pickPauseApps() {
+        val apps = repo.visibleApps()
+        val chosen = prefs.pauseApps.toMutableSet()
+        val sheet = Sheet(this, "Pause before opening")
+        val list = ListView(this).apply {
+            divider = null
+            selector = ColorDrawable(0)
+            isVerticalScrollBarEnabled = false
+        }
+        val adapter = object : ArrayAdapter<App>(this, 0, apps) {
+            override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
+                val row = convertView as? TextView ?: text("", 19f).apply { setPadding(0, dp(12), 0, dp(12)) }
+                val app = apps[position]
+                row.text = app.label
+                row.setTextColor(pressable(if (app.key in chosen) Palette.TEXT else Palette.TERTIARY))
+                return row
+            }
+        }
+        list.adapter = adapter
+        list.setOnItemClickListener { _, _, position, _ ->
+            val key = apps[position].key
+            if (!chosen.remove(key)) chosen += key
+            prefs.pauseApps = chosen.toSet()
+            adapter.notifyDataSetChanged()
+        }
+        sheet.column.addView(
+            list,
+            LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, (resources.displayMetrics.heightPixels * 0.55f).toInt()),
+        )
+        sheet.dialog.setOnDismissListener { render() }
         sheet.show()
     }
 

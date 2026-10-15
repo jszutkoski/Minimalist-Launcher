@@ -6,6 +6,7 @@ import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
+import android.view.View
 import android.view.ViewGroup
 import android.view.Window
 import android.widget.FrameLayout
@@ -59,6 +60,17 @@ class Sheet(activity: Activity, title: String?) {
                 }
             },
             LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT),
+        )
+    }
+
+    /** A hairline between groups of options. */
+    fun divider() {
+        column.addView(
+            View(context).apply { setBackgroundColor(Palette.TRACK) },
+            LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 1).apply {
+                topMargin = context.dp(8)
+                bottomMargin = context.dp(8)
+            },
         )
     }
 

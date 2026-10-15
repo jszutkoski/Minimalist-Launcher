@@ -9,13 +9,6 @@ import android.media.session.MediaSessionManager
 import android.media.session.PlaybackState
 import android.os.Handler
 import android.os.Looper
-import android.service.notification.NotificationListenerService
-
-/**
- * Exists only so the system will hand this app the list of media sessions;
- * it does nothing with the notifications themselves.
- */
-class MediaListener : NotificationListenerService()
 
 /** Follows whichever app is playing music and reports its title and state. */
 class NowPlaying(private val context: Context, private val onChange: (Track?) -> Unit) {

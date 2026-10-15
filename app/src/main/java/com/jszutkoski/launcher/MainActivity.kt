@@ -5,6 +5,7 @@ import android.animation.AnimatorListenerAdapter
 import android.animation.ValueAnimator
 import android.app.Activity
 import android.app.ActivityOptions
+import android.app.AlarmManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -51,6 +52,11 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
     private lateinit var batteryBar: BatteryBar
     private lateinit var batteryText: TextView
     private lateinit var batteryDot: TextView
+    private lateinit var alarmDot: TextView
+    private lateinit var alarmText: TextView
+    private lateinit var pause: PauseView
+    private var favoriteViews: List<Pair<TextView, App>> = emptyList()
+    private val dotsChanged: () -> Unit = { showDots() }
     private lateinit var favorites: LinearLayout
     private lateinit var setDefault: TextView
     private lateinit var clockBlock: LinearLayout
@@ -89,16 +95,23 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         addDock()
         repo.start()
         nowPlaying = NowPlaying(this, ::showTrack)
+        Notifications.addListener(dotsChanged)
     }
 
     private val batteryReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) = updateBattery(intent)
     }
 
+    private val alarmReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) = updateAlarm()
+    }
+
     override fun onStart() {
         super.onStart()
         // A sticky broadcast: registering returns the current state right away.
         registerReceiver(batteryReceiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED))?.let(::updateBattery)
+        registerReceiver(alarmReceiver, IntentFilter(AlarmManager.ACTION_NEXT_ALARM_CLOCK_CHANGED))
+        updateAlarm()
     }
 
     override fun onResume() {
@@ -125,7 +138,9 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
     override fun onStop() {
         super.onStop()
         unregisterReceiver(batteryReceiver)
+        unregisterReceiver(alarmReceiver)
         nowPlaying.stop()
+        pause.hide(animate = false)
         // Coming back home should always land on the clock, never a stale search.
         closeDrawer(animate = false)
         root.removeCallbacks(idleStandby)
@@ -134,11 +149,13 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         // Home pressed while already home.
+        if (pause.isShowing) cancelPause()
         if (progress > 0f) closeDrawer(animate = true)
     }
 
     override fun onDestroy() {
         repo.stop()
+        Notifications.removeListener(dotsChanged)
         background.shutdownNow()
         super.onDestroy()
     }
@@ -146,7 +163,7 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
     @Deprecated("Only reached below Android 13; newer versions use OnBackInvokedCallback.")
     override fun onBackPressed() {
         // A home screen never finishes itself.
-        if (progress > 0f) closeDrawer(animate = true)
+        if (pause.isShowing) cancelPause() else if (progress > 0f) closeDrawer(animate = true)
     }
 
     private fun buildViews() {
@@ -185,6 +202,19 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
             setPadding(0, dp(10), dp(8), dp(10))
             setOnClickListener { SystemActions.openBatteryUsage(this@MainActivity) }
         }
+        alarmDot = text("·", 15f, Palette.TERTIARY, 400).apply {
+            setPadding(dp(2), dp(10), dp(10), dp(10))
+            visibility = View.GONE
+        }
+        alarmText = text("", 15f, Palette.SECONDARY, 400).apply {
+            letterSpacing = 0.02f
+            setPadding(0, dp(10), dp(8), dp(10))
+            visibility = View.GONE
+            setCompoundDrawablesRelativeWithIntrinsicBounds(R.drawable.ic_alarm, 0, 0, 0)
+            compoundDrawablePadding = dp(5)
+            compoundDrawableTintList = pressable(Palette.SECONDARY)
+            setOnClickListener { SystemActions.openAlarms(this@MainActivity) }
+        }
         favorites = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         setDefault = text("Set as home app", 14f, Palette.SECONDARY, 400).apply {
             gravity = Gravity.CENTER
@@ -216,6 +246,8 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
             addView(date)
             addView(batteryDot)
             addView(batteryText)
+            addView(alarmDot)
+            addView(alarmText)
         }
         home.addView(clockBlock, LinearLayout.LayoutParams(wrap, wrap))
         home.addView(dateRow, LinearLayout.LayoutParams(wrap, wrap))
@@ -242,6 +274,9 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         }
         root.addView(drawer)
 
+        pause = PauseView(this, onOpen = ::openAfterPause, onCancel = ::cancelPause)
+        root.addView(pause)
+
         root.setOnApplyWindowInsetsListener { _, insets ->
             // Ignoring visibility keeps the layout still when the status bar is hidden or peeks in.
             val bars = Insets.max(
@@ -263,8 +298,12 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         date.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f * scale)
         batteryDot.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f * scale)
         batteryText.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f * scale)
+        alarmDot.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f * scale)
+        alarmText.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f * scale)
+        pause.setTextScale(scale)
         renderFavorites(scale)
         dock.render()
+        showDots()
         screenTimeText.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f * scale)
         player.setTextScale(scale)
         setDefault.visibility = if (SystemActions.isDefaultHome(this)) View.GONE else View.VISIBLE
@@ -387,6 +426,7 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
             height = if (center) 0 else dp(28)
         }
         val apps = prefs.favorites.mapNotNull(repo::find)
+        favoriteViews = emptyList()
         if (apps.isEmpty()) {
             if (repo.loaded) {
                 favorites.addView(
@@ -399,19 +439,74 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
             }
             return
         }
-        apps.forEach { app ->
+        favoriteViews = apps.map { app ->
+            val view = text(app.label, 30f * scale).apply {
+                setPadding(0, dp(9), 0, dp(9))
+                compoundDrawablePadding = dp(12)
+                setOnClickListener { launch(app, it) }
+                setOnLongClickListener {
+                    showActions(app)
+                    true
+                }
+            }
             favorites.addView(
-                text(app.label, 30f * scale).apply {
-                    setPadding(0, dp(9), 0, dp(9))
-                    setOnClickListener { launch(app, it) }
-                    setOnLongClickListener {
-                        showActions(app)
-                        true
-                    }
-                },
+                view,
                 LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT),
             )
+            view to app
         }
+    }
+
+    // Notification dots ------------------------------------------------------------
+
+    private fun showDots() {
+        val enabled = prefs.notificationDots && NowPlaying.hasAccess(this)
+        val centred = prefs.centerFavorites
+        favoriteViews.forEach { (view, app) ->
+            val dot = if (enabled && Notifications.has(app.component.packageName)) Dot(this) else null
+            // Centred names get an invisible twin on the other side, so the dot never pulls them off centre.
+            val twin = if (dot != null && centred) Dot(this).apply { shown = false } else null
+            dot?.setBounds(0, 0, dot.intrinsicWidth, dot.intrinsicHeight)
+            twin?.setBounds(0, 0, twin.intrinsicWidth, twin.intrinsicHeight)
+            view.setCompoundDrawablesRelative(twin, null, dot, null)
+        }
+        dock.showDots(enabled)
+    }
+
+    // Next alarm -------------------------------------------------------------------
+
+    /** "6:30" within a day, "Sat 6:30" further out, gone when no alarm is set. */
+    private fun updateAlarm() {
+        val next = getSystemService(AlarmManager::class.java)?.nextAlarmClock?.triggerTime
+        val visible = if (next != null) View.VISIBLE else View.GONE
+        alarmDot.visibility = visible
+        alarmText.visibility = visible
+        if (next == null) return
+        val skeleton = (if (next - System.currentTimeMillis() > DAY_MS) "EEE" else "") +
+            (if (DateFormat.is24HourFormat(this)) "Hm" else "hm")
+        alarmText.text = DateFormat.format(DateFormat.getBestDateTimePattern(Locale.getDefault(), skeleton), next)
+    }
+
+    // Mindful pause ------------------------------------------------------------------
+
+    private fun showPause(app: App) {
+        root.gesturesEnabled = false
+        pause.show(app, null)
+        if (!prefs.screenTime || !ScreenTime.hasAccess(this)) return
+        background.execute {
+            val spent = ScreenTime.today(this, app.component.packageName)
+            runOnUiThread { if (pause.isShowing) pause.setUsage(ScreenTime.format(spent)) }
+        }
+    }
+
+    private fun openAfterPause(app: App) {
+        launchNow(app, pause)
+        // Hidden once home stops, so the app opens over the pause rather than over home.
+    }
+
+    private fun cancelPause() {
+        pause.hide(animate = true)
+        root.gesturesEnabled = progress == 0f
     }
 
     // Drawer animation --------------------------------------------------------
@@ -477,7 +572,7 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
     private fun interceptBack() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
         onBackInvokedDispatcher.registerOnBackInvokedCallback(OnBackInvokedDispatcher.PRIORITY_DEFAULT) {
-            if (progress > 0f) closeDrawer(animate = true)
+            if (pause.isShowing) cancelPause() else if (progress > 0f) closeDrawer(animate = true)
         }
     }
 
@@ -524,7 +619,12 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
 
     // Apps ----------------------------------------------------------------------
 
+    /** Opens an app, through the breathing pause when it is on its list. */
     private fun launch(app: App, source: View) {
+        if (app.key in prefs.pauseApps) showPause(app) else launchNow(app, source)
+    }
+
+    private fun launchNow(app: App, source: View) {
         val bounds = Rect().also { source.getGlobalVisibleRect(it) }
         try {
             launcherApps.startMainActivity(app.component, app.user, bounds, null)
@@ -538,7 +638,9 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
     private fun showActions(app: App) {
         val favoriteKeys = prefs.favorites
         val index = favoriteKeys.indexOf(app.key)
+        val paused = app.key in prefs.pauseApps
         Sheet(this, app.label).apply {
+            addShortcuts(this@MainActivity, app)
             if (index >= 0) {
                 option("Remove from home") { prefs.favorites = favoriteKeys - app.key; render() }
                 if (index > 0) option("Move up") { moveFavorite(app.key, -1) }
@@ -547,6 +649,9 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
                 option("Add to home") { addFavorite(app) }
             }
             option("Rename") { showRename(app) }
+            option(if (paused) "Open without pause" else "Pause before opening") {
+                prefs.pauseApps = if (paused) prefs.pauseApps - app.key else prefs.pauseApps + app.key
+            }
             if (index < 0) option("Hide") { hide(app) }
             option("App info") { launcherApps.startAppDetailsActivity(app.component, app.user, null, null) }
             if (!app.isSystem) option("Uninstall", Palette.SECONDARY) { uninstall(app) }
@@ -640,5 +745,6 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
     private companion object {
         const val MAX_FAVORITES = 8
         const val STANDBY_DELAY_MS = 20_000L
+        const val DAY_MS = 24 * 60 * 60 * 1000L
     }
 }

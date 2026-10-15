@@ -47,6 +47,11 @@ class Dock(
     val iconInset = activity.dp(14)
 
     private val icons = slots.map { icon() }
+    private val dots = icons.map { icon -> Dot(activity, iconInset).also {
+        it.shown = false
+        icon.foreground = it
+    } }
+    private val slotApps = arrayOfNulls<App>(slots.size)
 
     /** Icons spread evenly, the outer two in the corners. */
     val view = LinearLayout(activity).apply {
@@ -63,6 +68,7 @@ class Dock(
             val icon = icons[index]
             val custom = prefs.dockApp(index)?.let(repo::find)
             val app = custom ?: slot.packages.firstNotNullOfOrNull(::installed)
+            slotApps[index] = app
             when {
                 custom != null -> {
                     val glyph = GLYPHS[custom.component.packageName]
@@ -92,8 +98,16 @@ class Dock(
     private fun installed(pkg: String): App? =
         repo.apps.filter { it.component.packageName == pkg }.minByOrNull { if (it.user == Process.myUserHandle()) 0 else 1 }
 
+    /** A dot at the glyph's corner for slots whose app has notifications waiting. */
+    fun showDots(enabled: Boolean) {
+        dots.forEachIndexed { index, dot ->
+            dot.shown = enabled && slotApps[index]?.let { Notifications.has(it.component.packageName) } == true
+        }
+    }
+
     private fun showOptions(index: Int, slot: Slot, app: App?, customised: Boolean) {
         Sheet(activity, app?.label ?: slot.label).apply {
+            if (app != null) addShortcuts(activity, app)
             option("Change app") { pickApp(index) }
             if (customised) option("Back to ${slot.label}") {
                 prefs.setDockApp(index, null)

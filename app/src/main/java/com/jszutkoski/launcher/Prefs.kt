@@ -112,6 +112,16 @@ class Prefs(context: Context) {
         prefs.edit().putString(KEY_STANDBY_LOG, lines.joinToString("\n")).apply()
     }
 
+    /** Small dots beside apps with notifications waiting (needs notification access). */
+    var notificationDots: Boolean
+        get() = prefs.getBoolean(KEY_NOTIFICATION_DOTS, false)
+        set(value) = prefs.edit().putBoolean(KEY_NOTIFICATION_DOTS, value).apply()
+
+    /** Apps that open only after a short breathing pause. */
+    var pauseApps: Set<String>
+        get() = prefs.getStringSet(KEY_PAUSE_APPS, null)?.toSet().orEmpty()
+        set(value) = prefs.edit().putStringSet(KEY_PAUSE_APPS, value).apply()
+
     /** App chosen for a bottom icon, or null for that slot's default. */
     fun dockApp(slot: Int): String? = prefs.getString("$KEY_DOCK$slot", null)
 
@@ -143,6 +153,8 @@ class Prefs(context: Context) {
         const val KEY_STANDBY = "standby"
         const val KEY_STANDBY_ON_WAKE = "standby_on_wake"
         const val KEY_STANDBY_LOG = "standby_log"
+        const val KEY_NOTIFICATION_DOTS = "notification_dots"
+        const val KEY_PAUSE_APPS = "pause_apps"
         const val STANDBY_LOG_LINES = 8
     }
 }

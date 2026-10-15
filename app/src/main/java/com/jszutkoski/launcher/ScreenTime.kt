@@ -18,10 +18,11 @@ object ScreenTime {
     }
 
     /**
-     * Adds up every stretch an app's activity spent in the foreground since midnight.
-     * Time on this home screen is left out: it is the screen you see when not using the phone.
+     * Adds up every stretch an app's activity spent in the foreground since midnight, for one
+     * app or, with [only] null, all of them. Time on this home screen is left out: it is the
+     * screen you see when not using the phone.
      */
-    fun today(context: Context): Long {
+    fun today(context: Context, only: String? = null): Long {
         val usage = context.getSystemService(UsageStatsManager::class.java) ?: return 0
         val start = Calendar.getInstance().apply {
             set(Calendar.HOUR_OF_DAY, 0)
@@ -36,6 +37,7 @@ object ScreenTime {
         while (events.hasNextEvent()) {
             events.getNextEvent(event)
             if (event.packageName == context.packageName) continue
+            if (only != null && event.packageName != only) continue
             val key = "${event.packageName}/${event.className}"
             when (event.eventType) {
                 UsageEvents.Event.ACTIVITY_RESUMED -> resumedAt[key] = event.timeStamp
