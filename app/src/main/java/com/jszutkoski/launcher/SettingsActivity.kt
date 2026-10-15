@@ -101,26 +101,6 @@ class SettingsActivity : Activity() {
             setEnabled = { prefs.standbyOnWake = it },
             grant = { SystemActions.openAccessibility(this) },
         )
-        if (prefs.standbyOnWake) {
-            row(
-                "Fingerprint on wake",
-                onOff(prefs.fingerprintOnWake),
-                "When the screen turns on over the lock screen, ask to unlock straight away so you can " +
-                    "touch the sensor. Off: the clock stays until you tap it. On the charger the screen " +
-                    "stays on, so the clock remains either way",
-            ) { prefs.fingerprintOnWake = !prefs.fingerprintOnWake }
-        }
-        // What happened on recent wakes: tells a blocked start from a missing screen-off signal.
-        if (prefs.standbyOnWake && prefs.standbyLog.isNotEmpty()) {
-            content.addView(
-                text(prefs.standbyLog.joinToString("\n"), 12f, Palette.TERTIARY, 400).apply {
-                    isSingleLine = false
-                    typeface = android.graphics.Typeface.MONOSPACE
-                    setLineSpacing(dp(3f), 1f)
-                    setPadding(0, 0, 0, dp(14))
-                },
-            )
-        }
         permissionRow(
             title = "Screen time",
             description = "Today's time in apps, under the date",

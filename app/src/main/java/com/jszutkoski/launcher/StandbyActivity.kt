@@ -25,35 +25,19 @@ import java.text.NumberFormat
 open class StandbyActivity : Activity() {
     private lateinit var view: StandbyView
     private var charging = false
-    private var closing = false
     private var unlockAsked = false
-    private var resumed = false
-    private var askOnResume = false
 
     private val batteryReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) = updateBattery(intent)
     }
 
     /** Unlocked with the fingerprint or face while showing: the phone is wanted, so step aside. */
-    /**
-     * The screen just lit up over the lock screen. While standby covers it, Android keeps the
-     * fingerprint sensor off; asking to unlock right away brings it up with no extra tap.
-     */
-    private val screenOn = object : BroadcastReceiver() {
-        override fun onReceive(context: Context, intent: Intent) {
-            if (!Prefs(context).fingerprintOnWake) return
-            // The unlock prompt needs standby on screen; the broadcast can arrive just before.
-            if (resumed) leave() else askOnResume = true
-        }
-    }
-
     private val unlockReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context, intent: Intent) = close("unlocked")
+        override fun onReceive(context: Context, intent: Intent) = finish()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        Prefs(this).logStandby("standby opened (${if (this is StandbyOverAppsActivity) "over apps" else "from home"})")
         setShowWhenLocked(true)
         edgeToEdge()
         view = StandbyView(this, ::leave)
@@ -66,7 +50,7 @@ open class StandbyActivity : Activity() {
         val dark = WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS or WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS
         window.insetsController?.setSystemBarsAppearance(dark, dark)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            onBackInvokedDispatcher.registerOnBackInvokedCallback(OnBackInvokedDispatcher.PRIORITY_DEFAULT) { close("back") }
+            onBackInvokedDispatcher.registerOnBackInvokedCallback(OnBackInvokedDispatcher.PRIORITY_DEFAULT) { finish() }
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             overrideActivityTransition(OVERRIDE_TRANSITION_CLOSE, R.anim.hold, R.anim.fade_out)
@@ -75,35 +59,21 @@ open class StandbyActivity : Activity() {
         // Sticky: registering returns the current charge right away.
         registerReceiver(batteryReceiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED))?.let(::updateBattery)
         registerReceiver(unlockReceiver, IntentFilter(Intent.ACTION_USER_PRESENT))
-        registerReceiver(screenOn, IntentFilter(Intent.ACTION_SCREEN_ON))
     }
 
     override fun onResume() {
         super.onResume()
         inFront = true
-        resumed = true
         view.show()
-        if (askOnResume) {
-            askOnResume = false
-            leave()
-        }
-    }
-
-    override fun onPause() {
-        resumed = false
-        super.onPause()
     }
 
     override fun onDestroy() {
         inFront = false
-        if (!closing) Prefs(this).logStandby("standby closed by Android")
         unregisterReceiver(batteryReceiver)
         unregisterReceiver(unlockReceiver)
-        unregisterReceiver(screenOn)
         super.onDestroy()
     }
 
-    /** Home pressed while unlocked: done, rather than lingering in a background task. */
     /**
      * Android calls this when the user leaves for home, but also right after standby is put
      * on top at screen off. The copy over other apps must survive that, or it closes before
@@ -114,18 +84,11 @@ open class StandbyActivity : Activity() {
         // With the screen off this is just the launch at screen off, not the user leaving.
         if (getSystemService(PowerManager::class.java)?.isInteractive == false) return
         inFront = false
-        if (this !is StandbyOverAppsActivity) close("left for home")
-    }
-
-    /** Every way out goes through here, so the diagnostic log says why standby closed. */
-    private fun close(reason: String) {
-        Prefs(this).logStandby("standby closed: $reason")
-        closing = true
-        finish()
+        if (this !is StandbyOverAppsActivity) finish()
     }
 
     @Deprecated("Only reached below Android 13; newer versions use OnBackInvokedCallback.")
-    override fun onBackPressed() = close("back")
+    override fun onBackPressed() = finish()
 
     /** A tap: straight home when unlocked, otherwise through the PIN or fingerprint first. */
     private fun leave() {
@@ -136,9 +99,9 @@ open class StandbyActivity : Activity() {
             keyguard.requestDismissKeyguard(
                 this,
                 object : KeyguardManager.KeyguardDismissCallback() {
-                    override fun onDismissSucceeded() = close("unlocked from standby")
+                    override fun onDismissSucceeded() = finish()
 
-                    // Back out of the PIN pad: standby stays, and the next tap or wake asks again.
+                    // Back out of the PIN pad: standby stays, and the next tap asks again.
                     override fun onDismissCancelled() {
                         unlockAsked = false
                     }
@@ -149,7 +112,7 @@ open class StandbyActivity : Activity() {
                 },
             )
         } else {
-            close("tap")
+            finish()
         }
     }
 
@@ -185,8 +148,8 @@ open class StandbyActivity : Activity() {
                 context.startActivity(
                     Intent(context, StandbyOverAppsActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
                 )
-            } catch (e: RuntimeException) {
-                Prefs(context).logStandby("could not open: ${e.javaClass.simpleName}")
+            } catch (_: RuntimeException) {
+                // No longer allowed to open screens from the background.
             }
         }
 
@@ -194,8 +157,8 @@ open class StandbyActivity : Activity() {
         fun startOverHome(context: Context) {
             try {
                 context.startActivity(Intent(context, StandbyActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-            } catch (e: RuntimeException) {
-                Prefs(context).logStandby("could not open: ${e.javaClass.simpleName}")
+            } catch (_: RuntimeException) {
+                // No longer allowed to open screens from the background.
             }
         }
 
