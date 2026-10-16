@@ -200,7 +200,8 @@ class SettingsActivity : Activity() {
             "Standby while charging",
             onOff(prefs.standbyWhenCharging),
             "A dim bedside clock after 20 seconds on the home screen while charging. " +
-                "Pinch the home screen with two fingers to open it any time; tap to leave",
+                "Pinch the home screen with two fingers to open it any time; tap to leave. " +
+                "It stays lit all night only with Minimalist on in Accessibility",
         ) { prefs.standbyWhenCharging = !prefs.standbyWhenCharging }
         permissionRow(
             title = "Standby on every wake",

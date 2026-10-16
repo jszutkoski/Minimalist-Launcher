@@ -59,8 +59,16 @@ so the APK stays tiny.
 
 ## Signing
 
-`app/personal.keystore` signs every build with the same key, so new builds install
-as updates. It's fine for sideloading onto your own phone. Because the key is in
-the repository, anyone with access to the repository could sign an APK that
-installs over yours, so only install builds from this repository. For Google Play,
-create a separate upload key and keep it out of the repository.
+Release builds are signed with a key kept only in the repository's Actions secrets,
+never in the code:
+
+- `MINIMALIST_KEYSTORE`: the PKCS12 keystore, base64-encoded (alias `minimalist`).
+- `MINIMALIST_KEYSTORE_PASSWORD`: its password (store and key).
+
+CI decodes the key to a temporary file for the build and deletes it afterwards. Keep a
+private backup of the keystore: losing it means uninstalling and reinstalling once.
+
+Until those secrets exist, builds fall back to `app/personal.keystore`, an older key that
+is public in this repository. Anyone could sign an APK with it that installs over yours,
+so it is to be removed once the secret key is in use (switching keys needs one uninstall
+and reinstall). For Google Play, use a separate upload key, also kept out of the repository.

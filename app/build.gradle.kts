@@ -18,14 +18,24 @@ android {
     }
 
     signingConfigs {
-        // A fixed key so every CI build can be installed as an update over the
-        // previous one. For personal sideloading only: Google Play uses its own
-        // upload key, which must be kept out of the repository.
+        // A fixed key so every CI build installs as an update over the previous one.
+        // The release key lives only in the repository's Actions secrets, which CI decodes
+        // to a file; it is never in the code. Until those secrets exist, builds fall back to
+        // the old key below, which is public and so lets anyone sign an "update": it goes
+        // as soon as the secret one is in use.
+        val releaseKey = System.getenv("MINIMALIST_KEYSTORE_FILE")
         create("personal") {
-            storeFile = file("personal.keystore")
-            storePassword = "minimalist"
-            keyAlias = "minimalist"
-            keyPassword = "minimalist"
+            if (releaseKey != null) {
+                storeFile = file(releaseKey)
+                storePassword = System.getenv("MINIMALIST_KEYSTORE_PASSWORD")
+                keyAlias = "minimalist"
+                keyPassword = System.getenv("MINIMALIST_KEYSTORE_PASSWORD")
+            } else {
+                storeFile = file("personal.keystore")
+                storePassword = "minimalist"
+                keyAlias = "minimalist"
+                keyPassword = "minimalist"
+            }
         }
     }
 

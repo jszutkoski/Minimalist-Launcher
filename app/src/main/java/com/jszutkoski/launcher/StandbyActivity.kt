@@ -229,8 +229,12 @@ open class StandbyActivity : Activity() {
         charging = status == BatteryManager.BATTERY_STATUS_CHARGING || status == BatteryManager.BATTERY_STATUS_FULL
         val low = !charging && fraction <= LOW_BATTERY
         view.updateBattery(fraction, charging, low)
-        // Awake all night on the charger; on battery the screen times out as usual.
-        if (charging) {
+        // Awake all night on the charger; on battery the screen times out as usual. Only with
+        // the accessibility service on (or no screen lock at all): without it, a home swipe
+        // can't lock the phone behind standby, so the screen must time out and let Android lock.
+        val canGuard = LockService.isEnabled(this) ||
+            getSystemService(KeyguardManager::class.java)?.isDeviceSecure != true
+        if (charging && canGuard) {
             window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         } else {
             window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
