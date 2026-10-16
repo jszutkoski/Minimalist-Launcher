@@ -104,7 +104,7 @@ class SettingsActivity : Activity() {
         section("Extras")
         permissionRow(
             title = "Weather",
-            description = "Temperature and sky under the date, from Open-Meteo, for your approximate location. Tap it for the forecast",
+            description = "Temperature and sky under the date on the bedside clock, from Open-Meteo, for your approximate location",
             enabled = prefs.weather,
             granted = Weather.hasAccess(this),
             missing = "Tap to allow approximate location",

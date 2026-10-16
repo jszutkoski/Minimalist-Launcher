@@ -75,6 +75,14 @@ open class StandbyActivity : Activity() {
         showWeather()
     }
 
+    override fun onStop() {
+        super.onStop()
+        // Covered by something else with the screen on (a call, an alarm, an app opened from a
+        // notification): no longer in front, so the next screen off must bring it back on top.
+        // Stopped by the screen going off, it is still what the wake will show.
+        if (getSystemService(PowerManager::class.java)?.isInteractive == true) inFront = false
+    }
+
     override fun onDestroy() {
         Notifications.removeListener(notificationsChanged)
         inFront = false
@@ -213,7 +221,6 @@ open class StandbyActivity : Activity() {
             "com.samsung.android.email.provider",
         )
 
-        /** Standby screens alive right now, of either kind. */
         /** A standby screen is showing, or was when the screen went off. */
         var inFront = false
             private set

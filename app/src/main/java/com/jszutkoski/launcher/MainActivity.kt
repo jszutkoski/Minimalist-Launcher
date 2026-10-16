@@ -71,8 +71,6 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
     private lateinit var bottomSpace: Space
     private lateinit var dock: Dock
     private lateinit var screenTimeText: TextView
-    private lateinit var weatherText: TextView
-    private var weatherLoading = false
     private var contactsLoaded = false
     private val contactsObserver = object : ContentObserver(Handler(Looper.getMainLooper())) {
         override fun onChange(selfChange: Boolean) {
@@ -141,7 +139,6 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         // Lookups that can wait for the first frame.
         root.post {
             updateScreenTime()
-            updateWeather()
             loadContacts()
             if (prefs.nowPlaying) nowPlaying.start() else nowPlaying.stop()
         }
@@ -240,14 +237,8 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         screenTimeText = text("", 17f, Palette.SECONDARY, 400).apply {
             letterSpacing = 0.02f
             visibility = View.GONE
-            setPadding(0, dp(8), 0, dp(8))
-            setOnClickListener { SystemActions.openDigitalWellbeing(this@MainActivity) }
-        }
-        weatherText = text("", 17f, Palette.SECONDARY, 400).apply {
-            letterSpacing = 0.02f
-            visibility = View.GONE
             setPadding(0, dp(4), 0, dp(8))
-            setOnClickListener { SystemActions.webSearch(this@MainActivity, "weather") }
+            setOnClickListener { SystemActions.openDigitalWellbeing(this@MainActivity) }
         }
         player = PlayerView(this, ::openPlayer)
 
@@ -271,8 +262,8 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         }
         home.addView(clockBlock, LinearLayout.LayoutParams(wrap, wrap))
         home.addView(dateRow, LinearLayout.LayoutParams(wrap, wrap))
-        // Optional: the weather, on its own line under the date. Screen time sits by the dock.
-        home.addView(weatherText, LinearLayout.LayoutParams(wrap, wrap))
+        // Optional: today's screen time, on its own line under the date. The weather is for standby.
+        home.addView(screenTimeText, LinearLayout.LayoutParams(wrap, wrap))
         topSpace = Space(this)
         bottomSpace = Space(this)
         home.addView(topSpace, LinearLayout.LayoutParams(0, 0, 1f))
@@ -323,8 +314,7 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         renderFavorites(scale)
         dock.render()
         showDots()
-        screenTimeText.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f * scale)
-        weatherText.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f * scale)
+        screenTimeText.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f * scale)
         player.setTextScale(scale)
         setDefault.visibility = if (SystemActions.isDefaultHome(this)) View.GONE else View.VISIBLE
 
@@ -391,7 +381,7 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         }
     }
 
-    /** The player, screen time and the dock go last, below "Set as home app", once the app list exists. */
+    /** The player and the dock go last, below "Set as home app", once the app list exists. */
     private fun addDock() {
         // Away from the clock: the player sits just above the icons, and only while music plays.
         home.addView(
@@ -400,8 +390,6 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
                 bottomMargin = dp(20)
             },
         )
-        // Your own time, right where apps are opened: a quiet reminder, not a headline.
-        home.addView(screenTimeText, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT))
         home.addView(
             dock.view,
             LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
@@ -424,30 +412,6 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
                 screenTimeText.visibility = View.VISIBLE
             }
         }
-    }
-
-    // Weather ------------------------------------------------------------------------
-
-    /** The last reading right away, then a new one when it is over half an hour old. */
-    private fun updateWeather() {
-        if (!prefs.weather || !Weather.hasAccess(this)) {
-            weatherText.visibility = View.GONE
-            return
-        }
-        Weather.cached(this)?.let(::showWeather)
-        if (weatherLoading || Weather.isFresh(this)) return
-        weatherLoading = true
-        Weather.refresh(this) { now ->
-            runOnUiThread {
-                weatherLoading = false
-                if (now != null && prefs.weather) showWeather(now)
-            }
-        }
-    }
-
-    private fun showWeather(now: Weather.Now) {
-        weatherText.text = now.label
-        weatherText.visibility = View.VISIBLE
     }
 
     // Smart search -------------------------------------------------------------------
@@ -534,7 +498,6 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         val center = prefs.centerFavorites
         val alignment = if (center) Gravity.CENTER_HORIZONTAL else Gravity.START
         favorites.gravity = alignment
-        (weatherText.layoutParams as LinearLayout.LayoutParams).gravity = alignment
         (screenTimeText.layoutParams as LinearLayout.LayoutParams).gravity = alignment
         player.setAlignment(alignment)
         // The clock widget follows the same alignment as the pinned apps.
