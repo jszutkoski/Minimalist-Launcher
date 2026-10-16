@@ -135,6 +135,12 @@ object AppSearch {
             .map { it.second }
     }
 
+    /** The query begins the name or one of its words: "ai" or "fome" for aiqfome, never "q". */
+    fun startsWord(app: App, query: String): Boolean {
+        val q = normalize(query.trim())
+        return q.isNotEmpty() && (app.searchKey.startsWith(q) || app.searchKey.contains(" $q"))
+    }
+
     private fun rank(key: String, q: String): Int? = when {
         key.startsWith(q) -> 0
         key.contains(" $q") -> 1

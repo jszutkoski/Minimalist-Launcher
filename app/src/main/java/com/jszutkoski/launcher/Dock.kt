@@ -59,7 +59,8 @@ class Dock(
         gravity = Gravity.CENTER_VERTICAL
         icons.forEachIndexed { index, icon ->
             if (index > 0) addView(Space(context), LinearLayout.LayoutParams(0, 0, 1f))
-            addView(icon)
+            val size = activity.dp(ICON_DP) + 2 * iconInset
+            addView(icon, LinearLayout.LayoutParams(size, size))
         }
     }
 
@@ -153,6 +154,9 @@ class Dock(
     }
 
     private companion object {
+        /** Glyphs are drawn at 26dp and scaled up crisply to this. */
+        const val ICON_DP = 30
+
         /** Apps that have a hand-drawn glyph, whichever slot they are put in. */
         val GLYPHS = mapOf(
             "com.whatsapp" to R.drawable.ic_chat,

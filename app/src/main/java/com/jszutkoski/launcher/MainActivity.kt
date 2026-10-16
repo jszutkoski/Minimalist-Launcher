@@ -36,6 +36,7 @@ import android.view.WindowManager
 import android.view.animation.PathInterpolator
 import android.view.inputmethod.EditorInfo
 import android.widget.EditText
+import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.Space
 import android.widget.TextClock
@@ -46,6 +47,7 @@ import java.text.NumberFormat
 import java.util.Locale
 import java.util.concurrent.Executors
 import kotlin.math.abs
+import kotlin.math.roundToInt
 
 class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
     private lateinit var prefs: Prefs
@@ -58,7 +60,7 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
     private lateinit var date: TextClock
     private lateinit var batteryBar: BatteryBar
     private lateinit var batteryText: TextView
-    private lateinit var batteryDot: TextView
+    private lateinit var batteryTip: FrameLayout
     private lateinit var alarmDot: TextView
     private lateinit var alarmText: TextView
     private lateinit var pause: PauseView
@@ -73,8 +75,6 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
     private lateinit var dock: Dock
     private lateinit var screenTimeText: TextView
     private lateinit var weatherText: TextView
-    private lateinit var infoDot: TextView
-    private lateinit var infoRow: LinearLayout
     private var weatherLoading = false
     private var contactsLoaded = false
     private val contactsObserver = object : ContentObserver(Handler(Looper.getMainLooper())) {
@@ -221,14 +221,21 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
             setPadding(0, dp(10), 0, dp(10))
             setOnClickListener { SystemActions.openCalendar(this@MainActivity) }
         }
-        batteryDot = text("·", 15f, Palette.TERTIARY, 400).apply { setPadding(dp(10), dp(10), dp(10), dp(10)) }
-        batteryText = text("", 15f, Palette.SECONDARY, 400).apply {
-            letterSpacing = 0.02f
-            setPadding(0, dp(10), dp(8), dp(10))
+        // The percentage rides the end of the fill, just under the bar.
+        batteryText = text("", 13f, Palette.SECONDARY, 400).apply {
+            letterSpacing = 0.04f
+            setPadding(dp(6), dp(4), dp(6), dp(4))
             setOnClickListener { SystemActions.openBatteryUsage(this@MainActivity) }
         }
+        batteryBar.follower = batteryText
+        batteryTip = FrameLayout(this).apply {
+            addView(batteryText, FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+            // Its own width or the text's changes: move the label to the fill's end again.
+            addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> placeBatteryTip() }
+        }
+        batteryText.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> placeBatteryTip() }
         alarmDot = text("·", 15f, Palette.TERTIARY, 400).apply {
-            setPadding(dp(2), dp(10), dp(10), dp(10))
+            setPadding(dp(10), dp(10), dp(10), dp(10))
             visibility = View.GONE
         }
         alarmText = text("", 15f, Palette.SECONDARY, 400).apply {
@@ -255,12 +262,8 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         weatherText = text("", 17f, Palette.SECONDARY, 400).apply {
             letterSpacing = 0.02f
             visibility = View.GONE
-            setPadding(0, dp(8), 0, dp(8))
+            setPadding(0, dp(4), 0, dp(8))
             setOnClickListener { SystemActions.webSearch(this@MainActivity, "weather") }
-        }
-        infoDot = text("·", 17f, Palette.TERTIARY, 400).apply {
-            setPadding(dp(10), dp(8), dp(10), dp(8))
-            visibility = View.GONE
         }
         player = PlayerView(this, ::openPlayer)
 
@@ -271,29 +274,25 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         clockBlock.addView(clock, LinearLayout.LayoutParams(wrap, wrap))
         clockBlock.addView(
             batteryBar,
+            LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, wrap).apply { topMargin = dp(16) },
+        )
+        clockBlock.addView(
+            batteryTip,
             LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, wrap).apply {
-                topMargin = dp(16)
-                bottomMargin = dp(14)
+                topMargin = dp(2)
+                bottomMargin = dp(4)
             },
         )
         dateRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             addView(date)
-            addView(batteryDot)
-            addView(batteryText)
             addView(alarmDot)
             addView(alarmText)
         }
         home.addView(clockBlock, LinearLayout.LayoutParams(wrap, wrap))
         home.addView(dateRow, LinearLayout.LayoutParams(wrap, wrap))
-        // Optional: the weather and today's screen time, a quiet line under the date.
-        infoRow = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            addView(weatherText)
-            addView(infoDot)
-            addView(screenTimeText)
-        }
-        home.addView(infoRow, LinearLayout.LayoutParams(wrap, wrap).apply { topMargin = dp(8) })
+        // Optional: the weather, on its own line under the date. Screen time sits by the dock.
+        home.addView(weatherText, LinearLayout.LayoutParams(wrap, wrap))
         topSpace = Space(this)
         bottomSpace = Space(this)
         home.addView(topSpace, LinearLayout.LayoutParams(0, 0, 1f))
@@ -337,17 +336,15 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         val scale = prefs.textSize.scale
         clock.setTextSize(TypedValue.COMPLEX_UNIT_SP, 92f * scale)
         date.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f * scale)
-        batteryDot.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f * scale)
-        batteryText.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f * scale)
+        batteryText.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f * scale)
         alarmDot.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f * scale)
         alarmText.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f * scale)
         pause.setTextScale(scale)
         renderFavorites(scale)
         dock.render()
         showDots()
-        screenTimeText.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f * scale)
+        screenTimeText.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f * scale)
         weatherText.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f * scale)
-        infoDot.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f * scale)
         player.setTextScale(scale)
         setDefault.visibility = if (SystemActions.isDefaultHome(this)) View.GONE else View.VISIBLE
 
@@ -366,14 +363,25 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         val status = intent.getIntExtra(BatteryManager.EXTRA_STATUS, BatteryManager.BATTERY_STATUS_UNKNOWN)
         val charging = status == BatteryManager.BATTERY_STATUS_CHARGING || status == BatteryManager.BATTERY_STATUS_FULL
         val low = !charging && fraction <= LOW_BATTERY
-        val label = NumberFormat.getPercentInstance().format(fraction.toDouble())
         batteryBar.update(fraction, charging, low)
-        batteryText.text = label
+        // Just the number: under the battery bar, it needs no percent sign.
+        batteryText.text = NumberFormat.getIntegerInstance().format((fraction * 100).roundToInt())
+        batteryText.contentDescription = NumberFormat.getPercentInstance().format(fraction.toDouble())
+        placeBatteryTip()
         batteryText.setTextColor(pressable(if (low) Palette.LOW else Palette.SECONDARY))
         if (charging != this.charging) {
             this.charging = charging
             scheduleStandby()
         }
+    }
+
+    /** Centres the percentage under the end of the fill, kept within the bar's ends. */
+    private fun placeBatteryTip() {
+        val track = batteryTip.width
+        val label = batteryText.width
+        if (track == 0 || label == 0) return
+        val x = batteryBar.fraction * track - label / 2f
+        batteryText.translationX = x.coerceIn(0f, (track - label).toFloat().coerceAtLeast(0f))
     }
 
     // Standby ------------------------------------------------------------------
@@ -414,7 +422,7 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         }
     }
 
-    /** The player and the dock go last, below "Set as home app", once the app list exists. */
+    /** The player, screen time and the dock go last, below "Set as home app", once the app list exists. */
     private fun addDock() {
         // Away from the clock: the player sits just above the icons, and only while music plays.
         home.addView(
@@ -423,6 +431,8 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
                 bottomMargin = dp(20)
             },
         )
+        // Your own time, right where apps are opened: a quiet reminder, not a headline.
+        home.addView(screenTimeText, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT))
         home.addView(
             dock.view,
             LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
@@ -436,7 +446,6 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
     private fun updateScreenTime() {
         if (!prefs.screenTime || !ScreenTime.hasAccess(this)) {
             screenTimeText.visibility = View.GONE
-            updateInfoDot()
             return
         }
         background.execute {
@@ -444,7 +453,6 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
             runOnUiThread {
                 screenTimeText.text = "${ScreenTime.format(total)} today"
                 screenTimeText.visibility = View.VISIBLE
-                updateInfoDot()
             }
         }
     }
@@ -455,7 +463,6 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
     private fun updateWeather() {
         if (!prefs.weather || !Weather.hasAccess(this)) {
             weatherText.visibility = View.GONE
-            updateInfoDot()
             return
         }
         Weather.cached(this)?.let(::showWeather)
@@ -472,13 +479,6 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
     private fun showWeather(now: Weather.Now) {
         weatherText.text = now.label
         weatherText.visibility = View.VISIBLE
-        updateInfoDot()
-    }
-
-    /** The dot only between two things. */
-    private fun updateInfoDot() {
-        val both = weatherText.visibility == View.VISIBLE && screenTimeText.visibility == View.VISIBLE
-        infoDot.visibility = if (both) View.VISIBLE else View.GONE
     }
 
     // Smart search -------------------------------------------------------------------
@@ -565,7 +565,8 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         val center = prefs.centerFavorites
         val alignment = if (center) Gravity.CENTER_HORIZONTAL else Gravity.START
         favorites.gravity = alignment
-        (infoRow.layoutParams as LinearLayout.LayoutParams).gravity = alignment
+        (weatherText.layoutParams as LinearLayout.LayoutParams).gravity = alignment
+        (screenTimeText.layoutParams as LinearLayout.LayoutParams).gravity = alignment
         player.setAlignment(alignment)
         // The clock widget follows the same alignment as the pinned apps.
         (clockBlock.layoutParams as LinearLayout.LayoutParams).gravity = alignment

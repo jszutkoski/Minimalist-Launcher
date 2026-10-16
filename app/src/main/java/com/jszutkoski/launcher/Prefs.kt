@@ -4,9 +4,9 @@ import android.content.Context
 import android.content.SharedPreferences
 
 enum class TextSize(val label: String, val scale: Float) {
-    SMALL("Small", 0.86f),
-    DEFAULT("Default", 1f),
-    LARGE("Large", 1.16f),
+    SMALL("Small", 0.95f),
+    DEFAULT("Default", 1.1f),
+    LARGE("Large", 1.26f),
 }
 
 enum class StatusBarMode(val label: String) {

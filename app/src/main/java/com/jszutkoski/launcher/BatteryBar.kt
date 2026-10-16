@@ -20,6 +20,12 @@ class BatteryBar(context: Context) : View(context) {
     private var level = 1f
     private var breathing: ValueAnimator? = null
 
+    /** Fades in step with the fill while charging: the percentage riding the bar's tip. */
+    var follower: View? = null
+
+    /** Where the fill ends, from 0 to 1. */
+    val fraction get() = level
+
     fun update(level: Float, charging: Boolean, low: Boolean) {
         this.level = level.coerceIn(0f, 1f)
         fillPaint.color = if (low) Palette.LOW else Palette.TEXT
@@ -57,6 +63,7 @@ class BatteryBar(context: Context) : View(context) {
             repeatCount = ValueAnimator.INFINITE
             addUpdateListener {
                 fillPaint.alpha = it.animatedValue as Int
+                follower?.alpha = fillPaint.alpha / 255f
                 invalidate()
             }
             if (isAttachedToWindow) start()
@@ -67,5 +74,6 @@ class BatteryBar(context: Context) : View(context) {
         breathing?.cancel()
         breathing = null
         fillPaint.alpha = 255
+        follower?.alpha = 1f
     }
 }

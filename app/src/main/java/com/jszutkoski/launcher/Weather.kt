@@ -8,6 +8,7 @@ import android.icu.util.ULocale
 import android.location.Location
 import android.location.LocationManager
 import android.os.Build
+import android.telephony.TelephonyManager
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URI
@@ -95,7 +96,7 @@ object Weather {
             return null
         }
 
-        val unit = if (fahrenheit()) "fahrenheit" else "celsius"
+        val unit = if (fahrenheit(context)) "fahrenheit" else "celsius"
         val url = String.format(
             Locale.ROOT,
             "https://api.open-meteo.com/v1/forecast?latitude=%.2f&longitude=%.2f&current=temperature_2m,weather_code&temperature_unit=%s",
@@ -123,7 +124,24 @@ object Weather {
         }
     }
 
-    private fun fahrenheit() = LocaleData.getMeasurementSystem(ULocale.getDefault()) == LocaleData.MeasurementSystem.US
+    /**
+     * The temperature unit picked in Android's regional preferences (Android 14+), else the one
+     * of the country the SIM is in. Not the language: a phone in US English in Brazil wants °C.
+     */
+    private fun fahrenheit(context: Context): Boolean {
+        when (Locale.getDefault().getUnicodeLocaleType("mu")) {
+            "fahrenhe" -> return true
+            "celsius", "kelvin" -> return false
+        }
+        val telephony = context.getSystemService(TelephonyManager::class.java)
+        val country = listOfNotNull(telephony?.networkCountryIso, telephony?.simCountryIso)
+            .firstOrNull { it.isNotBlank() }
+            ?.uppercase(Locale.ROOT)
+            ?: return LocaleData.getMeasurementSystem(ULocale.getDefault()) == LocaleData.MeasurementSystem.US
+        return country in FAHRENHEIT_COUNTRIES
+    }
+
+    private val FAHRENHEIT_COUNTRIES = setOf("US", "LR", "MM", "BS", "BZ", "KY", "PW", "FM", "MH")
 
     /** WMO weather codes, as Open-Meteo reports them. */
     private fun describe(code: Int) = when (code) {

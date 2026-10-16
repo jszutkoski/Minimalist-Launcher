@@ -201,11 +201,14 @@ class AppDrawerView(context: Context, private val callbacks: Callbacks) : Linear
             if (q.isNotEmpty()) add(SearchResult.Web(q))
         }
 
-        // Only when the query grew: deleting letters should never launch anything. And only
-        // when the app is the one thing found, not a contact or setting with the same letters.
+        // Only when the query grew: deleting letters should never launch anything. Only from
+        // two letters that begin the name or a word of it, so a question can still be typed.
+        // And only when the app is the one thing found, not a contact or setting.
         val grew = query.length > lastQueryLength
         lastQueryLength = query.length
-        if (fromTyping && grew && autoLaunch && q.isNotEmpty() && found.size == 1 && people.isEmpty() && settings.isEmpty()) {
+        if (fromTyping && grew && autoLaunch && q.length >= 2 && found.size == 1 &&
+            AppSearch.startsWord(found[0], q) && people.isEmpty() && settings.isEmpty()
+        ) {
             callbacks.onLaunch(found[0], search)
         }
     }
