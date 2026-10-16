@@ -70,8 +70,14 @@ class SettingsActivity : Activity() {
         row("Open single match", onOff(prefs.autoLaunch), "Launch an app as soon as the search finds only one") {
             prefs.autoLaunch = !prefs.autoLaunch
         }
-        row("Keyboard with app list", onOff(prefs.showKeyboard), "Start typing as soon as the list opens") {
-            prefs.showKeyboard = !prefs.showKeyboard
+        row("Search only", onOff(prefs.searchOnly), "No app list to scroll: apps appear only as you type their name") {
+            prefs.searchOnly = !prefs.searchOnly
+        }
+        // Search only always brings up the keyboard.
+        if (!prefs.searchOnly) {
+            row("Keyboard with app list", onOff(prefs.showKeyboard), "Start typing as soon as the list opens") {
+                prefs.showKeyboard = !prefs.showKeyboard
+            }
         }
         row("Layout", if (prefs.centerFavorites) "Centred" else "Left aligned", "Clock and pinned apps") {
             prefs.centerFavorites = !prefs.centerFavorites

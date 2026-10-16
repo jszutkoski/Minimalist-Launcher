@@ -314,6 +314,7 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
 
         drawer.textScale = scale
         drawer.autoLaunch = prefs.autoLaunch
+        drawer.searchOnly = prefs.searchOnly
         drawer.setApps(repo.visibleApps())
     }
 
@@ -553,7 +554,8 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
     }
 
     private fun openDrawer() {
-        if (prefs.showKeyboard) drawer.showKeyboard()
+        // An empty list with no keyboard would be a dead end.
+        if (prefs.showKeyboard || prefs.searchOnly) drawer.showKeyboard()
         animateTo(1f)
     }
 

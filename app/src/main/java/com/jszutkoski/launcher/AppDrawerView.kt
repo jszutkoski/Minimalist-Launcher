@@ -36,6 +36,15 @@ class AppDrawerView(context: Context, private val callbacks: Callbacks) : Linear
 
     var autoLaunch = true
 
+    /** Nothing listed until a letter is typed. */
+    var searchOnly = false
+        set(value) {
+            if (field == value) return
+            field = value
+            search.hint = if (value) "Type an app name" else "Search"
+            filter(fromTyping = false)
+        }
+
     var textScale = 1f
         set(value) {
             field = value
@@ -164,9 +173,10 @@ class AppDrawerView(context: Context, private val callbacks: Callbacks) : Linear
 
     private fun filter(fromTyping: Boolean) {
         val query = search.text.toString()
-        val results = AppSearch.filter(apps, query)
+        val waiting = searchOnly && query.isBlank()
+        val results = if (waiting) emptyList() else AppSearch.filter(apps, query)
         adapter.items = results
-        empty.visibility = if (results.isEmpty() && apps.isNotEmpty()) VISIBLE else GONE
+        empty.visibility = if (results.isEmpty() && apps.isNotEmpty() && !waiting) VISIBLE else GONE
 
         // Only when the query grew: deleting letters should never launch anything.
         val grew = query.length > lastQueryLength

@@ -52,6 +52,11 @@ class Prefs(context: Context) {
         get() = prefs.getBoolean(KEY_AUTO_LAUNCH, true)
         set(value) = prefs.edit().putBoolean(KEY_AUTO_LAUNCH, value).apply()
 
+    /** The app list stays empty until something is typed: no list to scroll through idly. */
+    var searchOnly: Boolean
+        get() = prefs.getBoolean(KEY_SEARCH_ONLY, false)
+        set(value) = prefs.edit().putBoolean(KEY_SEARCH_ONLY, value).apply()
+
     /** Bring up the keyboard together with the app list. */
     var showKeyboard: Boolean
         get() = prefs.getBoolean(KEY_SHOW_KEYBOARD, true)
@@ -130,6 +135,7 @@ class Prefs(context: Context) {
         const val KEY_TEXT_SIZE = "text_size"
         const val KEY_AUTO_LAUNCH = "auto_launch"
         const val KEY_SHOW_KEYBOARD = "show_keyboard"
+        const val KEY_SEARCH_ONLY = "search_only"
         const val KEY_HIDE_STATUS_BAR = "hide_status_bar"
         const val KEY_STATUS_BAR = "status_bar"
         const val KEY_CENTER_FAVORITES = "center_favorites"
