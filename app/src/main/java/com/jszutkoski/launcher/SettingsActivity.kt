@@ -13,11 +13,14 @@ import android.widget.LinearLayout
 import android.widget.ListView
 import android.widget.ScrollView
 import android.widget.TextView
+import android.window.OnBackInvokedCallback
+import android.window.OnBackInvokedDispatcher
 
 class SettingsActivity : Activity() {
     private lateinit var prefs: Prefs
     private lateinit var repo: AppRepository
     private lateinit var content: LinearLayout
+    private lateinit var scroll: ScrollView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -25,7 +28,7 @@ class SettingsActivity : Activity() {
         edgeToEdge()
 
         content = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        val scroll = ScrollView(this).apply {
+        scroll = ScrollView(this).apply {
             setBackgroundColor(Palette.BACKGROUND)
             isVerticalScrollBarEnabled = false
             addView(content)
@@ -58,37 +61,74 @@ class SettingsActivity : Activity() {
         super.onDestroy()
     }
 
+    /** The main list of groups, or one group's settings. */
+    private enum class Page(val title: String, val summary: String) {
+        HOME("Home screen", "Text size, layout, status bar, screen time, dots, music"),
+        SEARCH("Search", "Opening apps as you type, search only, contacts"),
+        STANDBY("Standby", "The bedside clock, on every wake, weather"),
+        APPS("Apps", "Mindful pause, hidden apps, home app"),
+        GESTURES("Gestures", "Double-tap to lock, and every gesture there is"),
+    }
+
+    private var page: Page? = null
+    private var backRegistered = false
+    private val backToMain by lazy { OnBackInvokedCallback { open(null) } }
+
+    /** Into a group, or back out to the main list with null. */
+    private fun open(target: Page?) {
+        page = target
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            // Back leaves a group first; only from the main list does it close settings.
+            if (target != null && !backRegistered) {
+                onBackInvokedDispatcher.registerOnBackInvokedCallback(OnBackInvokedDispatcher.PRIORITY_DEFAULT, backToMain)
+                backRegistered = true
+            } else if (target == null && backRegistered) {
+                onBackInvokedDispatcher.unregisterOnBackInvokedCallback(backToMain)
+                backRegistered = false
+            }
+        }
+        scroll.scrollTo(0, 0)
+        render()
+        content.alpha = 0f
+        content.animate().alpha(1f).setDuration(180).start()
+    }
+
+    @Deprecated("Only reached below Android 13; newer versions use OnBackInvokedCallback.")
+    override fun onBackPressed() {
+        @Suppress("DEPRECATION")
+        if (page != null) open(null) else super.onBackPressed()
+    }
+
     private fun render() {
         content.removeAllViews()
+        val current = page
         content.addView(
-            text("Settings", 40f, fontWeight = 200).apply { setPadding(0, 0, 0, dp(32)) },
+            text(current?.title ?: "Settings", 40f, fontWeight = 200).apply { setPadding(0, 0, 0, dp(20)) },
         )
+        when (current) {
+            null -> renderMain()
+            Page.HOME -> renderHome()
+            Page.SEARCH -> renderSearch()
+            Page.STANDBY -> renderStandby()
+            Page.APPS -> renderApps()
+            Page.GESTURES -> renderGestures()
+        }
+    }
 
-        section("Home screen")
+    private fun renderMain() {
+        Page.entries.forEach { group -> row(group.title, group.summary) { open(group) } }
+        row(
+            "Restricted setting?",
+            "Open app info",
+            "If Android says \"App was denied access\" for usage access, notification access or " +
+                "the screen lock: try once, then open app info, tap ⋮ and choose " +
+                "\"Allow restricted settings\".",
+        ) { SystemActions.openAppInfo(this) }
+    }
+
+    private fun renderHome() {
         row("Text size", prefs.textSize.label) {
             prefs.textSize = TextSize.entries[(prefs.textSize.ordinal + 1) % TextSize.entries.size]
-        }
-        row("Open single match", onOff(prefs.autoLaunch), "Launch an app as soon as the search finds only one") {
-            prefs.autoLaunch = !prefs.autoLaunch
-        }
-        row("Search only", onOff(prefs.searchOnly), "No app list to scroll: apps appear only as you type their name") {
-            prefs.searchOnly = !prefs.searchOnly
-        }
-        permissionRow(
-            title = "Contacts in search",
-            description = "Type a name to call, text or open a WhatsApp chat. " +
-                "Search also answers sums (12*7), finds settings (wifi, brilho) and the flashlight",
-            enabled = prefs.contactSearch,
-            granted = ContactSearch.hasAccess(this),
-            missing = "Tap to allow contacts",
-            setEnabled = { prefs.contactSearch = it },
-            grant = { askPermission(Manifest.permission.READ_CONTACTS) },
-        )
-        // Search only always brings up the keyboard.
-        if (!prefs.searchOnly) {
-            row("Keyboard with app list", onOff(prefs.showKeyboard), "Start typing as soon as the list opens") {
-                prefs.showKeyboard = !prefs.showKeyboard
-            }
         }
         row("Layout", if (prefs.centerFavorites) "Centred" else "Left aligned", "Clock and pinned apps") {
             prefs.centerFavorites = !prefs.centerFavorites
@@ -101,32 +141,6 @@ class SettingsActivity : Activity() {
         ) {
             prefs.statusBar = StatusBarMode.entries[(prefs.statusBar.ordinal + 1) % StatusBarMode.entries.size]
         }
-        section("Extras")
-        permissionRow(
-            title = "Weather",
-            description = "Temperature and sky under the date on the bedside clock, from Open-Meteo, for your approximate location",
-            enabled = prefs.weather,
-            granted = Weather.hasAccess(this),
-            missing = "Tap to allow approximate location",
-            setEnabled = { prefs.weather = it },
-            grant = { askPermission(Manifest.permission.ACCESS_COARSE_LOCATION) },
-        )
-        row(
-            "Standby while charging",
-            onOff(prefs.standbyWhenCharging),
-            "A dim bedside clock after 20 seconds on the home screen while charging. " +
-                "Pinch the home screen with two fingers to open it any time; tap to leave",
-        ) { prefs.standbyWhenCharging = !prefs.standbyWhenCharging }
-        permissionRow(
-            title = "Standby on every wake",
-            description = "Each time the screen turns on, the bedside clock shows first, over the lock screen. " +
-                "Tap it to unlock, or unlock with your fingerprint or face; you return to the app you were in",
-            enabled = prefs.standbyOnWake,
-            granted = LockService.isEnabled(this),
-            missing = "Tap to turn on Minimalist in Accessibility",
-            setEnabled = { prefs.standbyOnWake = it },
-            grant = { SystemActions.openAccessibility(this) },
-        )
         permissionRow(
             title = "Screen time",
             description = "Today's time in apps, under the date",
@@ -145,12 +159,6 @@ class SettingsActivity : Activity() {
             setEnabled = { prefs.notificationDots = it },
             grant = { SystemActions.openNotificationAccess(this) },
         )
-        val paused = prefs.pauseApps.mapNotNull { repo.find(it)?.label }.sorted()
-        row(
-            "Mindful pause",
-            if (paused.isEmpty()) "Off" else paused.joinToString(", "),
-            "A breath before these apps open. Choose here, or long-press an app → Pause before opening",
-        ) { pickPauseApps() }
         permissionRow(
             title = "Now playing",
             description = "The playing song and its controls, just above the bottom icons",
@@ -160,6 +168,77 @@ class SettingsActivity : Activity() {
             setEnabled = { prefs.nowPlaying = it },
             grant = { SystemActions.openNotificationAccess(this) },
         )
+    }
+
+    private fun renderSearch() {
+        row("Open single match", onOff(prefs.autoLaunch), "Launch an app as soon as the search finds only one") {
+            prefs.autoLaunch = !prefs.autoLaunch
+        }
+        row("Search only", onOff(prefs.searchOnly), "No app list to scroll: apps appear only as you type their name") {
+            prefs.searchOnly = !prefs.searchOnly
+        }
+        // Search only always brings up the keyboard.
+        if (!prefs.searchOnly) {
+            row("Keyboard with app list", onOff(prefs.showKeyboard), "Start typing as soon as the list opens") {
+                prefs.showKeyboard = !prefs.showKeyboard
+            }
+        }
+        permissionRow(
+            title = "Contacts in search",
+            description = "Type a name to call, text or open a WhatsApp chat. " +
+                "Search also answers sums (12*7), finds settings (wifi, brilho) and the flashlight",
+            enabled = prefs.contactSearch,
+            granted = ContactSearch.hasAccess(this),
+            missing = "Tap to allow contacts",
+            setEnabled = { prefs.contactSearch = it },
+            grant = { askPermission(Manifest.permission.READ_CONTACTS) },
+        )
+    }
+
+    private fun renderStandby() {
+        row(
+            "Standby while charging",
+            onOff(prefs.standbyWhenCharging),
+            "A dim bedside clock after 20 seconds on the home screen while charging. " +
+                "Pinch the home screen with two fingers to open it any time; tap to leave",
+        ) { prefs.standbyWhenCharging = !prefs.standbyWhenCharging }
+        permissionRow(
+            title = "Standby on every wake",
+            description = "Each time the screen turns on, the bedside clock shows first, over the lock screen. " +
+                "Tap it to unlock, or unlock with your fingerprint or face; you return to the app you were in",
+            enabled = prefs.standbyOnWake,
+            granted = LockService.isEnabled(this),
+            missing = "Tap to turn on Minimalist in Accessibility",
+            setEnabled = { prefs.standbyOnWake = it },
+            grant = { SystemActions.openAccessibility(this) },
+        )
+        permissionRow(
+            title = "Weather",
+            description = "Temperature and sky under the date on the bedside clock, from Open-Meteo, for your approximate location",
+            enabled = prefs.weather,
+            granted = Weather.hasAccess(this),
+            missing = "Tap to allow approximate location",
+            setEnabled = { prefs.weather = it },
+            grant = { askPermission(Manifest.permission.ACCESS_COARSE_LOCATION) },
+        )
+    }
+
+    private fun renderApps() {
+        val paused = prefs.pauseApps.mapNotNull { repo.find(it)?.label }.sorted()
+        row(
+            "Mindful pause",
+            if (paused.isEmpty()) "Off" else paused.joinToString(", "),
+            "A breath before these apps open. Choose here, or long-press an app → Pause before opening",
+        ) { pickPauseApps() }
+        val hiddenCount = prefs.hidden.size
+        row("Hidden apps", if (hiddenCount == 0) "None" else "$hiddenCount hidden") { showHidden() }
+        val isDefault = SystemActions.isDefaultHome(this)
+        row("Home app", if (isDefault) "Minimalist is your home app" else "Not your home app yet") {
+            if (isDefault) SystemActions.openHomeSettings(this) else SystemActions.requestDefaultHome(this)
+        }
+    }
+
+    private fun renderGestures() {
         permissionRow(
             title = "Double-tap to lock",
             description = "Double-tap an empty part of the home screen to turn the screen off",
@@ -169,22 +248,6 @@ class SettingsActivity : Activity() {
             setEnabled = { prefs.doubleTapLock = it },
             grant = { SystemActions.openAccessibility(this) },
         )
-        row(
-            "Restricted setting?",
-            "Open app info",
-            "If Android says \"App was denied access\" for usage access, notification access or " +
-                "the screen lock: try once, then open app info, tap ⋮ and choose " +
-                "\"Allow restricted settings\".",
-        ) { SystemActions.openAppInfo(this) }
-
-        section("Apps")
-        val hiddenCount = prefs.hidden.size
-        row("Hidden apps", if (hiddenCount == 0) "None" else "$hiddenCount hidden") { showHidden() }
-        val isDefault = SystemActions.isDefaultHome(this)
-        row("Home app", if (isDefault) "Minimalist is your home app" else "Not your home app yet") {
-            if (isDefault) SystemActions.openHomeSettings(this) else SystemActions.requestDefaultHome(this)
-        }
-
         content.addView(
             text(
                 "Swipe up for apps · down for notifications\n" +
@@ -198,16 +261,7 @@ class SettingsActivity : Activity() {
             ).apply {
                 isSingleLine = false
                 setLineSpacing(dp(6f), 1f)
-                setPadding(0, dp(40), 0, 0)
-            },
-        )
-    }
-
-    private fun section(title: String) {
-        content.addView(
-            text(title.uppercase(), 12f, Palette.TERTIARY, 500).apply {
-                letterSpacing = 0.12f
-                setPadding(0, dp(28), 0, dp(4))
+                setPadding(0, dp(28), 0, 0)
             },
         )
     }

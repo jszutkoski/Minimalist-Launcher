@@ -304,7 +304,7 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
     private fun render() {
         stale = false
         val scale = prefs.textSize.scale
-        clock.setTextSize(TypedValue.COMPLEX_UNIT_SP, 92f * scale)
+        clock.setTextSize(TypedValue.COMPLEX_UNIT_SP, 100f * scale)
         date.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f * scale)
         batteryBar.setLabelSize(13f * scale)
         // The battery line midway between the clock's digits and the date, at any text size.

@@ -44,7 +44,7 @@ class StandbyView(context: Context, private val onExit: () -> Unit) : FrameLayou
             format24Hour = "HH:mm"
             setTextColor(Palette.TEXT)
             typeface = weight(200)
-            textSize = 96f
+            textSize = 106f
             letterSpacing = -0.02f
             includeFontPadding = false
         }

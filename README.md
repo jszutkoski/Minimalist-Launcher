@@ -22,7 +22,7 @@ No app icons, no widgets, no ads, no tracking. The only thing that ever leaves t
 | **Mindful pause** (setting) | Chosen apps open only after a five-second "Breathe in / Breathe out", with today's time in the app when usage access is on. |
 | **Bottom icons** | Long-press one to swap in any app. Apps with a hand-drawn glyph keep it; others show their initial in a thin circle. |
 | **Extras** (off by default, in Settings) | *Screen time*: today's time in apps, on its own line under the date (usage access). *Now playing*: the song, artist and ⏮ ⏯ ⏭ just above the bottom icons while a player holds a track, paused or playing; its space stays reserved so nothing moves (notification access). Tap screen time to open Digital Wellbeing. *Double-tap to lock*: double-tap empty space to turn the screen off (accessibility service). |
-| **Settings** | Long-press empty space on the home screen: text size, auto-open, keyboard, layout (centred or left aligned), status bar (visible, dimmed or hidden), hidden apps, default home app. |
+| **Settings** | Long-press empty space on the home screen. Five groups, each its own page (back returns to the list): *Home screen*, *Search*, *Standby*, *Apps* and *Gestures*. |
 
 ## Install on your phone
 
