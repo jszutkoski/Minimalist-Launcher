@@ -2,6 +2,7 @@ package com.jszutkoski.launcher
 
 import android.annotation.SuppressLint
 import android.app.Activity
+import android.app.SearchManager
 import android.app.role.RoleManager
 import android.content.ActivityNotFoundException
 import android.content.ComponentName
@@ -71,6 +72,11 @@ object SystemActions {
                 .build(),
         ),
     )
+
+    /** The phone's search app, else Google in the browser. */
+    fun webSearch(activity: Activity, query: String) =
+        start(activity, Intent(Intent.ACTION_WEB_SEARCH).putExtra(SearchManager.QUERY, query)) ||
+            start(activity, Intent(Intent.ACTION_VIEW, Uri.parse("https://www.google.com/search?q=${Uri.encode(query)}")))
 
     fun openHomeSettings(activity: Activity) = start(activity, Intent(Settings.ACTION_HOME_SETTINGS))
 

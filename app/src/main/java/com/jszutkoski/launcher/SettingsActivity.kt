@@ -1,5 +1,6 @@
 package com.jszutkoski.launcher
 
+import android.Manifest
 import android.app.Activity
 import android.graphics.drawable.ColorDrawable
 import android.os.Build
@@ -73,6 +74,16 @@ class SettingsActivity : Activity() {
         row("Search only", onOff(prefs.searchOnly), "No app list to scroll: apps appear only as you type their name") {
             prefs.searchOnly = !prefs.searchOnly
         }
+        permissionRow(
+            title = "Contacts in search",
+            description = "Type a name to call, text or open a WhatsApp chat. " +
+                "Search also answers sums (12*7), finds settings (wifi, brilho) and the flashlight",
+            enabled = prefs.contactSearch,
+            granted = ContactSearch.hasAccess(this),
+            missing = "Tap to allow contacts",
+            setEnabled = { prefs.contactSearch = it },
+            grant = { askPermission(Manifest.permission.READ_CONTACTS) },
+        )
         // Search only always brings up the keyboard.
         if (!prefs.searchOnly) {
             row("Keyboard with app list", onOff(prefs.showKeyboard), "Start typing as soon as the list opens") {
@@ -91,6 +102,15 @@ class SettingsActivity : Activity() {
             prefs.statusBar = StatusBarMode.entries[(prefs.statusBar.ordinal + 1) % StatusBarMode.entries.size]
         }
         section("Extras")
+        permissionRow(
+            title = "Weather",
+            description = "Temperature and sky under the date, from Open-Meteo, for your approximate location. Tap it for the forecast",
+            enabled = prefs.weather,
+            granted = Weather.hasAccess(this),
+            missing = "Tap to allow approximate location",
+            setEnabled = { prefs.weather = it },
+            grant = { askPermission(Manifest.permission.ACCESS_COARSE_LOCATION) },
+        )
         row(
             "Standby while charging",
             onOff(prefs.standbyWhenCharging),
@@ -168,6 +188,7 @@ class SettingsActivity : Activity() {
         content.addView(
             text(
                 "Swipe up for apps · down for notifications\n" +
+                    "Type a sum, a setting or a name in the search\n" +
                     "Long-press an icon at the bottom to change its app\n" +
                     "Pinch for the bedside clock · double-tap to lock (if on)\n" +
                     "Long-press empty space for settings",
@@ -220,6 +241,21 @@ class SettingsActivity : Activity() {
                 else -> setEnabled(false)
             }
         }
+    }
+
+    /** Android's own prompt; once it has been refused for good, app info is the only way left. */
+    private fun askPermission(permission: String) {
+        if (prefs.askedFor(permission) && !shouldShowRequestPermissionRationale(permission)) {
+            SystemActions.openAppInfo(this)
+        } else {
+            prefs.setAskedFor(permission)
+            requestPermissions(arrayOf(permission), 0)
+        }
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        render()
     }
 
     private fun row(title: String, value: String, description: String? = null, onClick: () -> Unit) {

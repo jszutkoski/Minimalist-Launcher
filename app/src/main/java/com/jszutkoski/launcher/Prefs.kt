@@ -57,6 +57,21 @@ class Prefs(context: Context) {
         get() = prefs.getBoolean(KEY_SEARCH_ONLY, false)
         set(value) = prefs.edit().putBoolean(KEY_SEARCH_ONLY, value).apply()
 
+    /** Contacts in the search, to call, text or open WhatsApp (needs the contacts permission). */
+    var contactSearch: Boolean
+        get() = prefs.getBoolean(KEY_CONTACT_SEARCH, false)
+        set(value) = prefs.edit().putBoolean(KEY_CONTACT_SEARCH, value).apply()
+
+    /** Temperature and sky under the date (needs approximate location). */
+    var weather: Boolean
+        get() = prefs.getBoolean(KEY_WEATHER, false)
+        set(value) = prefs.edit().putBoolean(KEY_WEATHER, value).apply()
+
+    /** Android asks for a permission only twice; after that, only app info can grant it. */
+    fun askedFor(permission: String) = prefs.getBoolean("$KEY_ASKED$permission", false)
+
+    fun setAskedFor(permission: String) = prefs.edit().putBoolean("$KEY_ASKED$permission", true).apply()
+
     /** Bring up the keyboard together with the app list. */
     var showKeyboard: Boolean
         get() = prefs.getBoolean(KEY_SHOW_KEYBOARD, true)
@@ -136,6 +151,9 @@ class Prefs(context: Context) {
         const val KEY_AUTO_LAUNCH = "auto_launch"
         const val KEY_SHOW_KEYBOARD = "show_keyboard"
         const val KEY_SEARCH_ONLY = "search_only"
+        const val KEY_CONTACT_SEARCH = "contact_search"
+        const val KEY_WEATHER = "weather"
+        const val KEY_ASKED = "asked_"
         const val KEY_HIDE_STATUS_BAR = "hide_status_bar"
         const val KEY_STATUS_BAR = "status_bar"
         const val KEY_CENTER_FAVORITES = "center_favorites"

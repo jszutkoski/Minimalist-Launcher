@@ -3,7 +3,7 @@
 A quiet, text-only Android home screen. Black background, a clock, the few apps
 you actually use, and everything else one swipe away.
 
-No app icons, no widgets, no ads, no tracking, no internet permission. Nothing it reads ever leaves the phone.
+No app icons, no widgets, no ads, no tracking. The only thing that ever leaves the phone is the weather request, when that option is on: an approximate position (rounded to about a kilometre) sent to Open-Meteo. Contacts, notifications and usage never do.
 
 ## What it does
 
@@ -16,6 +16,8 @@ No app icons, no widgets, no ads, no tracking, no internet permission. Nothing i
 | **Standby** | A dim bedside clock (time, battery line, date and charge, plus a WhatsApp or envelope glyph when those apps have notifications waiting at half strength, at the system brightness) that drifts a little every minute. Opens after 20 seconds on the home screen while charging, or with a two-finger pinch; tap to leave. Keeps the screen on only while charging. If the phone locks while it is open, pressing power shows it again over the lock screen; tapping then asks for your PIN or fingerprint, and unlocking any other way closes it. With *Standby on every wake* on (it needs Minimalist's accessibility service, the same one as double-tap to lock), it is put on top each time the screen turns off (except during calls), so it is the first thing you see on every wake; after unlocking you are back in the app you were using. |
 | **Next alarm** | Beside the date and battery: "6:30" within a day, "Sat 6:30" further out. Tap for alarms. |
 | **Notification dots** (setting) | A small dot beside pinned apps and bottom icons with notifications waiting (notification access). |
+| **Smart search** | The app search also answers sums (`12*7`, `2,5 + 1`, `200 x 15%`; tap to copy), finds Android settings by English or Portuguese words (`wifi`, `brilho`, `hotspot`, `bateria`…), switches the flashlight (`lanterna`), and ends with a web search. With *Contacts in search* on (contacts permission), names appear from two letters: the chat glyph opens their WhatsApp chat directly; tapping the name offers WhatsApp, call, message and the contact card. A single app still opens on its own only when nothing else matches. |
+| **Weather** (setting) | Temperature and sky under the date, beside screen time, from Open-Meteo (free, no account) for the approximate location; refreshed at most every half hour, last place remembered when location is off. Tap for the forecast. |
 | **Search only** (setting) | The app list stays empty until you type: apps appear only as their name is searched, so there is nothing to scroll through idly. The keyboard always opens with it. |
 | **Mindful pause** (setting) | Chosen apps open only after a five-second "Breathe in / Breathe out", with today's time in the app when usage access is on. |
 | **Bottom icons** | Long-press one to swap in any app. Apps with a hand-drawn glyph keep it; others show their initial in a thin circle. |

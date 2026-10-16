@@ -18,17 +18,23 @@ import android.view.inputmethod.InputMethodManager
 import android.widget.AbsListView
 import android.widget.BaseAdapter
 import android.widget.EditText
-import android.widget.FrameLayout
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ListView
 import android.widget.TextView
 import kotlin.math.abs
 
-/** Full-screen, searchable, alphabetical list of apps. Drag down at the top to close. */
+/**
+ * Full-screen, searchable, alphabetical list of apps. Drag down at the top to close. The
+ * search also answers sums and finds contacts, settings and the web, below the apps.
+ */
 class AppDrawerView(context: Context, private val callbacks: Callbacks) : LinearLayout(context) {
     interface Callbacks {
         fun onLaunch(app: App, source: View)
         fun onAppLongPress(app: App)
+        /** Anything but an app: a sum, a contact, a setting or the web. */
+        fun onResult(result: SearchResult, source: View)
+        fun onWhatsApp(contact: Contact)
         /** Drag-to-close in progress; 1 is fully open, 0 is closed. */
         fun onCloseDrag(progress: Float)
         fun onCloseRelease(close: Boolean)
@@ -49,17 +55,29 @@ class AppDrawerView(context: Context, private val callbacks: Callbacks) : Linear
         set(value) {
             field = value
             search.setTextSize(TypedValue.COMPLEX_UNIT_SP, 26f * value)
-            empty.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f * value)
             adapter.textScale = value
+        }
+
+    /** Searched by name once two letters are typed; empty while contacts are off. */
+    var contacts: List<Contact> = emptyList()
+        set(value) {
+            field = value
+            filter(fromTyping = false)
+        }
+
+    /** WhatsApp is installed, so contacts get its glyph. */
+    var whatsApp: Boolean
+        get() = adapter.whatsApp
+        set(value) {
+            adapter.whatsApp = value
         }
 
     private var apps: List<App> = emptyList()
     private var lastQueryLength = 0
 
-    private val adapter = AppAdapter(context)
+    private val adapter = ResultAdapter(context) { callbacks.onWhatsApp(it) }
     private val search = EditText(context)
     private val list = ListView(context)
-    private val empty = context.text("No apps found", 17f, Palette.TERTIARY)
     private val hairline = View(context)
 
     private val slop = ViewConfiguration.get(context).scaledTouchSlop
@@ -97,7 +115,7 @@ class AppDrawerView(context: Context, private val callbacks: Callbacks) : Linear
             })
             setOnEditorActionListener { _, actionId, _ ->
                 if (actionId == EditorInfo.IME_ACTION_GO) {
-                    adapter.items.firstOrNull()?.let { callbacks.onLaunch(it, search) }
+                    adapter.items.firstOrNull()?.let { open(it, search) }
                     true
                 } else {
                     false
@@ -115,10 +133,11 @@ class AppDrawerView(context: Context, private val callbacks: Callbacks) : Linear
             selector = ColorDrawable(0)
             isVerticalScrollBarEnabled = false
             clipToPadding = false
-            setOnItemClickListener { _, view, position, _ -> callbacks.onLaunch(this@AppDrawerView.adapter.items[position], view) }
+            setOnItemClickListener { _, view, position, _ -> open(this@AppDrawerView.adapter.items[position], view) }
             setOnItemLongClickListener { _, _, position, _ ->
-                callbacks.onAppLongPress(this@AppDrawerView.adapter.items[position])
-                true
+                val item = this@AppDrawerView.adapter.items[position]
+                if (item is SearchResult.AppHit) callbacks.onAppLongPress(item.app)
+                item is SearchResult.AppHit
             }
             setOnScrollListener(object : AbsListView.OnScrollListener {
                 override fun onScrollStateChanged(view: AbsListView, state: Int) {
@@ -128,15 +147,7 @@ class AppDrawerView(context: Context, private val callbacks: Callbacks) : Linear
                 override fun onScroll(view: AbsListView, first: Int, visible: Int, total: Int) = Unit
             })
         }
-        val listArea = FrameLayout(context)
-        listArea.addView(list, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
-        empty.visibility = GONE
-        listArea.addView(
-            empty,
-            FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.TOP or Gravity.START)
-                .apply { topMargin = dp(16) },
-        )
-        addView(listArea, LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f))
+        addView(list, LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f))
 
         textScale = 1f
     }
@@ -171,18 +182,31 @@ class AppDrawerView(context: Context, private val callbacks: Callbacks) : Linear
         list.setSelection(0)
     }
 
+    private fun open(result: SearchResult, source: View) {
+        if (result is SearchResult.AppHit) callbacks.onLaunch(result.app, source) else callbacks.onResult(result, source)
+    }
+
+    /** A sum's answer, then apps, contacts and settings, and the web last. */
     private fun filter(fromTyping: Boolean) {
         val query = search.text.toString()
-        val waiting = searchOnly && query.isBlank()
-        val results = if (waiting) emptyList() else AppSearch.filter(apps, query)
-        adapter.items = results
-        empty.visibility = if (results.isEmpty() && apps.isNotEmpty() && !waiting) VISIBLE else GONE
+        val q = query.trim()
+        val found = if (searchOnly && q.isEmpty()) emptyList() else AppSearch.filter(apps, query)
+        val people = ContactSearch.filter(contacts, q).takeIf { q.length >= 2 }.orEmpty().take(MAX_CONTACTS)
+        val settings = SettingSearch.filter(q).take(MAX_SETTINGS)
+        adapter.items = buildList {
+            Calculator.evaluate(q)?.let { add(SearchResult.Answer(it)) }
+            found.mapTo(this, SearchResult::AppHit)
+            people.mapTo(this, SearchResult::ContactHit)
+            settings.mapTo(this, SearchResult::SettingHit)
+            if (q.isNotEmpty()) add(SearchResult.Web(q))
+        }
 
-        // Only when the query grew: deleting letters should never launch anything.
+        // Only when the query grew: deleting letters should never launch anything. And only
+        // when the app is the one thing found, not a contact or setting with the same letters.
         val grew = query.length > lastQueryLength
         lastQueryLength = query.length
-        if (fromTyping && grew && autoLaunch && query.isNotBlank() && results.size == 1) {
-            callbacks.onLaunch(results[0], search)
+        if (fromTyping && grew && autoLaunch && q.isNotEmpty() && found.size == 1 && people.isEmpty() && settings.isEmpty()) {
+            callbacks.onLaunch(found[0], search)
         }
     }
 
@@ -237,8 +261,11 @@ class AppDrawerView(context: Context, private val callbacks: Callbacks) : Linear
     }
 }
 
-private class AppAdapter(private val context: Context) : BaseAdapter() {
-    var items: List<App> = emptyList()
+private const val MAX_CONTACTS = 4
+private const val MAX_SETTINGS = 3
+
+private class ResultAdapter(private val context: Context, private val onWhatsApp: (Contact) -> Unit) : BaseAdapter() {
+    var items: List<SearchResult> = emptyList()
         set(value) {
             field = value
             notifyDataSetChanged()
@@ -250,18 +277,93 @@ private class AppAdapter(private val context: Context) : BaseAdapter() {
             notifyDataSetChanged()
         }
 
+    var whatsApp = false
+        set(value) {
+            if (field == value) return
+            field = value
+            notifyDataSetChanged()
+        }
+
     override fun getCount() = items.size
 
     override fun getItem(position: Int) = items[position]
 
-    override fun getItemId(position: Int) = items[position].key.hashCode().toLong()
+    override fun getItemId(position: Int) = position.toLong()
+
+    override fun getViewTypeCount() = 2
+
+    override fun getItemViewType(position: Int) = if (items[position] is SearchResult.AppHit) 0 else 1
 
     override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
+        val item = items[position]
+        if (item !is SearchResult.AppHit) return row(item)
         val view = convertView as? TextView ?: context.text("", 21f).apply {
             setPadding(0, dp(13), 0, dp(13))
         }
         view.setTextSize(TypedValue.COMPLEX_UNIT_SP, 21f * textScale)
-        view.text = items[position].label
+        view.text = item.app.label
         return view
+    }
+
+    /** Title, a quiet word saying what it is, and for contacts on WhatsApp its glyph. Few, so built fresh. */
+    private fun row(item: SearchResult): View {
+        val title: String
+        var color = Palette.TEXT
+        val hint: String
+        var contact: Contact? = null
+        when (item) {
+            is SearchResult.Answer -> {
+                title = "= ${Calculator.format(item.value)}"
+                hint = "Copy"
+            }
+            is SearchResult.ContactHit -> {
+                title = item.contact.name
+                hint = "Contact"
+                contact = item.contact.takeIf { whatsApp && it.whatsApp != null }
+            }
+            is SearchResult.SettingHit -> {
+                title = item.setting.label
+                hint = if (item.setting.isTorch) (if (Torch.on) "Turn off" else "Turn on") else "Settings"
+            }
+            is SearchResult.Web -> {
+                title = "Search \u201c${item.query}\u201d"
+                color = Palette.SECONDARY
+                hint = "Web"
+            }
+            is SearchResult.AppHit -> error("Apps use the plain row")
+        }
+        val row = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            minimumHeight = context.dp(56)
+        }
+        row.addView(
+            context.text(title, 21f * textScale, color).apply {
+                setPadding(0, dp(13), 0, dp(13))
+                isDuplicateParentStateEnabled = true
+            },
+            LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f),
+        )
+        row.addView(
+            context.text(hint, 13f * textScale, Palette.TERTIARY, 400).apply {
+                letterSpacing = 0.04f
+                setPadding(context.dp(12), 0, 0, 0)
+                isDuplicateParentStateEnabled = true
+            },
+        )
+        if (contact != null) {
+            row.addView(
+                ImageView(context).apply {
+                    setImageResource(R.drawable.ic_chat)
+                    imageTintList = pressable(Palette.TEXT)
+                    contentDescription = "WhatsApp"
+                    val inset = context.dp(10)
+                    setPadding(inset, inset, 0, inset)
+                    setOnClickListener { onWhatsApp(contact) }
+                },
+                LinearLayout.LayoutParams(context.dp(46), context.dp(46)).apply { leftMargin = context.dp(6) },
+            )
+        }
+        return row
     }
 }

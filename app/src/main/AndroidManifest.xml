@@ -11,6 +11,12 @@
         android:name="android.permission.PACKAGE_USAGE_STATS"
         tools:ignore="ProtectedPermissions" />
 
+    <!-- Weather under the date: Open-Meteo, for the approximate location. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <!-- Contacts in the search. Asked for only when that setting is turned on. -->
+    <uses-permission android:name="android.permission.READ_CONTACTS" />
+
     <!-- Lets the launcher see every app that has a launcher entry, without the
          restricted QUERY_ALL_PACKAGES permission. -->
     <queries>

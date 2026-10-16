@@ -7,17 +7,23 @@ import android.app.Activity
 import android.app.ActivityOptions
 import android.app.AlarmManager
 import android.content.BroadcastReceiver
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.LauncherApps
+import android.database.ContentObserver
 import android.graphics.Insets
 import android.graphics.Rect
 import android.net.Uri
 import android.os.BatteryManager
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.os.PowerManager
+import android.provider.ContactsContract
 import android.text.InputType
 import android.text.format.DateFormat
 import android.util.TypedValue
@@ -66,6 +72,16 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
     private lateinit var bottomSpace: Space
     private lateinit var dock: Dock
     private lateinit var screenTimeText: TextView
+    private lateinit var weatherText: TextView
+    private lateinit var infoDot: TextView
+    private lateinit var infoRow: LinearLayout
+    private var weatherLoading = false
+    private var contactsLoaded = false
+    private val contactsObserver = object : ContentObserver(Handler(Looper.getMainLooper())) {
+        override fun onChange(selfChange: Boolean) {
+            contactsLoaded = false
+        }
+    }
     private lateinit var player: PlayerView
     private lateinit var nowPlaying: NowPlaying
     private val background = Executors.newSingleThreadExecutor()
@@ -97,6 +113,7 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         repo.start()
         nowPlaying = NowPlaying(this, ::showTrack)
         Notifications.addListener(dotsChanged)
+        Torch.start(this)
     }
 
     private val batteryReceiver = object : BroadcastReceiver() {
@@ -127,6 +144,8 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         // Lookups that can wait for the first frame.
         root.post {
             updateScreenTime()
+            updateWeather()
+            loadContacts()
             if (prefs.nowPlaying) nowPlaying.start() else nowPlaying.stop()
         }
         scheduleStandby()
@@ -160,6 +179,8 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
     override fun onDestroy() {
         repo.stop()
         Notifications.removeListener(dotsChanged)
+        Torch.stop(this)
+        if (contactsObserverOn) contentResolver.unregisterContentObserver(contactsObserver)
         background.shutdownNow()
         super.onDestroy()
     }
@@ -231,6 +252,16 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
             setPadding(0, dp(8), 0, dp(8))
             setOnClickListener { SystemActions.openDigitalWellbeing(this@MainActivity) }
         }
+        weatherText = text("", 17f, Palette.SECONDARY, 400).apply {
+            letterSpacing = 0.02f
+            visibility = View.GONE
+            setPadding(0, dp(8), 0, dp(8))
+            setOnClickListener { SystemActions.webSearch(this@MainActivity, "weather") }
+        }
+        infoDot = text("·", 17f, Palette.TERTIARY, 400).apply {
+            setPadding(dp(10), dp(8), dp(10), dp(8))
+            visibility = View.GONE
+        }
         player = PlayerView(this, ::openPlayer)
 
         val wrap = ViewGroup.LayoutParams.WRAP_CONTENT
@@ -255,8 +286,14 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         }
         home.addView(clockBlock, LinearLayout.LayoutParams(wrap, wrap))
         home.addView(dateRow, LinearLayout.LayoutParams(wrap, wrap))
-        // Optional: today's screen time, a quiet line under the date.
-        home.addView(screenTimeText, LinearLayout.LayoutParams(wrap, wrap).apply { topMargin = dp(8) })
+        // Optional: the weather and today's screen time, a quiet line under the date.
+        infoRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            addView(weatherText)
+            addView(infoDot)
+            addView(screenTimeText)
+        }
+        home.addView(infoRow, LinearLayout.LayoutParams(wrap, wrap).apply { topMargin = dp(8) })
         topSpace = Space(this)
         bottomSpace = Space(this)
         home.addView(topSpace, LinearLayout.LayoutParams(0, 0, 1f))
@@ -309,12 +346,15 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         dock.render()
         showDots()
         screenTimeText.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f * scale)
+        weatherText.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f * scale)
+        infoDot.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f * scale)
         player.setTextScale(scale)
         setDefault.visibility = if (SystemActions.isDefaultHome(this)) View.GONE else View.VISIBLE
 
         drawer.textScale = scale
         drawer.autoLaunch = prefs.autoLaunch
         drawer.searchOnly = prefs.searchOnly
+        drawer.whatsApp = whatsAppPackage() != null
         drawer.setApps(repo.visibleApps())
     }
 
@@ -396,6 +436,7 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
     private fun updateScreenTime() {
         if (!prefs.screenTime || !ScreenTime.hasAccess(this)) {
             screenTimeText.visibility = View.GONE
+            updateInfoDot()
             return
         }
         background.execute {
@@ -403,8 +444,113 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
             runOnUiThread {
                 screenTimeText.text = "${ScreenTime.format(total)} today"
                 screenTimeText.visibility = View.VISIBLE
+                updateInfoDot()
             }
         }
+    }
+
+    // Weather ------------------------------------------------------------------------
+
+    /** The last reading right away, then a new one when it is over half an hour old. */
+    private fun updateWeather() {
+        if (!prefs.weather || !Weather.hasAccess(this)) {
+            weatherText.visibility = View.GONE
+            updateInfoDot()
+            return
+        }
+        Weather.cached(this)?.let(::showWeather)
+        if (weatherLoading || Weather.isFresh(this)) return
+        weatherLoading = true
+        Weather.refresh(this) { now ->
+            runOnUiThread {
+                weatherLoading = false
+                if (now != null && prefs.weather) showWeather(now)
+            }
+        }
+    }
+
+    private fun showWeather(now: Weather.Now) {
+        weatherText.text = now.label
+        weatherText.visibility = View.VISIBLE
+        updateInfoDot()
+    }
+
+    /** The dot only between two things. */
+    private fun updateInfoDot() {
+        val both = weatherText.visibility == View.VISIBLE && screenTimeText.visibility == View.VISIBLE
+        infoDot.visibility = if (both) View.VISIBLE else View.GONE
+    }
+
+    // Smart search -------------------------------------------------------------------
+
+    private var contactsObserverOn = false
+
+    /** Once, then again only after the address book changes. */
+    private fun loadContacts() {
+        if (!prefs.contactSearch || !ContactSearch.hasAccess(this)) {
+            if (drawer.contacts.isNotEmpty()) drawer.contacts = emptyList()
+            contactsLoaded = false
+            return
+        }
+        if (!contactsObserverOn) {
+            contactsObserverOn = true
+            contentResolver.registerContentObserver(ContactsContract.Contacts.CONTENT_URI, true, contactsObserver)
+        }
+        if (contactsLoaded) return
+        contactsLoaded = true
+        background.execute {
+            val contacts = ContactSearch.load(this)
+            runOnUiThread { if (prefs.contactSearch) drawer.contacts = contacts }
+        }
+    }
+
+    override fun onResult(result: SearchResult, source: View) {
+        when (result) {
+            is SearchResult.AppHit -> launch(result.app, source)
+            is SearchResult.Answer -> copy(Calculator.plain(result.value))
+            is SearchResult.ContactHit -> showContact(result.contact)
+            is SearchResult.SettingHit -> openSetting(result.setting)
+            is SearchResult.Web -> SystemActions.webSearch(this, result.query)
+        }
+    }
+
+    override fun onWhatsApp(contact: Contact) {
+        val pkg = whatsAppPackage() ?: return
+        val number = contact.whatsApp ?: return
+        SystemActions.start(this, Intent(Intent.ACTION_VIEW, Uri.parse("https://wa.me/$number")).setPackage(pkg))
+    }
+
+    private fun whatsAppPackage(): String? =
+        WHATSAPP.firstOrNull { pkg -> repo.apps.any { it.component.packageName == pkg } }
+
+    private fun copy(value: String) {
+        getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText("Result", value))
+        // Android 13+ confirms a copy on its own.
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) Toast.makeText(this, "Copied $value", Toast.LENGTH_SHORT).show()
+    }
+
+    private fun showContact(contact: Contact) {
+        Sheet(this, "${contact.name} · ${contact.phone}").apply {
+            if (contact.whatsApp != null && whatsAppPackage() != null) option("WhatsApp") { onWhatsApp(contact) }
+            option("Call") { SystemActions.start(this@MainActivity, Intent(Intent.ACTION_DIAL, Uri.fromParts("tel", contact.phone, null))) }
+            option("Message") { SystemActions.start(this@MainActivity, Intent(Intent.ACTION_SENDTO, Uri.fromParts("smsto", contact.phone, null))) }
+            option("Contact card") {
+                SystemActions.start(
+                    this@MainActivity,
+                    Intent(Intent.ACTION_VIEW, ContactsContract.Contacts.getLookupUri(contact.id, contact.lookupKey)),
+                )
+            }
+            show()
+        }
+    }
+
+    private fun openSetting(setting: SystemSetting) {
+        if (setting.isTorch) {
+            if (!Torch.toggle(this)) Toast.makeText(this, "The flashlight is unavailable", Toast.LENGTH_SHORT).show()
+            closeDrawer(animate = true)
+            return
+        }
+        setting.intents.any { SystemActions.start(this, it()) }
     }
 
     private fun showTrack(track: NowPlaying.Track?) = player.show(track)
@@ -419,7 +565,7 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         val center = prefs.centerFavorites
         val alignment = if (center) Gravity.CENTER_HORIZONTAL else Gravity.START
         favorites.gravity = alignment
-        (screenTimeText.layoutParams as LinearLayout.LayoutParams).gravity = alignment
+        (infoRow.layoutParams as LinearLayout.LayoutParams).gravity = alignment
         player.setAlignment(alignment)
         // The clock widget follows the same alignment as the pinned apps.
         (clockBlock.layoutParams as LinearLayout.LayoutParams).gravity = alignment
@@ -754,6 +900,7 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
             private set
 
         private const val MAX_FAVORITES = 8
+        private val WHATSAPP = listOf("com.whatsapp", "com.whatsapp.w4b")
         private const val STANDBY_DELAY_MS = 20_000L
         private const val DAY_MS = 24 * 60 * 60 * 1000L
     }
