@@ -19,7 +19,8 @@ import kotlin.random.Random
  * to a new spot every minute so no pixel stays lit in the same place. A tap calls [onExit].
  */
 class StandbyView(context: Context, private val onExit: () -> Unit) : FrameLayout(context) {
-    private val battery = BatteryBar(context)
+    // Room for the charging bolt from the start, so plugging in never shifts the clock.
+    private val battery = BatteryBar(context).apply { roomForMarker = true }
     private val weather: TextView = context.text("", 17f, Palette.SECONDARY, 400).apply {
         letterSpacing = 0.02f
         visibility = GONE

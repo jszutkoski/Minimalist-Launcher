@@ -22,6 +22,8 @@ object Palette {
     const val TRACK = 0xFF262626.toInt()
     /** Only used to warn about a low battery. */
     const val LOW = 0xFFE5484D.toInt()
+    /** Only used for a battery full on the charger. */
+    const val FULL = 0xFF3DD68C.toInt()
 }
 
 /** Distance a finger travels to fully open or close the app list. */

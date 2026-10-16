@@ -7,9 +7,12 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.hardware.biometrics.BiometricManager
+import android.hardware.biometrics.BiometricPrompt
 import android.os.BatteryManager
 import android.os.Build
 import android.os.Bundle
+import android.os.CancellationSignal
 import android.os.PowerManager
 import android.view.WindowInsetsController
 import android.view.WindowManager
@@ -25,6 +28,8 @@ open class StandbyActivity : Activity() {
     private lateinit var view: StandbyView
     private var charging = false
     private var unlockAsked = false
+    /** The fingerprint or PIN was given here, so leaving needs no lock behind it. */
+    private var confirmed = false
     private val notificationsChanged: () -> Unit = { showWaiting() }
 
     private val batteryReceiver = object : BroadcastReceiver() {
@@ -52,7 +57,7 @@ open class StandbyActivity : Activity() {
         val dark = WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS or WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS
         window.insetsController?.setSystemBarsAppearance(dark, dark)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            onBackInvokedDispatcher.registerOnBackInvokedCallback(OnBackInvokedDispatcher.PRIORITY_DEFAULT) { finish() }
+            onBackInvokedDispatcher.registerOnBackInvokedCallback(OnBackInvokedDispatcher.PRIORITY_DEFAULT) { leave() }
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             overrideActivityTransition(OVERRIDE_TRANSITION_CLOSE, R.anim.hold, R.anim.fade_out)
@@ -87,37 +92,77 @@ open class StandbyActivity : Activity() {
         super.onUserLeaveHint()
         // With the screen off this is just the launch at screen off, not the user leaving.
         if (getSystemService(PowerManager::class.java)?.isInteractive == false) return
+        // The PIN pad of our own prompt opening over standby.
+        if (unlockAsked) return
         inFront = false
+        // Home or recents on a phone that was never locked (the charger keeps the screen on,
+        // so it never locks by itself): lock it now, or that swipe would get straight in.
+        val locked = getSystemService(KeyguardManager::class.java)?.isKeyguardLocked == true
+        if (!locked && needsUnlock()) LockService.lock()
         if (this !is StandbyOverAppsActivity) finish()
     }
 
     @Deprecated("Only reached below Android 13; newer versions use OnBackInvokedCallback.")
-    override fun onBackPressed() = finish()
+    override fun onBackPressed() = leave()
 
-    /** A tap: straight home when unlocked, otherwise through the PIN or fingerprint first. */
+    /** The phone has a PIN, pattern or password, and nobody has given it yet. */
+    private fun needsUnlock() = !confirmed && getSystemService(KeyguardManager::class.java)?.isDeviceSecure == true
+
+    /**
+     * A tap or back: never straight in. Over the lock screen, Android's own unlock; on a phone
+     * that is still unlocked (standby opened from home, or kept awake by the charger), the
+     * fingerprint or PIN first all the same, so standby always guards the phone.
+     */
     private fun leave() {
         val keyguard = getSystemService(KeyguardManager::class.java)
-        if (keyguard?.isKeyguardLocked == true) {
-            if (unlockAsked) return
-            unlockAsked = true
-            keyguard.requestDismissKeyguard(
-                this,
-                object : KeyguardManager.KeyguardDismissCallback() {
-                    override fun onDismissSucceeded() = finish()
+        if (keyguard?.isKeyguardLocked != true) {
+            if (needsUnlock()) confirmIdentity() else finish()
+            return
+        }
+        if (unlockAsked) return
+        unlockAsked = true
+        keyguard.requestDismissKeyguard(
+            this,
+            object : KeyguardManager.KeyguardDismissCallback() {
+                override fun onDismissSucceeded() = finish()
 
-                    // Back out of the PIN pad: standby stays, and the next tap asks again.
-                    override fun onDismissCancelled() {
+                // Back out of the PIN pad: standby stays, and the next tap asks again.
+                override fun onDismissCancelled() {
+                    unlockAsked = false
+                }
+
+                override fun onDismissError() {
+                    unlockAsked = false
+                }
+            },
+        )
+    }
+
+    private fun confirmIdentity() {
+        if (unlockAsked) return
+        unlockAsked = true
+        BiometricPrompt.Builder(this)
+            .setTitle("Unlock")
+            .setAllowedAuthenticators(
+                BiometricManager.Authenticators.BIOMETRIC_WEAK or BiometricManager.Authenticators.DEVICE_CREDENTIAL,
+            )
+            .build()
+            .authenticate(
+                CancellationSignal(),
+                mainExecutor,
+                object : BiometricPrompt.AuthenticationCallback() {
+                    override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
                         unlockAsked = false
+                        confirmed = true
+                        finish()
                     }
 
-                    override fun onDismissError() {
+                    // Cancelled or too many tries: standby stays, and the next tap asks again.
+                    override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
                         unlockAsked = false
                     }
                 },
             )
-        } else {
-            finish()
-        }
     }
 
     /** WhatsApp or email waiting: a glyph each under the date, from the notification listener. */
