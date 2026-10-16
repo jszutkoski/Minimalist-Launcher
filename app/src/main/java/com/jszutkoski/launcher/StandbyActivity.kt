@@ -14,7 +14,6 @@ import android.os.PowerManager
 import android.view.WindowInsetsController
 import android.view.WindowManager
 import android.window.OnBackInvokedDispatcher
-import java.text.NumberFormat
 
 /**
  * The bedside clock as its own screen, allowed to show over the lock screen. When the phone
@@ -68,6 +67,7 @@ open class StandbyActivity : Activity() {
         super.onResume()
         inFront = true
         view.show()
+        showWeather()
     }
 
     override fun onDestroy() {
@@ -128,6 +128,19 @@ open class StandbyActivity : Activity() {
         )
     }
 
+    /** The same reading as the home screen, fetched again when it is over half an hour old. */
+    private fun showWeather() {
+        if (!Prefs(this).weather || !Weather.hasAccess(this)) {
+            view.showWeather(null)
+            return
+        }
+        view.showWeather(Weather.cached(this)?.label)
+        if (Weather.isFresh(this)) return
+        Weather.refresh(this) { now ->
+            if (now != null) runOnUiThread { if (!isDestroyed) view.showWeather(now.label) }
+        }
+    }
+
     private fun updateBattery(intent: Intent) {
         val level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
         val scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, 100)
@@ -136,7 +149,7 @@ open class StandbyActivity : Activity() {
         val status = intent.getIntExtra(BatteryManager.EXTRA_STATUS, BatteryManager.BATTERY_STATUS_UNKNOWN)
         charging = status == BatteryManager.BATTERY_STATUS_CHARGING || status == BatteryManager.BATTERY_STATUS_FULL
         val low = !charging && fraction <= LOW_BATTERY
-        view.updateBattery(fraction, charging, low, NumberFormat.getPercentInstance().format(fraction.toDouble()))
+        view.updateBattery(fraction, charging, low)
         // Awake all night on the charger; on battery the screen times out as usual.
         if (charging) {
             window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)

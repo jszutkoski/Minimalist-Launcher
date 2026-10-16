@@ -15,12 +15,15 @@ import java.util.Locale
 import kotlin.random.Random
 
 /**
- * A bedside clock: time, battery line, date and charge, dimmed on black. The group drifts
+ * A bedside clock: time, battery line, date and weather, dimmed on black. The group drifts
  * to a new spot every minute so no pixel stays lit in the same place. A tap calls [onExit].
  */
 class StandbyView(context: Context, private val onExit: () -> Unit) : FrameLayout(context) {
     private val battery = BatteryBar(context)
-    private val percent: TextView = context.text("", 17f, Palette.SECONDARY, 400)
+    private val weather: TextView = context.text("", 17f, Palette.SECONDARY, 400).apply {
+        letterSpacing = 0.02f
+        visibility = GONE
+    }
     private val content = LinearLayout(context)
     private val chat = glyph(R.drawable.ic_chat, "WhatsApp")
     private val mail = glyph(R.drawable.ic_mail, "Email")
@@ -53,8 +56,6 @@ class StandbyView(context: Context, private val onExit: () -> Unit) : FrameLayou
             textSize = 17f
             letterSpacing = 0.02f
         }
-        val dot = context.text("·", 17f, Palette.TERTIARY, 400).apply { setPadding(dp(10), 0, dp(10), 0) }
-        percent.letterSpacing = 0.02f
 
         val wrap = ViewGroup.LayoutParams.WRAP_CONTENT
         val clockBlock = LinearLayout(context).apply {
@@ -65,19 +66,14 @@ class StandbyView(context: Context, private val onExit: () -> Unit) : FrameLayou
                 LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, wrap).apply { topMargin = dp(14) },
             )
         }
-        val dateRow = LinearLayout(context).apply {
-            orientation = LinearLayout.HORIZONTAL
-            addView(date)
-            addView(dot)
-            addView(percent)
-        }
         content.apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
             // Everything at half strength: readable in the dark, easy on the panel.
             alpha = 0.55f
             addView(clockBlock, LinearLayout.LayoutParams(wrap, wrap))
-            addView(dateRow, LinearLayout.LayoutParams(wrap, wrap).apply { topMargin = dp(14) })
+            addView(date, LinearLayout.LayoutParams(wrap, wrap).apply { topMargin = dp(14) })
+            addView(weather, LinearLayout.LayoutParams(wrap, wrap).apply { topMargin = dp(6) })
             addView(waiting, LinearLayout.LayoutParams(wrap, wrap).apply { topMargin = dp(22) })
         }
         waiting.addView(chat)
@@ -102,10 +98,12 @@ class StandbyView(context: Context, private val onExit: () -> Unit) : FrameLayou
         visibility = GONE
     }
 
-    fun updateBattery(fraction: Float, charging: Boolean, low: Boolean, label: CharSequence) {
-        battery.update(fraction, charging, low)
-        percent.text = label
-        percent.setTextColor(if (low) Palette.LOW else Palette.SECONDARY)
+    fun updateBattery(fraction: Float, charging: Boolean, low: Boolean) = battery.update(fraction, charging, low)
+
+    /** "18° Drizzle" under the date, or nothing. */
+    fun showWeather(label: String?) {
+        weather.text = label.orEmpty()
+        weather.visibility = if (label == null) GONE else VISIBLE
     }
 
     fun show() {
