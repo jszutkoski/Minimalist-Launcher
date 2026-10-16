@@ -203,6 +203,8 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
             setOnClickListener { SystemActions.openAlarms(this@MainActivity) }
         }
         batteryBar = BatteryBar(this).apply {
+            // Its height never changes with the number or the bolt, so the spacing holds.
+            roomForMarker = true
             setOnClickListener { SystemActions.openBatteryUsage(this@MainActivity) }
         }
         val datePattern = DateFormat.getBestDateTimePattern(Locale.getDefault(), "EEEEdMMMM")
@@ -249,10 +251,7 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         clockBlock.addView(clock, LinearLayout.LayoutParams(wrap, wrap))
         clockBlock.addView(
             batteryBar,
-            LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, wrap).apply {
-                topMargin = dp(10)
-                bottomMargin = dp(8)
-            },
+            LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, wrap),
         )
         dateRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -308,6 +307,8 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         clock.setTextSize(TypedValue.COMPLEX_UNIT_SP, 92f * scale)
         date.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f * scale)
         batteryBar.setLabelSize(13f * scale)
+        // The battery line midway between the clock's digits and the date, at any text size.
+        spaceEvenly(clock, batteryBar, batteryBar.preferredHeight, date, dp(26))
         alarmDot.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f * scale)
         alarmText.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f * scale)
         pause.setTextScale(scale)

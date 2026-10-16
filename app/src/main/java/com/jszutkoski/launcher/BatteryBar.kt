@@ -93,10 +93,16 @@ class BatteryBar(context: Context) : View(context) {
     /** As tall as the digits' capitals. */
     private val boltSize get() = labelPaint.textSize * 0.82f
 
+    /** The height it takes: the line alone, or the marker's when there is or may be one. */
+    val preferredHeight: Int
+        get() {
+            val line = thickness.toInt().coerceAtLeast(1)
+            val marker = label != null || charging || roomForMarker
+            return if (marker) maxOf(line, markerHeight) else line
+        }
+
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-        val line = thickness.toInt().coerceAtLeast(1)
-        val marker = label != null || charging || roomForMarker
-        setMeasuredDimension(MeasureSpec.getSize(widthMeasureSpec), if (marker) maxOf(line, markerHeight) else line)
+        setMeasuredDimension(MeasureSpec.getSize(widthMeasureSpec), preferredHeight)
     }
 
     override fun onDraw(canvas: Canvas) {

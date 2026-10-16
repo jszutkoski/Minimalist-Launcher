@@ -3,11 +3,13 @@ package com.jszutkoski.launcher
 import android.app.Activity
 import android.content.Context
 import android.content.res.ColorStateList
+import android.graphics.Rect
 import android.graphics.Typeface
 import android.os.Build
 import android.text.TextUtils
 import android.util.TypedValue
 import android.view.View
+import android.view.ViewGroup
 import android.widget.TextView
 import kotlin.math.roundToInt
 
@@ -61,6 +63,27 @@ fun Context.text(
     typeface = weight(fontWeight)
     isSingleLine = true
     ellipsize = TextUtils.TruncateAt.END
+}
+
+/**
+ * Margins that put [line] optically midway between two texts: [gap] from the baseline of the
+ * digits in [above] to the line's centre, and [gap] again from there to the tops of the
+ * capitals in [below]. Measured from the glyphs, not the text boxes, whose built-in space
+ * (descent under the clock, ascent above the date) would otherwise push the line off centre.
+ * [above] and [line] must share a vertical LinearLayout; [below] may sit in the next one.
+ */
+fun spaceEvenly(above: TextView, line: View, lineHeight: Int, below: TextView, gap: Int) {
+    val descent = above.paint.fontMetrics.descent + above.paddingBottom
+    val metrics = below.paint.fontMetrics
+    val boxTop = if (below.includeFontPadding) metrics.top else metrics.ascent
+    val caps = Rect().also { below.paint.getTextBounds("H", 0, 1, it) }
+    val capInset = below.paddingTop + (caps.top - boxTop)
+    (above.layoutParams as ViewGroup.MarginLayoutParams).bottomMargin = -descent.roundToInt()
+    (line.layoutParams as ViewGroup.MarginLayoutParams).apply {
+        topMargin = gap - lineHeight / 2
+        bottomMargin = (gap - lineHeight / 2 - capInset).roundToInt()
+    }
+    above.requestLayout()
 }
 
 /** Draws behind the status and navigation bars. Android 15+ does this for every app already. */

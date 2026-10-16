@@ -62,10 +62,7 @@ class StandbyView(context: Context, private val onExit: () -> Unit) : FrameLayou
         val clockBlock = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             addView(clock, LinearLayout.LayoutParams(wrap, wrap))
-            addView(
-                battery,
-                LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, wrap).apply { topMargin = dp(14) },
-            )
+            addView(battery, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, wrap))
         }
         content.apply {
             orientation = LinearLayout.VERTICAL
@@ -73,10 +70,12 @@ class StandbyView(context: Context, private val onExit: () -> Unit) : FrameLayou
             // Everything at half strength: readable in the dark, easy on the panel.
             alpha = 0.55f
             addView(clockBlock, LinearLayout.LayoutParams(wrap, wrap))
-            addView(date, LinearLayout.LayoutParams(wrap, wrap).apply { topMargin = dp(14) })
+            addView(date, LinearLayout.LayoutParams(wrap, wrap))
             addView(weather, LinearLayout.LayoutParams(wrap, wrap).apply { topMargin = dp(6) })
             addView(waiting, LinearLayout.LayoutParams(wrap, wrap).apply { topMargin = dp(22) })
         }
+        // The line midway between the clock's digits and the date.
+        spaceEvenly(clock, battery, battery.preferredHeight, date, dp(GAP_DP))
         waiting.addView(chat)
         waiting.addView(mail, LinearLayout.LayoutParams(wrap, wrap).apply { leftMargin = dp(22) })
         addView(content, LayoutParams(wrap, wrap, Gravity.CENTER))
@@ -115,10 +114,13 @@ class StandbyView(context: Context, private val onExit: () -> Unit) : FrameLayou
         animate().alpha(1f).setDuration(600).start()
     }
 
-    /** Somewhere new within the middle of the screen, once a minute. */
+    /**
+     * A few pixels from the centre, somewhere new once a minute: enough that no pixel stays lit
+     * all night, too little to ever look off centre.
+     */
     private fun moveContent() {
-        val rangeX = width * 0.12f
-        val rangeY = height * 0.18f
+        val rangeX = dp(DRIFT_DP).toFloat()
+        val rangeY = dp(DRIFT_DP).toFloat()
         content.animate()
             .translationX(Random.nextFloat() * 2 * rangeX - rangeX)
             .translationY(Random.nextFloat() * 2 * rangeY - rangeY)
@@ -136,5 +138,11 @@ class StandbyView(context: Context, private val onExit: () -> Unit) : FrameLayou
     override fun onDetachedFromWindow() {
         removeCallbacks(drift)
         super.onDetachedFromWindow()
+    }
+
+    private companion object {
+        /** From the digits' baseline to the battery line, and from the line to the date. */
+        const val GAP_DP = 26
+        const val DRIFT_DP = 6
     }
 }
