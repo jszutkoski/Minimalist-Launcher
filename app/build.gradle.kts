@@ -18,37 +18,31 @@ android {
     }
 
     signingConfigs {
-        // A fixed key so every CI build installs as an update over the previous one.
-        // The release key lives only in the repository's Actions secrets, which CI decodes
-        // to a file; it is never in the code. Until those secrets exist, builds fall back to
-        // the old key below, which is public and so lets anyone sign an "update": it goes
-        // as soon as the secret one is in use.
+        // A fixed key so every CI build installs as an update over the previous one. It lives
+        // only in the repository's Actions secrets, which CI decodes to a temporary file; it is
+        // never in the code. Without it (a local build, a pull request from a fork) a release
+        // build comes out unsigned, and CI refuses to publish one.
         val releaseKey = System.getenv("MINIMALIST_KEYSTORE_FILE")
-        create("personal") {
-            if (releaseKey != null) {
+        if (releaseKey != null) {
+            create("release") {
                 storeFile = file(releaseKey)
                 storePassword = System.getenv("MINIMALIST_KEYSTORE_PASSWORD")
                 keyAlias = "minimalist"
                 keyPassword = System.getenv("MINIMALIST_KEYSTORE_PASSWORD")
-            } else {
-                storeFile = file("personal.keystore")
-                storePassword = "minimalist"
-                keyAlias = "minimalist"
-                keyPassword = "minimalist"
             }
         }
     }
 
     buildTypes {
         debug {
+            // Android's own debug key, and a separate app: it never installs over the real one.
             applicationIdSuffix = ".debug"
-            signingConfig = signingConfigs.getByName("personal")
         }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
-            signingConfig = signingConfigs.getByName("personal")
+            signingConfig = signingConfigs.findByName("release")
         }
     }
 

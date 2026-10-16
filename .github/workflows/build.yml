@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       # The signing key, base64, and its password: repository secrets, never in the code.
-      # Absent on pull requests from forks, and until they are added.
+      # Absent on pull requests from forks, which then build an unsigned check only.
       MINIMALIST_KEYSTORE: ${{ secrets.MINIMALIST_KEYSTORE }}
       MINIMALIST_KEYSTORE_PASSWORD: ${{ secrets.MINIMALIST_KEYSTORE_PASSWORD }}
     steps:
@@ -27,6 +27,12 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
+      - name: Require the signing key for published builds
+        if: github.event_name == 'push' && env.MINIMALIST_KEYSTORE == ''
+        run: |
+          echo "::error::The MINIMALIST_KEYSTORE secret is missing; refusing to publish an unsigned APK."
+          exit 1
+
       - name: Decode the signing key
         if: env.MINIMALIST_KEYSTORE != ''
         run: |
@@ -37,7 +43,8 @@ jobs:
         run: ./gradlew assembleRelease --stacktrace
 
       - name: Name the APK
-        run: cp app/build/outputs/apk/release/app-release.apk minimalist-launcher.apk
+        # "-unsigned" in the name when built without the key (pull requests from forks).
+        run: cp app/build/outputs/apk/release/app-release*.apk minimalist-launcher.apk
 
       - name: Clean up the signing key
         if: always()

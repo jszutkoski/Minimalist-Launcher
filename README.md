@@ -68,7 +68,7 @@ never in the code:
 CI decodes the key to a temporary file for the build and deletes it afterwards. Keep a
 private backup of the keystore: losing it means uninstalling and reinstalling once.
 
-Until those secrets exist, builds fall back to `app/personal.keystore`, an older key that
-is public in this repository. Anyone could sign an APK with it that installs over yours,
-so it is to be removed once the secret key is in use (switching keys needs one uninstall
-and reinstall). For Google Play, use a separate upload key, also kept out of the repository.
+Without them (a local build, a pull request from a fork) the release APK comes out
+unsigned, and CI refuses to publish it. Debug builds use Android's own debug key and
+install as a separate app (`.debug`). For Google Play, use a separate upload key, also
+kept out of the repository.
