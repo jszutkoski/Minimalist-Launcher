@@ -14,6 +14,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.CancellationSignal
 import android.os.PowerManager
+import android.os.SystemClock
 import android.view.WindowInsetsController
 import android.view.WindowManager
 import android.window.OnBackInvokedDispatcher
@@ -30,6 +31,14 @@ open class StandbyActivity : Activity() {
     private var unlockAsked = false
     /** The fingerprint or PIN was given here, so leaving needs no lock behind it. */
     private var confirmed = false
+    /** When the screen last came on with standby up, or standby opened on a lit screen. */
+    private var awakeSince = SystemClock.elapsedRealtime()
+
+    private val screenOnReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            awakeSince = SystemClock.elapsedRealtime()
+        }
+    }
     private val notificationsChanged: () -> Unit = { showWaiting() }
 
     private val batteryReceiver = object : BroadcastReceiver() {
@@ -66,6 +75,7 @@ open class StandbyActivity : Activity() {
         // Sticky: registering returns the current charge right away.
         registerReceiver(batteryReceiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED))?.let(::updateBattery)
         registerReceiver(unlockReceiver, IntentFilter(Intent.ACTION_USER_PRESENT))
+        registerReceiver(screenOnReceiver, IntentFilter(Intent.ACTION_SCREEN_ON))
     }
 
     override fun onResume() {
@@ -88,6 +98,7 @@ open class StandbyActivity : Activity() {
         inFront = false
         unregisterReceiver(batteryReceiver)
         unregisterReceiver(unlockReceiver)
+        unregisterReceiver(screenOnReceiver)
         super.onDestroy()
     }
 
@@ -113,13 +124,28 @@ open class StandbyActivity : Activity() {
     @Deprecated("Only reached below Android 13; newer versions use OnBackInvokedCallback.")
     override fun onBackPressed() = leave()
 
-    /** The phone has a PIN, pattern or password, and nobody has given it yet. */
-    private fun needsUnlock() = !confirmed && getSystemService(KeyguardManager::class.java)?.isDeviceSecure == true
+    /** Put on top again at a later screen off: a fresh look, so a fresh grace period. */
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        awakeSince = SystemClock.elapsedRealtime()
+    }
 
     /**
-     * A tap or back: never straight in. Over the lock screen, Android's own unlock; on a phone
-     * that is still unlocked (standby opened from home, or kept awake by the charger), the
-     * fingerprint or PIN first all the same, so standby always guards the phone.
+     * The phone has a PIN, pattern or password, nobody has given it yet, and the grace period is
+     * over. For the first seconds after the screen comes on (or standby opens), a phone Android
+     * has not locked yet goes straight in, as it would without standby: a screen that timed out
+     * a moment ago should not need the fingerprint. Kept awake longer, by the charger or by
+     * just sitting there, standby guards the phone itself.
+     */
+    private fun needsUnlock(): Boolean {
+        if (confirmed || getSystemService(KeyguardManager::class.java)?.isDeviceSecure != true) return false
+        return SystemClock.elapsedRealtime() - awakeSince > GRACE_MS
+    }
+
+    /**
+     * A tap or back. Over the lock screen, Android's own unlock. On a phone that is still
+     * unlocked: straight in during the grace period, the fingerprint or PIN after it, so a
+     * standby kept awake by the charger still guards the phone.
      */
     private fun leave() {
         val keyguard = getSystemService(KeyguardManager::class.java)
@@ -212,6 +238,9 @@ open class StandbyActivity : Activity() {
     }
 
     companion object {
+        /** How long after the screen comes on a still-unlocked phone opens without the fingerprint. */
+        private const val GRACE_MS = 10_000L
+
         private val WHATSAPP = listOf("com.whatsapp", "com.whatsapp.w4b")
         private val EMAIL = listOf(
             "com.google.android.gm",
