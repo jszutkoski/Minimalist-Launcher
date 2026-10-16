@@ -36,7 +36,6 @@ import android.view.WindowManager
 import android.view.animation.PathInterpolator
 import android.view.inputmethod.EditorInfo
 import android.widget.EditText
-import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.Space
 import android.widget.TextClock
@@ -59,8 +58,6 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
     private lateinit var clock: TextClock
     private lateinit var date: TextClock
     private lateinit var batteryBar: BatteryBar
-    private lateinit var batteryText: TextView
-    private lateinit var batteryTip: FrameLayout
     private lateinit var alarmDot: TextView
     private lateinit var alarmText: TextView
     private lateinit var pause: PauseView
@@ -221,19 +218,6 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
             setPadding(0, dp(10), 0, dp(10))
             setOnClickListener { SystemActions.openCalendar(this@MainActivity) }
         }
-        // The percentage rides the end of the fill, just under the bar.
-        batteryText = text("", 13f, Palette.SECONDARY, 400).apply {
-            letterSpacing = 0.04f
-            setPadding(dp(6), dp(4), dp(6), dp(4))
-            setOnClickListener { SystemActions.openBatteryUsage(this@MainActivity) }
-        }
-        batteryBar.follower = batteryText
-        batteryTip = FrameLayout(this).apply {
-            addView(batteryText, FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT))
-            // Its own width or the text's changes: move the label to the fill's end again.
-            addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> placeBatteryTip() }
-        }
-        batteryText.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> placeBatteryTip() }
         alarmDot = text("·", 15f, Palette.TERTIARY, 400).apply {
             setPadding(dp(10), dp(10), dp(10), dp(10))
             visibility = View.GONE
@@ -268,19 +252,15 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         player = PlayerView(this, ::openPlayer)
 
         val wrap = ViewGroup.LayoutParams.WRAP_CONTENT
-        // The clock widget: time, a battery hairline exactly as wide as the time,
-        // then the date and the battery percentage on one quiet line.
+        // The clock widget: time, a battery hairline exactly as wide as the time with the
+        // percentage set into it where the fill ends, then the date on one quiet line.
         clockBlock = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         clockBlock.addView(clock, LinearLayout.LayoutParams(wrap, wrap))
         clockBlock.addView(
             batteryBar,
-            LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, wrap).apply { topMargin = dp(16) },
-        )
-        clockBlock.addView(
-            batteryTip,
             LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, wrap).apply {
-                topMargin = dp(2)
-                bottomMargin = dp(4)
+                topMargin = dp(10)
+                bottomMargin = dp(8)
             },
         )
         dateRow = LinearLayout(this).apply {
@@ -336,7 +316,7 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         val scale = prefs.textSize.scale
         clock.setTextSize(TypedValue.COMPLEX_UNIT_SP, 92f * scale)
         date.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f * scale)
-        batteryText.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f * scale)
+        batteryBar.setLabelSize(13f * scale)
         alarmDot.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f * scale)
         alarmText.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f * scale)
         pause.setTextScale(scale)
@@ -364,24 +344,13 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         val charging = status == BatteryManager.BATTERY_STATUS_CHARGING || status == BatteryManager.BATTERY_STATUS_FULL
         val low = !charging && fraction <= LOW_BATTERY
         batteryBar.update(fraction, charging, low)
-        // Just the number: under the battery bar, it needs no percent sign.
-        batteryText.text = NumberFormat.getIntegerInstance().format((fraction * 100).roundToInt())
-        batteryText.contentDescription = NumberFormat.getPercentInstance().format(fraction.toDouble())
-        placeBatteryTip()
-        batteryText.setTextColor(pressable(if (low) Palette.LOW else Palette.SECONDARY))
+        // Just the number: set into the battery line, it needs no percent sign.
+        batteryBar.label = NumberFormat.getIntegerInstance().format((fraction * 100).roundToInt())
+        batteryBar.contentDescription = NumberFormat.getPercentInstance().format(fraction.toDouble())
         if (charging != this.charging) {
             this.charging = charging
             scheduleStandby()
         }
-    }
-
-    /** Centres the percentage under the end of the fill, kept within the bar's ends. */
-    private fun placeBatteryTip() {
-        val track = batteryTip.width
-        val label = batteryText.width
-        if (track == 0 || label == 0) return
-        val x = batteryBar.fraction * track - label / 2f
-        batteryText.translationX = x.coerceIn(0f, (track - label).toFloat().coerceAtLeast(0f))
     }
 
     // Standby ------------------------------------------------------------------

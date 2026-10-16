@@ -9,7 +9,7 @@ No app icons, no widgets, no ads, no tracking. The only thing that ever leaves t
 
 | | |
 |---|---|
-| **Home** | Clock, a battery line as wide as the time with the percentage riding just under the end of its fill, then the date (and the next alarm). Up to 8 pinned apps. Everything is centred by default, or left aligned. A row of line icons along the bottom: WhatsApp, Waze, Google Photos, Spotify and the camera (an app that isn't installed leaves its slot empty). Tap the clock for alarms, the date for your calendar, the battery for battery usage. The line breathes while charging and turns red below 15%. |
+| **Home** | Clock, a battery line as wide as the time with the percentage set into it right where the fill ends, the line parting around the number, then the date (and the next alarm). Up to 8 pinned apps. Everything is centred by default, or left aligned. A row of line icons along the bottom: WhatsApp, Waze, Google Photos, Spotify and the camera (an app that isn't installed leaves its slot empty). Tap the clock for alarms, the date for your calendar, the battery for battery usage. The line breathes while charging and turns red below 15%. |
 | **App list** | Swipe up. The keyboard opens and search starts as you type; when only one app matches, it opens on its own. Press *Go* to open the top match. Accents are ignored, so `camera` finds *Câmera*. |
 | **Long-press an app** | The app's own shortcuts first (Waze "Drive home", WhatsApp chats…), then add to home, remove, reorder, rename, pause before opening, hide, app info, uninstall. |
 | **Gestures** | Swipe up for the app list, down for notifications. Drag the list down (or press back) to close it. |
