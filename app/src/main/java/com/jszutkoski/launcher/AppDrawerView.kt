@@ -55,6 +55,7 @@ class AppDrawerView(context: Context, private val callbacks: Callbacks) : Linear
         set(value) {
             field = value
             search.setTextSize(TypedValue.COMPLEX_UNIT_SP, 26f * value)
+            browse.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f * value)
             adapter.textScale = value
         }
 
@@ -79,6 +80,14 @@ class AppDrawerView(context: Context, private val callbacks: Callbacks) : Linear
     private val search = EditText(context)
     private val list = ListView(context)
     private val hairline = View(context)
+
+    /** Search only, for when the name is forgotten: the whole list, until the drawer closes. */
+    private val browse = context.text("Show all apps", 17f, Palette.SECONDARY, 400).apply {
+        letterSpacing = 0.02f
+        setPadding(0, dp(12), 0, dp(12))
+        visibility = GONE
+    }
+    private var showAll = false
 
     private val slop = ViewConfiguration.get(context).scaledTouchSlop
     private val fling = context.dp(500f)
@@ -147,6 +156,13 @@ class AppDrawerView(context: Context, private val callbacks: Callbacks) : Linear
                 override fun onScroll(view: AbsListView, first: Int, visible: Int, total: Int) = Unit
             })
         }
+        browse.setOnClickListener {
+            showAll = true
+            // Browsing, not typing: the keyboard would cover half the list.
+            hideKeyboard()
+            filter(fromTyping = false)
+        }
+        addView(browse, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT))
         addView(list, LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f))
 
         textScale = 1f
@@ -178,6 +194,10 @@ class AppDrawerView(context: Context, private val callbacks: Callbacks) : Linear
     /** Back to an empty search at the top of the list. */
     fun reset() {
         hideKeyboard()
+        if (showAll) {
+            showAll = false
+            filter(fromTyping = false)
+        }
         if (search.text.isNotEmpty()) search.text.clear()
         list.setSelection(0)
     }
@@ -190,7 +210,9 @@ class AppDrawerView(context: Context, private val callbacks: Callbacks) : Linear
     private fun filter(fromTyping: Boolean) {
         val query = search.text.toString()
         val q = query.trim()
-        val found = if (searchOnly && q.isEmpty()) emptyList() else AppSearch.filter(apps, query)
+        val waiting = searchOnly && !showAll && q.isEmpty()
+        browse.visibility = if (waiting) VISIBLE else GONE
+        val found = if (waiting) emptyList() else AppSearch.filter(apps, query)
         val people = ContactSearch.filter(contacts, q).takeIf { q.length >= 2 }.orEmpty().take(MAX_CONTACTS)
         val settings = SettingSearch.filter(q).take(MAX_SETTINGS)
         adapter.items = buildList {
