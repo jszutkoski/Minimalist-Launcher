@@ -37,12 +37,20 @@ object Weather {
     /** The last reading, unless it is too old to be worth showing. */
     fun cached(context: Context): Now? {
         val store = store(context)
-        val time = store.getLong("time", 0)
+        val time = readingTime(context)
         if (System.currentTimeMillis() - time > SHOWN_MS) return null
         return Now(store.getInt("temperature", 0), store.getInt("code", -1), time)
     }
 
-    fun isFresh(context: Context) = System.currentTimeMillis() - store(context).getLong("time", 0) < FRESH_MS
+    fun isFresh(context: Context) = System.currentTimeMillis() - readingTime(context) < FRESH_MS
+
+    /** When the last reading was taken, or never if it was in the other unit. */
+    private fun readingTime(context: Context): Long {
+        val store = store(context)
+        return if (store.getString("unit", null) == unit(context)) store.getLong("time", 0) else 0
+    }
+
+    private fun unit(context: Context) = if (fahrenheit(context)) "fahrenheit" else "celsius"
 
     /** Finds the place, then asks for the weather there. [done] runs on a background thread. */
     fun refresh(context: Context, done: (Now?) -> Unit) {
@@ -96,7 +104,7 @@ object Weather {
             return null
         }
 
-        val unit = if (fahrenheit(context)) "fahrenheit" else "celsius"
+        val unit = unit(context)
         val url = String.format(
             Locale.ROOT,
             "https://api.open-meteo.com/v1/forecast?latitude=%.2f&longitude=%.2f&current=temperature_2m,weather_code&temperature_unit=%s",
@@ -116,7 +124,7 @@ object Weather {
             }
             val current = JSONObject(body).getJSONObject("current")
             val now = Now(current.getDouble("temperature_2m").roundToInt(), current.getInt("weather_code"), System.currentTimeMillis())
-            store.edit().putInt("temperature", now.temperature).putInt("code", now.code).putLong("time", now.time).apply()
+            store.edit().putInt("temperature", now.temperature).putInt("code", now.code).putLong("time", now.time).putString("unit", unit).apply()
             now
         } catch (_: Exception) {
             // Offline, a timeout or an unexpected answer: keep showing the last reading.
