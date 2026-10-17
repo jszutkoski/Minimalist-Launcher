@@ -22,10 +22,11 @@ class SettingsScreenTest {
 
     private fun Activity.title() = content().textViews().first().text.toString()
 
-    /** Taps the row with this title; rows are the clickable parents of their texts. */
+    /** Taps the row with this title (rows are the clickable parents of their texts), or a text that is a button itself. */
     private fun Activity.tap(title: Int) {
         val text = getString(title)
-        (content().textViews().first { it.text == text }.parent as View).performClick()
+        val view = content().textViews().first { it.text == text }
+        (if (view.hasOnClickListeners()) view else view.parent as View).performClick()
         idle()
     }
 
