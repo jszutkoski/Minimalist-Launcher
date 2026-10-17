@@ -334,6 +334,7 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
                 insets.getInsets(WindowInsets.Type.displayCutout()),
             )
             val ime = insets.getInsets(WindowInsets.Type.ime())
+            if (insets.isVisible(WindowInsets.Type.ime())) drawer.onKeyboardShown()
             val side = dp(SIDE_MARGIN_DP)
             home.setPadding(bars.left + side, bars.top + dp(56), bars.right + side, bars.bottom + dp(36))
             drawer.applyInsets(bars.left, bars.top, bars.right, maxOf(bars.bottom, ime.bottom))
@@ -403,6 +404,8 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         // onResume doesn't run when it closes.
         if (hasFocus) applyStatusBar()
         if (hasFocus) scheduleStandby()
+        // A keyboard asked for while the window had no focus yet is shown now.
+        if (hasFocus && progress > 0f) drawer.onWindowFocus()
     }
 
     private fun showAccessibleRow() {

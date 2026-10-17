@@ -11,7 +11,6 @@ import android.os.Looper
 import android.provider.ContactsContract
 import android.provider.Settings
 import android.telephony.PhoneNumberUtils
-import android.telephony.TelephonyManager
 import java.text.DecimalFormatSymbols
 import java.text.NumberFormat
 import java.util.Locale
@@ -21,8 +20,8 @@ import kotlin.math.pow
 sealed interface SearchResult {
     class AppHit(val app: App) : SearchResult
 
-    /** The search was a sum: its result, copied on tap. */
-    class Answer(val value: Double) : SearchResult
+    /** The search was a sum: its result, written the [numbers] way, copied on tap. */
+    class Answer(val value: Double, val numbers: Locale) : SearchResult
 
     class ContactHit(val contact: Contact) : SearchResult
 
@@ -61,13 +60,13 @@ object Calculator {
         }
     }
 
-    /** Grouped the local way, for reading: "1.234,5" in Brazil. */
-    fun format(value: Double): String = formatter(grouping = true).format(value)
+    /** Grouped the [numbers] way, for reading: "1.234,5" in Brazil. */
+    fun format(value: Double, numbers: Locale): String = formatter(numbers, grouping = true).format(value)
 
     /** Without grouping, for pasting elsewhere. */
-    fun plain(value: Double): String = formatter(grouping = false).format(value)
+    fun plain(value: Double, numbers: Locale): String = formatter(numbers, grouping = false).format(value)
 
-    private fun formatter(grouping: Boolean) = NumberFormat.getNumberInstance().apply {
+    private fun formatter(numbers: Locale, grouping: Boolean) = NumberFormat.getNumberInstance(numbers).apply {
         maximumFractionDigits = 8
         isGroupingUsed = grouping
     }
@@ -313,13 +312,8 @@ object ContactSearch {
         }
     }
 
-    private fun countryIso(context: Context): String {
-        val telephony = context.getSystemService(TelephonyManager::class.java)
-        return listOfNotNull(telephony?.networkCountryIso, telephony?.simCountryIso, Locale.getDefault().country)
-            .firstOrNull { it.isNotBlank() }
-            ?.uppercase(Locale.ROOT)
-            ?: "US"
-    }
+    private fun countryIso(context: Context): String =
+        Region.country(context) ?: Locale.getDefault().country.takeIf { it.isNotBlank() } ?: "US"
 }
 
 // System settings ----------------------------------------------------------------

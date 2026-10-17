@@ -13,6 +13,7 @@ import android.view.VelocityTracker
 import android.view.View
 import android.view.ViewConfiguration
 import android.view.ViewGroup
+import android.view.WindowInsets
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
 import android.widget.AbsListView
@@ -22,6 +23,7 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ListView
 import android.widget.TextView
+import java.text.DecimalFormatSymbols
 import kotlin.math.abs
 
 /**
@@ -88,6 +90,16 @@ class AppDrawerView(context: Context, private val callbacks: Callbacks) : Linear
         visibility = GONE
     }
     private var showAll = false
+
+    /**
+     * Sums are read and written the way of the country the phone is in, not of its language:
+     * in Brazil "1.500" is fifteen hundred even on a phone in English. Looked up again each
+     * time the list closes, in case the phone has travelled.
+     */
+    private var numbers = Region.numbers(context)
+
+    /** Asked for but not up yet: a request made before the window has focus is dropped by Android. */
+    private var keyboardWanted = false
 
     private val slop = ViewConfiguration.get(context).scaledTouchSlop
     private val fling = context.dp(500f)
@@ -181,13 +193,36 @@ class AppDrawerView(context: Context, private val callbacks: Callbacks) : Linear
     }
 
     fun showKeyboard() {
-        search.requestFocus()
-        search.post {
-            context.getSystemService(InputMethodManager::class.java)?.showSoftInput(search, InputMethodManager.SHOW_IMPLICIT)
+        keyboardWanted = true
+        raiseKeyboard(FRAMES_TO_APPEAR)
+    }
+
+    /**
+     * Once the list is on screen: an editor in a hidden view can't take focus, and the list only
+     * appears with the first frame of its opening. Retried for a few frames, then left to
+     * [onWindowFocus] if the window still has no focus (just back home, or the shade closing).
+     */
+    private fun raiseKeyboard(framesLeft: Int) {
+        if (!keyboardWanted) return
+        if (!isShown || !hasWindowFocus()) {
+            if (framesLeft > 0) postOnAnimation { raiseKeyboard(framesLeft - 1) }
+            return
         }
+        search.requestFocus()
+        search.windowInsetsController?.show(WindowInsets.Type.ime())
+        context.getSystemService(InputMethodManager::class.java)?.showSoftInput(search, 0)
+    }
+
+    /** The window has focus again: a keyboard still wanted goes up now. */
+    fun onWindowFocus() = raiseKeyboard(FRAMES_TO_APPEAR)
+
+    /** The keyboard is up: nothing left to ask for. */
+    fun onKeyboardShown() {
+        keyboardWanted = false
     }
 
     fun hideKeyboard() {
+        keyboardWanted = false
         context.getSystemService(InputMethodManager::class.java)?.hideSoftInputFromWindow(windowToken, 0)
         search.clearFocus()
     }
@@ -195,6 +230,7 @@ class AppDrawerView(context: Context, private val callbacks: Callbacks) : Linear
     /** Back to an empty search at the top of the list. */
     fun reset() {
         hideKeyboard()
+        numbers = Region.numbers(context)
         if (showAll) {
             showAll = false
             filter(fromTyping = false)
@@ -217,7 +253,8 @@ class AppDrawerView(context: Context, private val callbacks: Callbacks) : Linear
         val people = ContactSearch.filter(contacts, q).takeIf { q.length >= 2 }.orEmpty().take(MAX_CONTACTS)
         val settings = SettingSearch.filter(q).take(MAX_SETTINGS)
         adapter.items = buildList {
-            Calculator.evaluate(q)?.let { add(SearchResult.Answer(it)) }
+            Calculator.evaluate(q, DecimalFormatSymbols.getInstance(numbers).decimalSeparator)
+                ?.let { add(SearchResult.Answer(it, numbers)) }
             found.mapTo(this, SearchResult::AppHit)
             people.mapTo(this, SearchResult::ContactHit)
             settings.mapTo(this, SearchResult::SettingHit)
@@ -286,6 +323,9 @@ class AppDrawerView(context: Context, private val callbacks: Callbacks) : Linear
 }
 
 private const val MAX_CONTACTS = 4
+
+/** How many frames the keyboard waits for the list to appear before leaving it to window focus. */
+private const val FRAMES_TO_APPEAR = 10
 private const val MAX_SETTINGS = 3
 
 private class ResultAdapter(private val context: Context, private val onWhatsApp: (Contact) -> Unit) : BaseAdapter() {
@@ -337,7 +377,7 @@ private class ResultAdapter(private val context: Context, private val onWhatsApp
         var contact: Contact? = null
         when (item) {
             is SearchResult.Answer -> {
-                title = "= ${Calculator.format(item.value)}"
+                title = "= ${Calculator.format(item.value, item.numbers)}"
                 hint = context.getString(R.string.result_copy)
             }
             is SearchResult.ContactHit -> {

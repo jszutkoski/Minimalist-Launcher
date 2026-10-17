@@ -3,6 +3,8 @@ package com.jszutkoski.launcher
 import android.content.Intent
 import android.content.pm.ShortcutInfo
 import android.view.View
+import android.view.inputmethod.InputMethodManager
+import android.widget.EditText
 import android.view.accessibility.AccessibilityManager
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -68,8 +70,42 @@ class HomeScreenTest {
         assertFalse(sheet.dialog.isShowing)
     }
 
-    private fun MainActivity.allApps() =
-        content().textViews().single { it.text == getString(R.string.all_apps) }.parent as View
+    private fun MainActivity.search() = content().views().filterIsInstance<EditText>().single()
+
+    private fun keyboardUp() = shadowOf(app.getSystemService(InputMethodManager::class.java)).isSoftInputVisible
+
+    @Test
+    fun theKeyboardComesUpWhenTheListOpens() {
+        shadowOf(app.getSystemService(AccessibilityManager::class.java)).setTouchExplorationEnabled(true)
+        val controller = home()
+        controller.windowFocusChanged(true)
+        val activity = controller.get()
+        // Opened from a button the list is still hidden when asked: focus has to wait for it.
+        activity.allAppsButton().performClick()
+        idle(1_000)
+        assertTrue(activity.search().isFocused)
+        assertTrue(keyboardUp())
+    }
+
+    @Test
+    fun theKeyboardWaitsForTheWindowToHaveFocus() {
+        shadowOf(app.getSystemService(AccessibilityManager::class.java)).setTouchExplorationEnabled(true)
+        val controller = home()
+        // Just back home: the window isn't focused yet, and Android would drop the request.
+        controller.windowFocusChanged(false)
+        val activity = controller.get()
+        activity.allAppsButton().performClick()
+        idle(1_000)
+        assertFalse(keyboardUp())
+        controller.windowFocusChanged(true)
+        idle()
+        assertTrue(activity.search().isFocused)
+        assertTrue(keyboardUp())
+    }
+
+    private fun MainActivity.allAppsButton() = content().textViews().single { it.text == getString(R.string.all_apps) }
+
+    private fun MainActivity.allApps() = allAppsButton().parent as View
 
     @Test
     fun talkBackGetsButtonsForWhatTheSwipesDo() {

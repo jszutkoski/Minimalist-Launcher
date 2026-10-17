@@ -9,7 +9,6 @@ import android.location.Location
 import android.location.LocationManager
 import android.os.Build
 import android.os.SystemClock
-import android.telephony.TelephonyManager
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URI
@@ -168,10 +167,7 @@ object Weather {
             "fahrenhe" -> return true
             "celsius", "kelvin" -> return false
         }
-        val telephony = context.getSystemService(TelephonyManager::class.java)
-        val country = listOfNotNull(telephony?.networkCountryIso, telephony?.simCountryIso)
-            .firstOrNull { it.isNotBlank() }
-            ?.uppercase(Locale.ROOT)
+        val country = Region.country(context)
             ?: return LocaleData.getMeasurementSystem(ULocale.getDefault()) == LocaleData.MeasurementSystem.US
         return country in FAHRENHEIT_COUNTRIES
     }

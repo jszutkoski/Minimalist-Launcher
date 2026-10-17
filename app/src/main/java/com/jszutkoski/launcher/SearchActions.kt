@@ -20,7 +20,7 @@ class SearchActions(
     fun open(result: SearchResult, source: View) {
         when (result) {
             is SearchResult.AppHit -> launch(result.app, source)
-            is SearchResult.Answer -> copy(Calculator.plain(result.value))
+            is SearchResult.Answer -> copy(Calculator.plain(result.value, result.numbers))
             is SearchResult.ContactHit -> showContact(result.contact)
             is SearchResult.SettingHit -> openSetting(result.setting)
             is SearchResult.Web -> SystemActions.webSearch(activity, result.query)
