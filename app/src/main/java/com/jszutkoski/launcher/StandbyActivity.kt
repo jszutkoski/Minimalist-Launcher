@@ -17,16 +17,23 @@ import android.os.PowerManager
 import android.os.SystemClock
 import android.view.WindowInsetsController
 import android.view.WindowManager
-import java.lang.ref.WeakReference
 import android.window.OnBackInvokedDispatcher
+import java.lang.ref.WeakReference
 
 /**
  * The bedside clock as its own screen, allowed to show over the lock screen. When the phone
  * locks while it is open, pressing power brings it back instead of the lock screen. It shows
- * only the time, date and battery: tapping asks for the PIN or fingerprint before anything
- * else, and unlocking by any means closes it.
+ * the time, battery, date, weather and which messages are waiting, nothing that can be opened:
+ * tapping asks for the PIN or fingerprint first, and unlocking by any means closes it.
  */
 open class StandbyActivity : Activity() {
+    private val prefs by lazy { Prefs(this) }
+    private val keyguard by lazy { getSystemService(KeyguardManager::class.java) }
+    private val power by lazy { getSystemService(PowerManager::class.java) }
+    private val screenOn get() = power?.isInteractive == true
+    private val locked get() = keyguard?.isKeyguardLocked == true
+    private val secure get() = keyguard?.isDeviceSecure == true
+
     private lateinit var view: StandbyView
     private var charging = false
     private var unlockAsked = false
@@ -50,6 +57,10 @@ open class StandbyActivity : Activity() {
         override fun onReceive(context: Context, intent: Intent) = updateBattery(intent)
     }
 
+    private val closeShadeAgain = Runnable {
+        if (locked && !unlockAsked && !isFinishing) LockService.closeShade()
+    }
+
     /** Unlocked with the fingerprint or face while showing: the phone is wanted, so step aside. */
     private val unlockReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) = finish()
@@ -68,7 +79,8 @@ open class StandbyActivity : Activity() {
         // then visibly ramp down to it. The half-strength text on black keeps it dim enough.
         // Bars stay, with dark icons on black: nearly invisible. Hidden bars flash in for a
         // moment on every wake before Android applies the request again.
-        val dark = WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS or WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS
+        val dark = WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS or
+            WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS
         window.insetsController?.setSystemBarsAppearance(dark, dark)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             onBackInvokedDispatcher.registerOnBackInvokedCallback(OnBackInvokedDispatcher.PRIORITY_DEFAULT) { leave() }
@@ -98,7 +110,7 @@ open class StandbyActivity : Activity() {
         // Covered by something else with the screen on (a call, an alarm, an app opened from a
         // notification): no longer in front, so the next screen off must bring it back on top.
         // Stopped by the screen going off, it is still what the wake will show.
-        if (getSystemService(PowerManager::class.java)?.isInteractive == true) leaveFront()
+        if (screenOn) leaveFront()
     }
 
     override fun onDestroy() {
@@ -119,13 +131,12 @@ open class StandbyActivity : Activity() {
     override fun onUserLeaveHint() {
         super.onUserLeaveHint()
         // With the screen off this is just the launch at screen off, not the user leaving.
-        if (getSystemService(PowerManager::class.java)?.isInteractive == false) return
+        if (!screenOn) return
         // The PIN pad of our own prompt opening over standby.
         if (unlockAsked) return
         leaveFront()
         // Home or recents on a phone that was never locked (the charger keeps the screen on,
         // so it never locks by itself): lock it now, or that swipe would get straight in.
-        val locked = getSystemService(KeyguardManager::class.java)?.isKeyguardLocked == true
         if (!locked && needsUnlock()) LockService.lock()
         if (this !is StandbyOverAppsActivity) finish()
     }
@@ -150,14 +161,10 @@ open class StandbyActivity : Activity() {
      */
     private fun systemCameOver(lostFocus: Boolean) {
         // Our own fingerprint prompt or PIN pad, standby closing, or the screen going off.
-        if (unlockAsked || isFinishing) return
-        if (getSystemService(PowerManager::class.java)?.isInteractive != true) return
-        if (LockService.inCall(this)) return
-        val keyguard = getSystemService(KeyguardManager::class.java)
-        val locked = keyguard?.isKeyguardLocked == true
+        if (unlockAsked || isFinishing || !screenOn || LockService.inCall(this)) return
         when {
             !locked -> if (lostFocus && needsUnlock()) LockService.lock()
-            keyguard?.isDeviceSecure == true && Prefs(this).closeShadeOnStandby -> closeShade()
+            secure && prefs.closeShadeOnStandby -> closeShade()
         }
     }
 
@@ -169,11 +176,6 @@ open class StandbyActivity : Activity() {
         LockService.closeShade()
         view.removeCallbacks(closeShadeAgain)
         SHADE_CLOSE_RETRIES_MS.forEach { view.postDelayed(closeShadeAgain, it) }
-    }
-
-    private val closeShadeAgain = Runnable {
-        val locked = getSystemService(KeyguardManager::class.java)?.isKeyguardLocked == true
-        if (locked && !unlockAsked && !isFinishing) LockService.closeShade()
     }
 
     private fun leaveFront() {
@@ -200,7 +202,7 @@ open class StandbyActivity : Activity() {
      * just sitting there, standby guards the phone itself.
      */
     private fun needsUnlock(): Boolean {
-        if (confirmed || getSystemService(KeyguardManager::class.java)?.isDeviceSecure != true) return false
+        if (confirmed || !secure) return false
         return SystemClock.elapsedRealtime() - awakeSince > GRACE_MS
     }
 
@@ -210,8 +212,8 @@ open class StandbyActivity : Activity() {
      * standby kept awake by the charger still guards the phone.
      */
     private fun leave() {
-        val keyguard = getSystemService(KeyguardManager::class.java)
-        if (keyguard?.isKeyguardLocked != true) {
+        val keyguard = keyguard
+        if (keyguard == null || !locked) {
             if (needsUnlock()) confirmIdentity() else finish()
             return
         }
@@ -266,18 +268,16 @@ open class StandbyActivity : Activity() {
      * Over the lock screen only if allowed, as they tell anyone looking that messages came in.
      */
     private fun showWaiting() {
-        val keyguard = getSystemService(KeyguardManager::class.java)
-        val overLock = keyguard?.isKeyguardLocked == true && keyguard.isDeviceSecure
-        val allowed = !overLock || Prefs(this).lockScreenGlyphs
+        val allowed = !(locked && secure) || prefs.lockScreenGlyphs
         view.showWaiting(
             whatsApp = allowed && Packages.WHATSAPP.any(Notifications::hasAny),
             email = allowed && Packages.EMAIL.any(Notifications::hasAny),
         )
     }
 
-    /** The same reading as the home screen, fetched again when it is over half an hour old. */
+    /** The last reading under the date, fetched again when it is over half an hour old. */
     private fun showWeather() {
-        if (!Prefs(this).weather || !Weather.hasAccess(this)) {
+        if (!prefs.weather || !Weather.hasAccess(this)) {
             view.showWeather(null)
             return
         }
@@ -302,9 +302,7 @@ open class StandbyActivity : Activity() {
      * Android locks, and from the next wake on it stays lit over the lock screen.
      */
     private fun keepScreenOn() {
-        val keyguard = getSystemService(KeyguardManager::class.java)
-        val guarded = keyguard?.isKeyguardLocked == true || keyguard?.isDeviceSecure != true
-        if (charging && guarded) {
+        if (charging && (locked || !secure)) {
             window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         } else {
             window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
@@ -350,7 +348,9 @@ open class StandbyActivity : Activity() {
         /** From the screen-off receiver when home was showing: into the home task, on top of home. */
         fun startOverHome(context: Context) {
             try {
-                context.startActivity(Intent(context, StandbyActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                context.startActivity(
+                    Intent(context, StandbyActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                )
             } catch (e: RuntimeException) {
                 // No longer allowed to open screens from the background.
                 warn("Standby could not open over home", e)

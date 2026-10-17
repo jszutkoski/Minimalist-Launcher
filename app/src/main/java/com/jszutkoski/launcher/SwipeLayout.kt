@@ -1,5 +1,6 @@
 package com.jszutkoski.launcher
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
@@ -98,6 +99,8 @@ class SwipeLayout(context: Context) : FrameLayout(context) {
     override fun onInterceptTouchEvent(ev: MotionEvent): Boolean =
         active && ev.actionMasked == MotionEvent.ACTION_MOVE && detect(ev)
 
+    // Swipes, pinches and long-presses, no click: TalkBack gets buttons for them on home instead.
+    @SuppressLint("ClickableViewAccessibility")
     override fun onTouchEvent(ev: MotionEvent): Boolean {
         if (!active) return false
         when (ev.actionMasked) {

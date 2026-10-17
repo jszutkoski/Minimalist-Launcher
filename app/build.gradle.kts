@@ -61,6 +61,8 @@ android {
         // Warnings are reported in the build log; only errors fail it.
         warningsAsErrors = false
         textReport = true
+        // Every view is built in code; none is ever inflated from a layout file.
+        disable += "ViewConstructor"
     }
 
     compileOptions {

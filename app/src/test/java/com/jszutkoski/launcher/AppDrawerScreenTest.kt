@@ -5,6 +5,7 @@ import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.widget.EditText
 import android.widget.ListView
+import java.util.Locale
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -14,7 +15,6 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
-import java.util.Locale
 
 @RunWith(RobolectricTestRunner::class)
 class AppDrawerScreenTest {

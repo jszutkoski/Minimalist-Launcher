@@ -9,13 +9,13 @@ import android.location.Location
 import android.location.LocationManager
 import android.os.Build
 import android.os.SystemClock
-import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URI
 import java.util.Locale
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.roundToInt
+import org.json.JSONObject
 
 /**
  * Temperature and sky from Open-Meteo (free, no account, no key), for the phone's approximate
@@ -148,8 +148,17 @@ object Weather {
                 connection.disconnect()
             }
             val current = JSONObject(body).getJSONObject("current")
-            val now = Now(current.getDouble("temperature_2m").roundToInt(), current.getInt("weather_code"), System.currentTimeMillis())
-            store.edit().putInt("temperature", now.temperature).putInt("code", now.code).putLong("time", now.time).putString("unit", unit).apply()
+            val now = Now(
+                temperature = current.getDouble("temperature_2m").roundToInt(),
+                code = current.getInt("weather_code"),
+                time = System.currentTimeMillis(),
+            )
+            store.edit()
+                .putInt("temperature", now.temperature)
+                .putInt("code", now.code)
+                .putLong("time", now.time)
+                .putString("unit", unit)
+                .apply()
             now
         } catch (e: Exception) {
             // Offline, a timeout or an unexpected answer: keep showing the last reading.

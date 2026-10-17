@@ -71,6 +71,7 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
     private lateinit var accessibleRow: LinearLayout
     private val touchExploration = AccessibilityManager.TouchExplorationStateChangeListener { showAccessibleRow() }
     private var contactsLoaded = false
+    private var contactsObserverOn = false
     private val contactsObserver = object : ContentObserver(Handler(Looper.getMainLooper())) {
         override fun onChange(selfChange: Boolean) {
             contactsLoaded = false
@@ -294,7 +295,8 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         accessibleRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             visibility = View.GONE
-            listOf(R.string.all_apps to { openDrawer() }, R.string.settings to { onLongPressEmpty() }).forEach { (label, action) ->
+            val buttons = listOf(R.string.all_apps to { openDrawer() }, R.string.settings to { onLongPressEmpty() })
+            buttons.forEach { (label, action) ->
                 addView(
                     text(getString(label), 17f, Palette.SECONDARY, 400).apply {
                         setPadding(dp(16), dp(12), dp(16), dp(12))
@@ -369,14 +371,12 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
 
     private fun updateBattery(intent: Intent) {
         val battery = BatteryState.from(intent) ?: return
-        val fraction = battery.fraction
-        val charging = battery.charging
-        batteryBar.update(fraction, charging, battery.low)
+        batteryBar.update(battery.fraction, battery.charging, battery.low)
         // Just the number: set into the battery line, it needs no percent sign.
-        batteryBar.label = NumberFormat.getIntegerInstance().format((fraction * 100).roundToInt())
-        batteryBar.contentDescription = NumberFormat.getPercentInstance().format(fraction.toDouble())
-        if (charging != this.charging) {
-            this.charging = charging
+        batteryBar.label = NumberFormat.getIntegerInstance().format((battery.fraction * 100).roundToInt())
+        batteryBar.contentDescription = NumberFormat.getPercentInstance().format(battery.fraction.toDouble())
+        if (battery.charging != charging) {
+            charging = battery.charging
             scheduleStandby()
         }
     }
@@ -460,8 +460,6 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
     }
 
     // Smart search -------------------------------------------------------------------
-
-    private var contactsObserverOn = false
 
     /** Once, then again only after the address book changes. */
     private fun loadContacts() {

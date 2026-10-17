@@ -38,12 +38,14 @@
     <application
         android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="false"
         android:enableOnBackInvokedCallback="true"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:localeConfig="@xml/locales_config"
         android:supportsRtl="true"
-        android:theme="@style/Theme.Minimalist">
+        android:theme="@style/Theme.Minimalist"
+        tools:targetApi="33">
 
         <activity
             android:name=".MainActivity"
@@ -55,7 +57,10 @@
             android:resumeWhilePausing="true"
             android:screenOrientation="portrait"
             android:stateNotNeeded="true"
-            android:windowSoftInputMode="adjustResize|stateHidden">
+            android:windowSoftInputMode="adjustResize|stateHidden"
+            tools:ignore="DiscouragedApi,LockedOrientationActivity">
+            <!-- Portrait on phones, where the home screen is laid out for it; tablets and Android
+                 16's large screens ignore the lock, and the column still fits. -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.HOME" />

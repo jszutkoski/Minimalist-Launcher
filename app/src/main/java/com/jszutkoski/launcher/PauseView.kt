@@ -3,6 +3,7 @@ package com.jszutkoski.launcher
 import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
 import android.animation.ValueAnimator
+import android.annotation.SuppressLint
 import android.content.Context
 import android.util.TypedValue
 import android.view.Gravity
@@ -118,7 +119,8 @@ class PauseView(context: Context, private val onCancel: () -> Unit) :
         animate().alpha(0f).setDuration(200).withEndAction { visibility = GONE }.start()
     }
 
-    /** Takes every touch, so nothing on the home screen underneath can be tapped. */
+    /** Takes every touch, so nothing on the home screen underneath can be tapped; nothing to click. */
+    @SuppressLint("ClickableViewAccessibility")
     override fun onTouchEvent(event: MotionEvent) = true
 
     private companion object {

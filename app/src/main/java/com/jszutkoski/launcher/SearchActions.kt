@@ -40,14 +40,16 @@ class SearchActions(
     private fun copy(value: String) {
         activity.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText("Result", value))
         // Android 13+ confirms a copy on its own.
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) Toast.makeText(activity, activity.getString(R.string.copied, value), Toast.LENGTH_SHORT).show()
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) toast(activity.getString(R.string.copied, value))
     }
 
     private fun showContact(contact: Contact) {
+        fun open(action: String, scheme: String) =
+            SystemActions.start(activity, Intent(action, Uri.fromParts(scheme, contact.phone, null)))
         Sheet(activity, "${contact.name} · ${contact.phone}").apply {
             if (contact.whatsApp != null && whatsAppPackage() != null) option("WhatsApp") { whatsApp(contact) }
-            option(activity.getString(R.string.contact_call)) { SystemActions.start(activity, Intent(Intent.ACTION_DIAL, Uri.fromParts("tel", contact.phone, null))) }
-            option(activity.getString(R.string.contact_message)) { SystemActions.start(activity, Intent(Intent.ACTION_SENDTO, Uri.fromParts("smsto", contact.phone, null))) }
+            option(activity.getString(R.string.contact_call)) { open(Intent.ACTION_DIAL, "tel") }
+            option(activity.getString(R.string.contact_message)) { open(Intent.ACTION_SENDTO, "smsto") }
             option(activity.getString(R.string.contact_card)) {
                 SystemActions.start(
                     activity,
@@ -58,9 +60,11 @@ class SearchActions(
         }
     }
 
+    private fun toast(text: String) = Toast.makeText(activity, text, Toast.LENGTH_SHORT).show()
+
     private fun openSetting(setting: SystemSetting) {
         if (setting.isTorch) {
-            if (!Torch.toggle(activity)) Toast.makeText(activity, activity.getString(R.string.torch_unavailable), Toast.LENGTH_SHORT).show()
+            if (!Torch.toggle(activity)) toast(activity.getString(R.string.torch_unavailable))
             closeDrawer()
             return
         }

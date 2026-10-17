@@ -36,6 +36,8 @@ class StandbyView(context: Context, private val onExit: () -> Unit) : FrameLayou
 
     init {
         setBackgroundColor(Palette.BACKGROUND)
+        // Clickable, so TalkBack offers its double-tap to leave.
+        isClickable = true
         visibility = GONE
         alpha = 0f
 
@@ -131,7 +133,14 @@ class StandbyView(context: Context, private val onExit: () -> Unit) : FrameLayou
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
-        if (event.actionMasked == MotionEvent.ACTION_UP) onExit()
+        if (event.actionMasked == MotionEvent.ACTION_UP) performClick()
+        return true
+    }
+
+    /** A tap anywhere, or TalkBack's double-tap: leave, through the unlock when it is needed. */
+    override fun performClick(): Boolean {
+        super.performClick()
+        onExit()
         return true
     }
 

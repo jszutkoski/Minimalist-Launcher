@@ -369,7 +369,9 @@ class SettingsActivity : Activity() {
         val sheet = Sheet(this, getString(R.string.hidden_sheet_title))
         val hidden = prefs.hidden
         if (hidden.isEmpty()) {
-            sheet.column.addView(text(getString(R.string.hidden_empty), 19f, Palette.TERTIARY).apply { setPadding(0, dp(13), 0, dp(13)) })
+            sheet.column.addView(
+                text(getString(R.string.hidden_empty), 19f, Palette.TERTIARY).apply { setPadding(0, dp(13), 0, dp(13)) },
+            )
         }
         hidden
             .map { key -> key to (repo.find(key)?.label ?: getString(R.string.uninstalled_app)) }

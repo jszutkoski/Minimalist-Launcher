@@ -40,7 +40,9 @@ class PlayerView(context: Context, private val onOpen: (packageName: String) -> 
         addView(artist, LayoutParams(full))
 
         controls.orientation = HORIZONTAL
-        val previous = button(R.drawable.ic_previous, context.getString(R.string.player_previous)) { track?.controls?.skipToPrevious() }
+        val previous = button(R.drawable.ic_previous, context.getString(R.string.player_previous)) {
+            track?.controls?.skipToPrevious()
+        }
         playPause = button(R.drawable.ic_play, context.getString(R.string.player_play)) {
             track?.let { if (it.playing) it.controls.pause() else it.controls.play() }
         }

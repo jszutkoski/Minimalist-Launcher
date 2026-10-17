@@ -3,9 +3,9 @@ package com.jszutkoski.launcher
 import android.content.Intent
 import android.content.pm.ShortcutInfo
 import android.view.View
+import android.view.accessibility.AccessibilityManager
 import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
-import android.view.accessibility.AccessibilityManager
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue

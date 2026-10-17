@@ -1,5 +1,6 @@
 package com.jszutkoski.launcher
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.GradientDrawable
@@ -286,7 +287,8 @@ class AppDrawerView(context: Context, private val callbacks: Callbacks) : Linear
     override fun onInterceptTouchEvent(ev: MotionEvent): Boolean =
         ev.actionMasked == MotionEvent.ACTION_MOVE && startDrag(ev)
 
-    /** Always consumes touches, so nothing reaches the home screen underneath. */
+    /** Always consumes touches, so nothing reaches the home screen underneath. Drags, no click: back closes it. */
+    @SuppressLint("ClickableViewAccessibility")
     override fun onTouchEvent(ev: MotionEvent): Boolean {
         when (ev.actionMasked) {
             MotionEvent.ACTION_MOVE -> if (dragging || startDrag(ev)) {

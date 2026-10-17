@@ -343,7 +343,11 @@ object SettingSearch {
             listOf("wifi", "wi-fi", "wi fi", "wireless", "internet", "rede"),
             listOf(page(Settings.ACTION_WIFI_SETTINGS)),
         ),
-        SystemSetting(R.string.setting_bluetooth, listOf("bluetooth", "fone", "headphones"), listOf(page(Settings.ACTION_BLUETOOTH_SETTINGS))),
+        SystemSetting(
+            R.string.setting_bluetooth,
+            listOf("bluetooth", "fone", "headphones"),
+            listOf(page(Settings.ACTION_BLUETOOTH_SETTINGS)),
+        ),
         SystemSetting(
             R.string.setting_mobile_data,
             listOf("dados moveis", "dados", "mobile data", "4g", "5g", "chip", "sim", "operadora"),
@@ -393,7 +397,11 @@ object SettingSearch {
             listOf("notificacoes", "notifications"),
             listOf(page("android.settings.NOTIFICATION_SETTINGS"), page(Settings.ACTION_SETTINGS)),
         ),
-        SystemSetting(R.string.setting_apps, listOf("aplicativos", "apps"), listOf(page(Settings.ACTION_APPLICATION_SETTINGS))),
+        SystemSetting(
+            R.string.setting_apps,
+            listOf("aplicativos", "apps"),
+            listOf(page(Settings.ACTION_APPLICATION_SETTINGS)),
+        ),
         SystemSetting(
             R.string.setting_default_apps,
             listOf("apps padrao", "padrao", "default apps"),
@@ -406,10 +414,17 @@ object SettingSearch {
         ),
         SystemSetting(
             R.string.setting_security,
-            listOf("seguranca", "senha", "bloqueio de tela", "digital", "biometria", "security", "password", "fingerprint", "pin"),
+            listOf(
+                "seguranca", "senha", "bloqueio de tela", "digital", "biometria",
+                "security", "password", "fingerprint", "pin",
+            ),
             listOf(page(Settings.ACTION_SECURITY_SETTINGS)),
         ),
-        SystemSetting(R.string.setting_privacy, listOf("privacidade", "privacy", "permissoes", "permissions"), listOf(page(Settings.ACTION_PRIVACY_SETTINGS))),
+        SystemSetting(
+            R.string.setting_privacy,
+            listOf("privacidade", "privacy", "permissoes", "permissions"),
+            listOf(page(Settings.ACTION_PRIVACY_SETTINGS)),
+        ),
         SystemSetting(
             R.string.setting_accessibility,
             listOf("acessibilidade", "accessibility"),
@@ -420,10 +435,26 @@ object SettingSearch {
             listOf("date & time", "data", "hora", "fuso horario", "date", "time", "timezone"),
             listOf(page(Settings.ACTION_DATE_SETTINGS)),
         ),
-        SystemSetting(R.string.setting_language, listOf("idioma", "lingua", "language"), listOf(page(Settings.ACTION_LOCALE_SETTINGS))),
-        SystemSetting(R.string.setting_keyboard, listOf("teclado", "keyboard"), listOf(page(Settings.ACTION_INPUT_METHOD_SETTINGS))),
-        SystemSetting(R.string.setting_accounts, listOf("contas", "accounts", "sincronizar", "sync"), listOf(page(Settings.ACTION_SYNC_SETTINGS))),
-        SystemSetting(R.string.setting_nfc, listOf("nfc", "aproximacao", "contactless"), listOf(page(Settings.ACTION_NFC_SETTINGS))),
+        SystemSetting(
+            R.string.setting_language,
+            listOf("idioma", "lingua", "language"),
+            listOf(page(Settings.ACTION_LOCALE_SETTINGS)),
+        ),
+        SystemSetting(
+            R.string.setting_keyboard,
+            listOf("teclado", "keyboard"),
+            listOf(page(Settings.ACTION_INPUT_METHOD_SETTINGS)),
+        ),
+        SystemSetting(
+            R.string.setting_accounts,
+            listOf("contas", "accounts", "sincronizar", "sync"),
+            listOf(page(Settings.ACTION_SYNC_SETTINGS)),
+        ),
+        SystemSetting(
+            R.string.setting_nfc,
+            listOf("nfc", "aproximacao", "contactless"),
+            listOf(page(Settings.ACTION_NFC_SETTINGS)),
+        ),
         SystemSetting(
             R.string.setting_cast,
             listOf("transmitir", "espelhar", "espelhamento", "cast", "chromecast"),
