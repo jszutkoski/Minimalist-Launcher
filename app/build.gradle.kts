@@ -51,6 +51,9 @@ android {
     testOptions {
         // Plain JVM tests: the Android classes they touch only need to exist.
         unitTests.isReturnDefaultValues = true
+        // Screen tests (Robolectric) run the real Android views, with the app's own texts.
+        unitTests.isIncludeAndroidResources = true
+        unitTests.all { it.maxHeapSize = "2g" }
     }
 
     lint {
@@ -73,4 +76,5 @@ kotlin {
 
 dependencies {
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.robolectric:robolectric:4.17")
 }

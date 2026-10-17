@@ -1,0 +1,128 @@
+package com.jszutkoski.launcher
+
+import android.app.KeyguardManager
+import android.content.Intent
+import android.os.BatteryManager
+import android.os.Process
+import android.view.View
+import android.view.WindowManager
+import android.widget.ImageView
+import org.junit.After
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.Robolectric
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
+import org.robolectric.Shadows.shadowOf
+
+/** The bedside clock: when it may keep the screen lit, and what it shows over the lock screen. */
+@RunWith(RobolectricTestRunner::class)
+class StandbyScreenTest {
+    private val app = RuntimeEnvironment.getApplication()
+    private val keyguard = shadowOf(app.getSystemService(KeyguardManager::class.java))
+
+    @After
+    fun tearDown() {
+        Notifications.update(emptySet())
+        idle()
+    }
+
+    @Suppress("DEPRECATION")
+    private fun battery(charging: Boolean) {
+        val status = if (charging) BatteryManager.BATTERY_STATUS_CHARGING else BatteryManager.BATTERY_STATUS_DISCHARGING
+        app.sendStickyBroadcast(
+            Intent(Intent.ACTION_BATTERY_CHANGED)
+                .putExtra(BatteryManager.EXTRA_LEVEL, 80)
+                .putExtra(BatteryManager.EXTRA_SCALE, 100)
+                .putExtra(BatteryManager.EXTRA_STATUS, status),
+        )
+        idle()
+    }
+
+    private fun phone(secure: Boolean, locked: Boolean) {
+        keyguard.setIsDeviceSecure(secure)
+        keyguard.setKeyguardLocked(locked)
+    }
+
+    private fun open() = Robolectric.buildActivity(StandbyActivity::class.java).setup().get()
+
+    private fun StandbyActivity.lit() =
+        window.attributes.flags and WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON != 0
+
+    private fun StandbyActivity.whatsApp() =
+        content().views().filterIsInstance<ImageView>().single { it.contentDescription == "WhatsApp" }
+
+    @Test
+    fun unlockedOnTheChargerItTimesOutLikeAnyScreen() {
+        phone(secure = true, locked = false)
+        battery(charging = true)
+        assertFalse(open().lit())
+    }
+
+    @Test
+    fun overTheLockScreenOnTheChargerItStaysLit() {
+        phone(secure = true, locked = true)
+        battery(charging = true)
+        assertTrue(open().lit())
+    }
+
+    @Test
+    fun onceAndroidLocksTheNextWakeStaysLit() {
+        phone(secure = true, locked = false)
+        battery(charging = true)
+        val standby = open()
+        assertFalse(standby.lit())
+        keyguard.setKeyguardLocked(true)
+        app.sendBroadcast(Intent(Intent.ACTION_SCREEN_ON))
+        idle()
+        assertTrue(standby.lit())
+    }
+
+    @Test
+    fun withNoScreenLockThereIsNothingToGuard() {
+        phone(secure = false, locked = false)
+        battery(charging = true)
+        assertTrue(open().lit())
+    }
+
+    @Test
+    fun offTheChargerItTimesOut() {
+        phone(secure = true, locked = true)
+        battery(charging = false)
+        val standby = open()
+        assertFalse(standby.lit())
+        battery(charging = true)
+        assertTrue(standby.lit())
+        battery(charging = false)
+        assertFalse(standby.lit())
+    }
+
+    private fun whatsAppWaiting() {
+        Notifications.update(setOf("com.whatsapp" to Process.myUserHandle()))
+        idle()
+    }
+
+    @Test
+    fun messageIconsShowOverTheLockScreenByDefault() {
+        phone(secure = true, locked = true)
+        whatsAppWaiting()
+        assertEquals(View.VISIBLE, open().whatsApp().visibility)
+    }
+
+    @Test
+    fun messageIconsCanStayOffTheLockScreen() {
+        Prefs(app).lockScreenGlyphs = false
+        phone(secure = true, locked = true)
+        whatsAppWaiting()
+        val standby = open()
+        assertEquals(View.GONE, standby.whatsApp().visibility)
+        // Unlocked, the phone is in your hands: the icons come back on the next wake.
+        keyguard.setKeyguardLocked(false)
+        app.sendBroadcast(Intent(Intent.ACTION_SCREEN_ON))
+        idle()
+        assertEquals(View.VISIBLE, standby.whatsApp().visibility)
+    }
+}
