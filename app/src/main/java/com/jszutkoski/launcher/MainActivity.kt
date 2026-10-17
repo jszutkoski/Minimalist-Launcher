@@ -63,6 +63,7 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
     private lateinit var bottomSpace: Space
     private lateinit var dock: Dock
     private lateinit var screenTimeText: TextView
+    private lateinit var weatherText: TextView
     /** Apps and settings as plain buttons, shown only to TalkBack, which can't make the swipes. */
     private lateinit var accessibleRow: LinearLayout
     private val touchExploration = AccessibilityManager.TouchExplorationStateChangeListener { showAccessibleRow() }
@@ -141,6 +142,7 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         player.reserveSpace = prefs.nowPlaying
         // Lookups that can wait for the first frame.
         root.post {
+            updateWeather()
             updateScreenTime()
             loadContacts()
             if (prefs.nowPlaying) nowPlaying.start() else nowPlaying.stop()
@@ -241,10 +243,15 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
             setPadding(0, dp(12), 0, dp(12))
             setOnClickListener { SystemActions.requestDefaultHome(this@MainActivity) }
         }
+        weatherText = text("", 17f, Palette.SECONDARY, 400).apply {
+            letterSpacing = 0.02f
+            visibility = View.GONE
+            setPadding(0, dp(EXTRAS_GAP_DP), 0, 0)
+        }
         screenTimeText = text("", 17f, Palette.SECONDARY, 400).apply {
             letterSpacing = 0.02f
             visibility = View.GONE
-            setPadding(0, dp(18), 0, dp(8))
+            setPadding(0, dp(EXTRAS_GAP_DP), 0, dp(8))
             setOnClickListener { SystemActions.openDigitalWellbeing(this@MainActivity) }
         }
         player = PlayerView(this, ::openPlayer)
@@ -258,7 +265,8 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         }
         home.addView(dateRow, LinearLayout.LayoutParams(wrap, wrap))
         home.addView(face, LinearLayout.LayoutParams(wrap, wrap))
-        // Optional: today's screen time, on its own line under the battery. The weather is for standby.
+        // Optional, each on its own line under the clock: the weather, then today's screen time.
+        home.addView(weatherText, LinearLayout.LayoutParams(wrap, wrap))
         home.addView(screenTimeText, LinearLayout.LayoutParams(wrap, wrap))
         topSpace = Space(this)
         bottomSpace = Space(this)
@@ -329,7 +337,7 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         stale = false
         val scale = prefs.textSize.scale
         date.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f * scale)
-        val look = ClockLook.from(prefs)
+        val look = prefs.clockLook(ClockScreen.HOME)
         face.apply(
             look,
             digitsSp = 100f * scale,
@@ -354,6 +362,7 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         dock.render()
         showDots()
         screenTimeText.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f * scale)
+        weatherText.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f * scale)
         player.setTextScale(scale)
         setDefault.visibility = if (SystemActions.isDefaultHome(this)) View.GONE else View.VISIBLE
 
@@ -438,7 +447,7 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
     }
 
     private fun updateScreenTime() {
-        if (!prefs.screenTime || !ScreenTime.hasAccess(this)) {
+        if (!prefs.screenTime(ClockScreen.HOME) || !ScreenTime.hasAccess(this)) {
             screenTimeText.visibility = View.GONE
             return
         }
@@ -449,6 +458,26 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
                 screenTimeText.visibility = View.VISIBLE
             }
         }
+    }
+
+    /** The last reading, fetched again when it is over half an hour old. */
+    private fun updateWeather() {
+        if (!prefs.weather(ClockScreen.HOME) || !Weather.hasAccess(this)) {
+            showWeather(null)
+            return
+        }
+        showWeather(Weather.cached(this)?.label(this))
+        if (Weather.isFresh(this)) return
+        Weather.refresh(this) { now ->
+            if (now != null) runOnUiThread { if (!isDestroyed) showWeather(now.label(this)) }
+        }
+    }
+
+    private fun showWeather(label: String?) {
+        weatherText.text = label.orEmpty()
+        weatherText.visibility = if (label == null) View.GONE else View.VISIBLE
+        // Under the weather, screen time follows closely; alone, it keeps the gap from the clock.
+        screenTimeText.setPadding(0, dp(if (label == null) EXTRAS_GAP_DP else 4), 0, dp(8))
     }
 
     // Smart search -------------------------------------------------------------------
@@ -489,6 +518,7 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         val alignment = if (center) Gravity.CENTER_HORIZONTAL else Gravity.START
         favorites.gravity = alignment
         (screenTimeText.layoutParams as LinearLayout.LayoutParams).gravity = alignment
+        (weatherText.layoutParams as LinearLayout.LayoutParams).gravity = alignment
         player.setAlignment(alignment)
         // The clock widget follows the same alignment as the pinned apps.
         (face.layoutParams as LinearLayout.LayoutParams).gravity = alignment
@@ -572,7 +602,7 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
     private fun showPause(app: App, open: () -> Unit) {
         root.gesturesEnabled = false
         pause.show(app, null, open)
-        if (!prefs.screenTime || !ScreenTime.hasAccess(this)) return
+        if (!prefs.screenTime(ClockScreen.HOME) || !ScreenTime.hasAccess(this)) return
         background.execute {
             val spent = ScreenTime.today(this, app.component.packageName)
             runOnUiThread { if (pause.isShowing) pause.setUsage(ScreenTime.format(spent)) }
@@ -731,6 +761,9 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
             private set
 
         private const val STANDBY_DELAY_MS = 20_000L
+
+        /** From the clock block to the weather or screen time under it. */
+        private const val EXTRAS_GAP_DP = 18
         private const val DAY_MS = 24 * 60 * 60 * 1000L
     }
 }

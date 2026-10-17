@@ -24,6 +24,8 @@
     <string name="clock_alarms">Alarmes</string>
     <string name="no_clock_app">Nenhum app de relógio aceitou o timer ou o alarme</string>
     <string name="clock_design">Relógio</string>
+    <string name="clock_home">Tela inicial</string>
+    <string name="clock_standby">Descanso</string>
     <string name="clock_digital">Digital</string>
     <string name="date_position">Data</string>
     <string name="date_above">Acima do relógio</string>
@@ -37,7 +39,7 @@
     <string name="weight_medium">Média</string>
     <string name="weight_bold">Forte</string>
     <string name="clock_size">Tamanho</string>
-    <string name="clock_help">O relógio e a bateria formam um bloco só: espessura e tamanho valem para os dois. Digital: a linha de bateria embaixo da hora. Analógico: a bateria na borda direita, do 1 ao 5. Igual na tela inicial e no relógio de cabeceira; um relógio largo demais para a tela diminui até caber.</string>
+    <string name="clock_help">A tela inicial e o relógio de cabeceira têm cada um o seu: escolha qual acima. O relógio e a bateria formam um bloco só: espessura e tamanho valem para os dois. Digital: a linha de bateria embaixo da hora. Analógico: a bateria na borda direita, do 1 ao 5. Um relógio largo demais para a tela diminui até caber.</string>
     <string name="swipe_left">Deslizar para a esquerda</string>
     <string name="swipe_right">Deslizar para a direita</string>
     <string name="swipe_desc">Abre o app que você escolher. Comece longe da borda da tela, que o Android usa para voltar</string>
@@ -91,13 +93,13 @@
     <string name="contact_card">Ficha do contato</string>
     <string name="torch_unavailable">A lanterna não está disponível</string>
     <string name="page_home">Tela inicial</string>
-    <string name="page_home_summary">Tamanho do texto, layout, barra de status, tempo de tela, pontos, música</string>
-    <string name="page_clock">Relógio e bateria</string>
-    <string name="page_clock_summary">Digital ou analógico, espessura, tamanho e data</string>
+    <string name="page_home_summary">Tamanho do texto, layout, barra de status, pontos, música</string>
+    <string name="page_clock">Relógio</string>
+    <string name="page_clock_summary">Tela inicial e descanso: design, espessura, tamanho, data, clima, tempo de tela</string>
     <string name="page_search">Busca</string>
     <string name="page_search_summary">Abrir apps ao digitar, só busca, contatos</string>
     <string name="page_standby">Descanso</string>
-    <string name="page_standby_summary">O relógio de cabeceira, a cada despertar, clima</string>
+    <string name="page_standby_summary">O relógio de cabeceira, a cada despertar, tela de bloqueio</string>
     <string name="page_apps">Apps</string>
     <string name="page_apps_summary">Pausa consciente, apps ocultos, app de início</string>
     <string name="page_gestures">Gestos</string>
@@ -117,7 +119,7 @@
     <string name="status_bar">Barra de status</string>
     <string name="status_bar_desc">Escurecida: ícones escuros no preto, quase invisível e nunca pula. Oculta: some, mas o Android a mostra e esconde junto com as notificações</string>
     <string name="screen_time">Tempo de tela</string>
-    <string name="screen_time_desc">O tempo de hoje nos apps, abaixo da data</string>
+    <string name="screen_time_desc">O tempo de hoje nos apps, abaixo do relógio</string>
     <string name="grant_usage">Toque para permitir o acesso ao uso</string>
     <string name="dots">Pontos de notificação</string>
     <string name="dots_desc">Um pontinho ao lado dos apps com notificações esperando</string>
@@ -148,7 +150,7 @@
     <string name="lock_notifications_value">Definido no Android</string>
     <string name="lock_notifications_desc">O que a tela de bloqueio mostra das notificações, também quando puxadas sobre o relógio de cabeceira: escolha lá se ela mostra suas mensagens, esconde o que dizem ou não mostra nada</string>
     <string name="weather">Clima</string>
-    <string name="weather_desc">Temperatura e céu abaixo da data no relógio de cabeceira, do Open-Meteo, para a sua localização aproximada</string>
+    <string name="weather_desc">Temperatura e céu abaixo do relógio, do Open-Meteo, para a sua localização aproximada</string>
     <string name="grant_location">Toque para permitir a localização aproximada</string>
     <string name="pause">Pausa consciente</string>
     <string name="pause_desc">Uma respiração antes de abrir estes apps. Escolha aqui, ou toque e segure um app → Pausar antes de abrir</string>

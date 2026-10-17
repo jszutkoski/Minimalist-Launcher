@@ -24,6 +24,8 @@
     <string name="clock_alarms">Alarms</string>
     <string name="no_clock_app">No clock app here takes timers or alarms</string>
     <string name="clock_design">Clock</string>
+    <string name="clock_home">Home screen</string>
+    <string name="clock_standby">Bedside clock</string>
     <string name="clock_digital">Digital</string>
     <string name="date_position">Date</string>
     <string name="date_above">Above the clock</string>
@@ -37,7 +39,7 @@
     <string name="weight_medium">Medium</string>
     <string name="weight_bold">Bold</string>
     <string name="clock_size">Size</string>
-    <string name="clock_help">The clock and its battery are one block: thickness and size apply to both. Digital: the battery line under the time. Analog: the battery along the right-hand edge, from the 1 to the 5. The same on the home screen and the bedside clock; a clock too wide for the screen shrinks until it fits.</string>
+    <string name="clock_help">The home screen and the bedside clock each have their own: choose which above. The clock and its battery are one block: thickness and size apply to both. Digital: the battery line under the time. Analog: the battery along the right-hand edge, from the 1 to the 5. A clock too wide for the screen shrinks until it fits.</string>
     <string name="swipe_left">Swipe left</string>
     <string name="swipe_right">Swipe right</string>
     <string name="swipe_desc">Opens the app you choose. Start away from the screen\'s edge, which Android keeps for back</string>
@@ -92,13 +94,13 @@
     <string name="contact_card">Contact card</string>
     <string name="torch_unavailable">The flashlight is unavailable</string>
     <string name="page_home">Home screen</string>
-    <string name="page_home_summary">Text size, layout, status bar, screen time, dots, music</string>
-    <string name="page_clock">Clock and battery</string>
-    <string name="page_clock_summary">Digital or analog, thickness, size and date</string>
+    <string name="page_home_summary">Text size, layout, status bar, dots, music</string>
+    <string name="page_clock">Clock</string>
+    <string name="page_clock_summary">Home screen and bedside clock: design, thickness, size, date, weather, screen time</string>
     <string name="page_search">Search</string>
     <string name="page_search_summary">Opening apps as you type, search only, contacts</string>
     <string name="page_standby">Standby</string>
-    <string name="page_standby_summary">The bedside clock, on every wake, weather</string>
+    <string name="page_standby_summary">The bedside clock, on every wake, lock screen</string>
     <string name="page_apps">Apps</string>
     <string name="page_apps_summary">Mindful pause, hidden apps, home app</string>
     <string name="page_gestures">Gestures</string>
@@ -118,7 +120,7 @@
     <string name="status_bar">Status bar</string>
     <string name="status_bar_desc">Dimmed: dark icons on black, almost invisible and never jumps. Hidden: gone, but Android slides it in and out with the notifications</string>
     <string name="screen_time">Screen time</string>
-    <string name="screen_time_desc">Today\'s time in apps, under the date</string>
+    <string name="screen_time_desc">Today\'s time in apps, under the clock</string>
     <string name="grant_usage">Tap to allow usage access</string>
     <string name="dots">Notification dots</string>
     <string name="dots_desc">A small dot beside apps that have notifications waiting</string>
@@ -149,7 +151,7 @@
     <string name="lock_notifications_value">Set in Android</string>
     <string name="lock_notifications_desc">What the lock screen shows of your notifications, also when they are pulled down over the bedside clock: choose there whether it shows your messages, hides what they say or shows nothing</string>
     <string name="weather">Weather</string>
-    <string name="weather_desc">Temperature and sky under the date on the bedside clock, from Open-Meteo, for your approximate location</string>
+    <string name="weather_desc">Temperature and sky under the clock, from Open-Meteo, for your approximate location</string>
     <string name="grant_location">Tap to allow approximate location</string>
     <string name="pause">Mindful pause</string>
     <string name="pause_desc">A breath before these apps open. Choose here, or long-press an app → Pause before opening</string>

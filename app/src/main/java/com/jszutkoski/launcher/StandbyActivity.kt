@@ -18,6 +18,7 @@ import android.os.SystemClock
 import android.view.WindowInsetsController
 import android.view.WindowManager
 import android.window.OnBackInvokedDispatcher
+import kotlin.concurrent.thread
 
 /**
  * The bedside clock as its own screen, allowed to show over the lock screen. When the phone
@@ -94,11 +95,12 @@ open class StandbyActivity : Activity() {
         super.onResume()
         shown += id
         // Kept behind other apps for days, so the face chosen meanwhile is applied on each return.
-        view.setLook(ClockLook.from(prefs))
+        view.setLook(prefs.clockLook(ClockScreen.STANDBY))
         view.show()
         keepScreenOn()
         showWaiting()
         showWeather()
+        showScreenTime()
     }
 
     override fun onStop() {
@@ -247,9 +249,9 @@ open class StandbyActivity : Activity() {
         )
     }
 
-    /** The last reading under the date, fetched again when it is over half an hour old. */
+    /** The last reading under the clock, fetched again when it is over half an hour old. */
     private fun showWeather() {
-        if (!prefs.weather || !Weather.hasAccess(this)) {
+        if (!prefs.weather(ClockScreen.STANDBY) || !Weather.hasAccess(this)) {
             view.showWeather(null)
             return
         }
@@ -257,6 +259,18 @@ open class StandbyActivity : Activity() {
         if (Weather.isFresh(this)) return
         Weather.refresh(this) { now ->
             if (now != null) runOnUiThread { if (!isDestroyed) view.showWeather(now.label(this)) }
+        }
+    }
+
+    /** Today's time in apps, read off the main thread. */
+    private fun showScreenTime() {
+        if (!prefs.screenTime(ClockScreen.STANDBY) || !ScreenTime.hasAccess(this)) {
+            view.showScreenTime(null)
+            return
+        }
+        thread(name = "screen-time") {
+            val label = getString(R.string.screen_time_today, ScreenTime.format(ScreenTime.today(this)))
+            runOnUiThread { if (!isDestroyed) view.showScreenTime(label) }
         }
     }
 

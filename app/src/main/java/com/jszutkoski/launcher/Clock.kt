@@ -56,17 +56,19 @@ enum class DatePosition(val label: Int) {
     HIDDEN(R.string.date_hidden),
 }
 
-/** The clock as chosen in settings, shared by the home screen and the bedside clock. */
+/** The two screens with a clock, each set up on its own. */
+enum class ClockScreen(val label: Int, val prefix: String) {
+    HOME(R.string.clock_home, ""),
+    STANDBY(R.string.clock_standby, "standby_"),
+}
+
+/** The clock as chosen in settings for one screen. */
 data class ClockLook(
     val design: ClockDesign = ClockDesign.DIGITAL,
     val weight: ClockWeight = ClockWeight.THIN,
     val size: SizeStep = SizeStep.DEFAULT,
     val date: DatePosition = DatePosition.ABOVE,
-) {
-    companion object {
-        fun from(prefs: Prefs) = ClockLook(prefs.clockDesign, prefs.clockWeight, prefs.clockSize, prefs.datePosition)
-    }
-}
+)
 
 /**
  * Roboto Flex, cut down to digits and Latin letters, with its whole weight axis: the phone's

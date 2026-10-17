@@ -101,9 +101,9 @@ class SettingsScreenTest {
         val activity = controller.get()
         activity.tap(R.string.page_clock)
         activity.tap(R.string.clock_design)
-        assertEquals(ClockDesign.ANALOG, Prefs(activity).clockDesign)
+        assertEquals(ClockDesign.ANALOG, Prefs(activity).clockLook(ClockScreen.HOME).design)
         activity.tap(R.string.clock_design)
-        assertEquals(ClockDesign.DIGITAL, Prefs(activity).clockDesign)
+        assertEquals(ClockDesign.DIGITAL, Prefs(activity).clockLook(ClockScreen.HOME).design)
     }
 
     @Test
@@ -121,12 +121,36 @@ class SettingsScreenTest {
     @Test
     fun theDateGoesAboveBelowOrNowhere() {
         val activity = controller.get()
-        assertEquals(DatePosition.ABOVE, Prefs(activity).datePosition)
+        assertEquals(DatePosition.ABOVE, Prefs(activity).clockLook(ClockScreen.HOME).date)
         activity.tap(R.string.page_clock)
         activity.tap(R.string.date_position)
-        assertEquals(DatePosition.BELOW, Prefs(activity).datePosition)
+        assertEquals(DatePosition.BELOW, Prefs(activity).clockLook(ClockScreen.HOME).date)
         activity.tap(R.string.date_position)
-        assertEquals(DatePosition.HIDDEN, Prefs(activity).datePosition)
+        assertEquals(DatePosition.HIDDEN, Prefs(activity).clockLook(ClockScreen.HOME).date)
+    }
+
+    @Test
+    fun theBedsideClockIsSetUpOnItsOwn() {
+        val activity = controller.get()
+        activity.tap(R.string.page_clock)
+        activity.tap(R.string.clock_standby)
+        activity.tap(R.string.clock_design)
+        assertEquals(ClockDesign.ANALOG, Prefs(activity).clockLook(ClockScreen.STANDBY).design)
+        assertEquals(ClockDesign.DIGITAL, Prefs(activity).clockLook(ClockScreen.HOME).design)
+    }
+
+    @Test
+    fun weatherAndScreenTimeAreChosenPerScreen() {
+        val activity = controller.get()
+        activity.tap(R.string.page_clock)
+        activity.tap(R.string.weather)
+        activity.tap(R.string.clock_standby)
+        activity.tap(R.string.screen_time)
+        val prefs = Prefs(activity)
+        assertTrue(prefs.weather(ClockScreen.HOME))
+        assertFalse(prefs.weather(ClockScreen.STANDBY))
+        assertTrue(prefs.screenTime(ClockScreen.STANDBY))
+        assertFalse(prefs.screenTime(ClockScreen.HOME))
     }
 
     @Test

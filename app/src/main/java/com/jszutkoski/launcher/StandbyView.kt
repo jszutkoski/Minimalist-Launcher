@@ -15,10 +15,14 @@ import java.util.Locale
 import kotlin.random.Random
 
 /**
- * A bedside clock: time, battery, date and weather, dimmed on black. The group drifts
+ * A bedside clock: time, battery, date, and the weather and screen time if chosen, dimmed on black. The group drifts
  * to a new spot every minute so no pixel stays lit in the same place. A tap calls [onExit].
  */
 class StandbyView(context: Context, private val onExit: () -> Unit) : FrameLayout(context) {
+    private val screenTime: TextView = context.text("", 17f, Palette.SECONDARY, 400).apply {
+        letterSpacing = 0.02f
+        visibility = GONE
+    }
     private val weather: TextView = context.text("", 17f, Palette.SECONDARY, 400).apply {
         letterSpacing = 0.02f
         visibility = GONE
@@ -60,6 +64,7 @@ class StandbyView(context: Context, private val onExit: () -> Unit) : FrameLayou
             addView(date, LinearLayout.LayoutParams(wrap, wrap))
             addView(face, LinearLayout.LayoutParams(wrap, wrap))
             addView(weather, LinearLayout.LayoutParams(wrap, wrap).apply { topMargin = dp(18) })
+            addView(screenTime, LinearLayout.LayoutParams(wrap, wrap).apply { topMargin = dp(18) })
             addView(waiting, LinearLayout.LayoutParams(wrap, wrap).apply { topMargin = dp(22) })
         }
         setLook(ClockLook())
@@ -104,10 +109,19 @@ class StandbyView(context: Context, private val onExit: () -> Unit) : FrameLayou
 
     fun updateBattery(state: BatteryState) = face.showBattery(state, number = false)
 
-    /** "18° Drizzle" under the date, or nothing. */
+    /** "18° Drizzle" under the clock, or nothing. */
     fun showWeather(label: String?) {
         weather.text = label.orEmpty()
         weather.visibility = if (label == null) GONE else VISIBLE
+        // Under the weather, screen time follows closely; alone, it keeps the gap from the clock.
+        (screenTime.layoutParams as LinearLayout.LayoutParams).topMargin = dp(if (label == null) 18 else 4)
+        screenTime.requestLayout()
+    }
+
+    /** "2 h 5 min today" under the weather, or nothing. */
+    fun showScreenTime(label: String?) {
+        screenTime.text = label.orEmpty()
+        screenTime.visibility = if (label == null) GONE else VISIBLE
     }
 
     fun show() {

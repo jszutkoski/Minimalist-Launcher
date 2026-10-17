@@ -62,11 +62,6 @@ class Prefs(context: Context) {
         get() = prefs.getBoolean(KEY_CONTACT_SEARCH, false)
         set(value) = prefs.edit().putBoolean(KEY_CONTACT_SEARCH, value).apply()
 
-    /** Temperature and sky under the date (needs approximate location). */
-    var weather: Boolean
-        get() = prefs.getBoolean(KEY_WEATHER, false)
-        set(value) = prefs.edit().putBoolean(KEY_WEATHER, value).apply()
-
     /** Android asks for a permission only twice; after that, only app info can grant it. */
     fun askedFor(permission: String) = prefs.getBoolean("$KEY_ASKED$permission", false)
 
@@ -89,23 +84,38 @@ class Prefs(context: Context) {
         }
         set(value) = prefs.edit().putInt(KEY_STATUS_BAR, value.ordinal).apply()
 
-    // The clock and the battery with it, on the home screen and the bedside clock.
-    var clockDesign: ClockDesign
-        get() = choice(KEY_CLOCK_DESIGN, ClockDesign.DIGITAL)
-        set(value) = prefs.edit().putInt(KEY_CLOCK_DESIGN, value.ordinal).apply()
+    /** The clock and battery on [screen]; each screen has its own. */
+    fun clockLook(screen: ClockScreen) = ClockLook(
+        choice(screen.prefix + KEY_CLOCK_DESIGN, ClockDesign.DIGITAL),
+        choice(screen.prefix + KEY_CLOCK_WEIGHT, ClockWeight.THIN),
+        choice(screen.prefix + KEY_CLOCK_SIZE, SizeStep.DEFAULT),
+        choice(screen.prefix + KEY_DATE_POSITION, DatePosition.ABOVE),
+    )
 
-    var clockWeight: ClockWeight
-        get() = choice(KEY_CLOCK_WEIGHT, ClockWeight.THIN)
-        set(value) = prefs.edit().putInt(KEY_CLOCK_WEIGHT, value.ordinal).apply()
+    fun setClockLook(screen: ClockScreen, look: ClockLook) {
+        prefs.edit()
+            .putInt(screen.prefix + KEY_CLOCK_DESIGN, look.design.ordinal)
+            .putInt(screen.prefix + KEY_CLOCK_WEIGHT, look.weight.ordinal)
+            .putInt(screen.prefix + KEY_CLOCK_SIZE, look.size.ordinal)
+            .putInt(screen.prefix + KEY_DATE_POSITION, look.date.ordinal)
+            .apply()
+    }
 
-    /** On top of the text size. */
-    var clockSize: SizeStep
-        get() = choice(KEY_CLOCK_SIZE, SizeStep.DEFAULT)
-        set(value) = prefs.edit().putInt(KEY_CLOCK_SIZE, value.ordinal).apply()
+    /** Temperature and sky under the clock on [screen] (needs approximate location). */
+    fun weather(screen: ClockScreen) = prefs.getBoolean(weatherKey(screen), false)
 
-    var datePosition: DatePosition
-        get() = choice(KEY_DATE_POSITION, DatePosition.ABOVE)
-        set(value) = prefs.edit().putInt(KEY_DATE_POSITION, value.ordinal).apply()
+    fun setWeather(screen: ClockScreen, on: Boolean) = prefs.edit().putBoolean(weatherKey(screen), on).apply()
+
+    /** Today's screen time under the clock on [screen] (needs usage access). */
+    fun screenTime(screen: ClockScreen) = prefs.getBoolean(screenTimeKey(screen), false)
+
+    fun setScreenTime(screen: ClockScreen, on: Boolean) = prefs.edit().putBoolean(screenTimeKey(screen), on).apply()
+
+    // Weather was the bedside clock's alone, and screen time the home screen's: their keys stay.
+    private fun weatherKey(screen: ClockScreen) = if (screen == ClockScreen.HOME) KEY_HOME_WEATHER else KEY_WEATHER
+
+    private fun screenTimeKey(screen: ClockScreen) =
+        if (screen == ClockScreen.HOME) KEY_SCREEN_TIME else KEY_STANDBY_SCREEN_TIME
 
     /** One of [default]'s values, stored by position; the default when unset or out of range. */
     private inline fun <reified T : Enum<T>> choice(key: String, default: T): T =
@@ -115,11 +125,6 @@ class Prefs(context: Context) {
     var centerFavorites: Boolean
         get() = prefs.getBoolean(KEY_CENTER_FAVORITES, true)
         set(value) = prefs.edit().putBoolean(KEY_CENTER_FAVORITES, value).apply()
-
-    /** Show today's screen time under the date (needs usage access). */
-    var screenTime: Boolean
-        get() = prefs.getBoolean(KEY_SCREEN_TIME, false)
-        set(value) = prefs.edit().putBoolean(KEY_SCREEN_TIME, value).apply()
 
     /** Show the playing track with controls under the date (needs notification access). */
     var nowPlaying: Boolean
@@ -207,6 +212,8 @@ class Prefs(context: Context) {
         const val KEY_CLOCK_WEIGHT = "clock_weight"
         const val KEY_CLOCK_SIZE = "clock_size"
         const val KEY_DATE_POSITION = "date_position"
+        const val KEY_HOME_WEATHER = "home_weather"
+        const val KEY_STANDBY_SCREEN_TIME = "standby_screen_time"
         const val KEY_SWIPE_LEFT = "swipe_left_app"
         const val KEY_SWIPE_RIGHT = "swipe_right_app"
     }
