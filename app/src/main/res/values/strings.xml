@@ -37,7 +37,7 @@
     <string name="weight_medium">Medium</string>
     <string name="weight_bold">Bold</string>
     <string name="clock_size">Size</string>
-    <string name="clock_help">The clock and its battery are one block: thickness and size apply to both. Digital: the battery line under the time. Analog: the battery along the right-hand edge, by the 3. The same on the home screen and the bedside clock; a clock too wide for the screen shrinks until it fits.</string>
+    <string name="clock_help">The clock and its battery are one block: thickness and size apply to both. Digital: the battery line under the time. Analog: the battery along the right-hand edge, from the 1 to the 5. The same on the home screen and the bedside clock; a clock too wide for the screen shrinks until it fits.</string>
     <string name="swipe_left">Swipe left</string>
     <string name="swipe_right">Swipe right</string>
     <string name="swipe_desc">Opens the app you choose. Start away from the screen\'s edge, which Android keeps for back</string>

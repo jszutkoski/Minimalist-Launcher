@@ -37,7 +37,7 @@
     <string name="weight_medium">Média</string>
     <string name="weight_bold">Forte</string>
     <string name="clock_size">Tamanho</string>
-    <string name="clock_help">O relógio e a bateria formam um bloco só: espessura e tamanho valem para os dois. Digital: a linha de bateria embaixo da hora. Analógico: a bateria na borda direita, junto do 3. Igual na tela inicial e no relógio de cabeceira; um relógio largo demais para a tela diminui até caber.</string>
+    <string name="clock_help">O relógio e a bateria formam um bloco só: espessura e tamanho valem para os dois. Digital: a linha de bateria embaixo da hora. Analógico: a bateria na borda direita, do 1 ao 5. Igual na tela inicial e no relógio de cabeceira; um relógio largo demais para a tela diminui até caber.</string>
     <string name="swipe_left">Deslizar para a esquerda</string>
     <string name="swipe_right">Deslizar para a direita</string>
     <string name="swipe_desc">Abre o app que você escolher. Comece longe da borda da tela, que o Android usa para voltar</string>

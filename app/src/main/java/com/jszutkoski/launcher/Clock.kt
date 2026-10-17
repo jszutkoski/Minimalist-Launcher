@@ -219,8 +219,8 @@ class ClockFace(context: Context, pressable: Boolean) : LinearLayout(context) {
 
 /**
  * An analog face: a dark dial, the 12, 3, 6 and 9, a mark for every hour and minute, three
- * hands, and the battery as a segmented arc along the right-hand edge with its icon and
- * percentage beside the 3. The battery is green when full on the charger, red when low, and
+ * hands, and the battery as a segmented arc along the right-hand edge, from the 1 to the 5.
+ * The battery is green when full on the charger, red when low, and
  * breathes while charging, as the battery line does.
  */
 class AnalogClock(context: Context, private val pressable: Boolean) : View(context) {
@@ -244,21 +244,14 @@ class AnalogClock(context: Context, private val pressable: Boolean) : View(conte
     private val dialPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Palette.SURFACE }
     private val markPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { strokeCap = Paint.Cap.ROUND }
     private val handPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { strokeCap = Paint.Cap.ROUND }
-    private val iconPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val numberPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         textAlign = Paint.Align.CENTER
         typeface = ClockFont.at(context, 200)
     }
     private val arcPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
     private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val percentPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        textAlign = Paint.Align.CENTER
-        typeface = ClockFont.at(context, 400)
-    }
     private val arcBounds = RectF()
-    private val icon = RectF()
     private val digitBounds = Rect()
-    private val percent = NumberFormat.getPercentInstance()
 
     private var level = 1f
     private var charging = false
@@ -278,6 +271,8 @@ class AnalogClock(context: Context, private val pressable: Boolean) : View(conte
         this.charging = charging
         this.full = full
         this.low = low
+        // Read out again with the new charge.
+        lastMinute = -1
         onFrame()
     }
 
@@ -292,9 +287,8 @@ class AnalogClock(context: Context, private val pressable: Boolean) : View(conte
         val ink = if (pressable && isPressed) Palette.SECONDARY else Palette.TEXT
         canvas.drawCircle(cx, cy, r, dialPaint)
 
-        // Every minute a short faint mark, every hour a long one; none by the 3, where the battery is.
+        // Every minute a short faint mark, every hour a long one.
         for (minute in 0 until 60) {
-            if (minute in 13..17) continue
             val hour = minute % 5 == 0
             markPaint.color = if (hour) ink else Palette.TERTIARY
             markPaint.strokeWidth = if (hour) s * 0.7f else s * 0.4f
@@ -313,7 +307,7 @@ class AnalogClock(context: Context, private val pressable: Boolean) : View(conte
         drawHands(canvas, cx, cy, r, s, ink)
     }
 
-    /** Ten segments from the 1 to the 5, lit from the top down; the icon and number by the 3. */
+    /** Ten segments from the 1 to the 5, lit from the top down. */
     private fun drawBattery(canvas: Canvas, cx: Float, cy: Float, r: Float, s: Float) {
         val color = when {
             low -> Palette.LOW
@@ -339,30 +333,6 @@ class AnalogClock(context: Context, private val pressable: Boolean) : View(conte
                 canvas.drawArc(arcBounds, ARC_START - 90f + from, end - from, false, arcPaint)
             }
         }
-
-        // A small battery filled to the charge, its terminal on the right, and the percentage under it.
-        val w = r * 0.14f
-        val h = r * 0.07f
-        val left = cx + r * 0.75f - w / 2
-        val top = cy - r * 0.04f - h
-        icon.set(left, top, left + w, top + h)
-        iconPaint.color = Palette.SECONDARY
-        iconPaint.style = Paint.Style.STROKE
-        iconPaint.strokeWidth = maxOf(context.dp(1f), s * 0.4f)
-        canvas.drawRoundRect(icon, h * 0.25f, h * 0.25f, iconPaint)
-        iconPaint.style = Paint.Style.FILL
-        canvas.drawRect(icon.right + h * 0.08f, top + h * 0.3f, icon.right + h * 0.22f, top + h * 0.7f, iconPaint)
-        val inset = iconPaint.strokeWidth * 1.5f
-        fillPaint.color = color
-        fillPaint.alpha = alpha
-        if (level > 0f) {
-            val right = icon.left + inset + (icon.width() - 2 * inset) * level
-            canvas.drawRect(icon.left + inset, icon.top + inset, right, icon.bottom - inset, fillPaint)
-        }
-        percentPaint.textSize = r * 0.085f
-        percentPaint.color = if (low || full) color else Palette.SECONDARY
-        percentPaint.alpha = alpha
-        canvas.drawText(percent.format(level.toDouble()), icon.centerX(), cy + r * 0.11f, percentPaint)
     }
 
     private fun drawHands(canvas: Canvas, cx: Float, cy: Float, r: Float, s: Float, ink: Int) {
@@ -399,7 +369,7 @@ class AnalogClock(context: Context, private val pressable: Boolean) : View(conte
 
     /**
      * Redrawn once a second for the second hand, or at the breath's steps while charging, and
-     * only while in sight. TalkBack's reading of the time changes once a minute.
+     * only while in sight. What TalkBack reads changes once a minute, or with the charge.
      */
     private fun onFrame() {
         invalidate()
@@ -408,7 +378,9 @@ class AnalogClock(context: Context, private val pressable: Boolean) : View(conte
         val minute = Calendar.getInstance().get(Calendar.MINUTE)
         if (minute != lastMinute) {
             lastMinute = minute
-            contentDescription = DateFormat.getTimeFormat(context).format(Calendar.getInstance().time)
+            // The time and the charge: the arc has no number of its own.
+            contentDescription = DateFormat.getTimeFormat(context).format(Calendar.getInstance().time) + ", " +
+                NumberFormat.getPercentInstance().format(level.toDouble())
         }
         val delay = if (charging) BREATH_FRAME_MS else SECOND_MS - System.currentTimeMillis() % SECOND_MS + 5
         postDelayed(frame, delay)
