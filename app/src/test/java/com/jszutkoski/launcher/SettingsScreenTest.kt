@@ -3,6 +3,7 @@ package com.jszutkoski.launcher
 import android.app.Activity
 import android.provider.Settings
 import android.view.View
+import android.widget.FrameLayout
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -105,6 +106,18 @@ class SettingsScreenTest {
         assertEquals(ClockDesign.ANALOG, Prefs(activity).clockDesign)
         activity.tap(R.string.clock_design)
         assertEquals(ClockDesign.LINE, Prefs(activity).clockDesign)
+    }
+
+    @Test
+    fun thePreviewKeepsItsHeightSoTheRowsStayPut() {
+        val activity = controller.get()
+        activity.tap(R.string.page_clock)
+        fun previewHeight() = activity.content().views().filterIsInstance<FrameLayout>().single { it.layoutParams.height > 0 }.layoutParams.height
+        val before = previewHeight()
+        activity.tap(R.string.clock_size)
+        activity.tap(R.string.clock_design)
+        activity.tap(R.string.battery_design)
+        assertEquals(before, previewHeight())
     }
 
     @Test

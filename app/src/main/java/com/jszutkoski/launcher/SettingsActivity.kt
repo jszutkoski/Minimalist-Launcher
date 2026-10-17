@@ -10,8 +10,10 @@ import android.text.format.DateFormat
 import android.view.Gravity
 import android.os.Build
 import android.os.Bundle
+import android.view.View
 import android.view.ViewGroup
 import android.view.WindowInsets
+import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.window.OnBackInvokedCallback
@@ -189,37 +191,37 @@ class SettingsActivity : Activity() {
         )
     }
 
-    /** A live preview on top, then each choice, going round its values on every tap. */
+    /**
+     * A live preview on top, then each choice, going round its values on every tap. The preview
+     * keeps the height of the tallest clock and battery there are, so the rows never move.
+     */
     private fun renderClock() {
         val look = ClockLook.from(prefs)
-        val date = text("", 17f, Palette.SECONDARY, 400).apply {
-            text = DateFormat.format(DateFormat.getBestDateTimePattern(Locale.getDefault(), "EEEEdMMMM"), Date())
-            letterSpacing = 0.02f
+        val tallest = ClockDesign.entries.flatMap { design ->
+            BatteryDesign.entries.map { battery ->
+                look.copy(
+                    design = design,
+                    weight = ClockWeight.BOLD,
+                    size = SizeStep.entries.last(),
+                    battery = battery,
+                    batteryWeight = LineWeight.entries.last(),
+                    batterySize = SizeStep.entries.last(),
+                )
+            }
+        }.maxOf { candidate ->
+            preview(candidate).run {
+                measure(
+                    View.MeasureSpec.makeMeasureSpec(previewWidth, View.MeasureSpec.AT_MOST),
+                    View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
+                )
+                measuredHeight
+            }
         }
-        val preview = ClockFace(this, pressable = false)
-        content.addView(preview, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+        val box = FrameLayout(this).apply { addView(preview(look, showBattery = true)) }
         content.addView(
-            date,
-            LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
-                bottomMargin = dp(28)
-            },
+            box,
+            LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, tallest).apply { bottomMargin = dp(28) },
         )
-        val scale = prefs.textSize.scale
-        preview.apply(
-            look,
-            digitsSp = 100f * scale,
-            analogDp = 170f * scale,
-            labelSp = 13f * scale,
-            gravity = Gravity.START,
-            maxWidth = resources.displayMetrics.widthPixels - 2 * dp(SIDE_MARGIN_DP),
-            below = date,
-            gap = dp(26),
-        )
-        // The battery as it is now: a sticky broadcast answers at once, with no receiver kept.
-        registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))?.let(BatteryState::from)?.let { battery ->
-            preview.battery.update(battery.fraction, battery.charging, battery.low)
-            preview.battery.label = NumberFormat.getIntegerInstance().format((battery.fraction * 100).roundToInt())
-        }
 
         row(getString(R.string.clock_design), getString(look.design.label)) { prefs.clockDesign = next(look.design) }
         // Each weight's name is written in that weight.
@@ -241,6 +243,46 @@ class SettingsActivity : Activity() {
                 setPadding(0, dp(28), 0, 0)
             },
         )
+    }
+
+    private val previewWidth get() = resources.displayMetrics.widthPixels - 2 * dp(SIDE_MARGIN_DP)
+
+    /** The date and [look] as the home screen shows them; with [showBattery], at today's charge. */
+    private fun preview(look: ClockLook, showBattery: Boolean = false): LinearLayout {
+        val scale = prefs.textSize.scale
+        val date = text("", 17f * scale, Palette.SECONDARY, 400).apply {
+            text = DateFormat.format(DateFormat.getBestDateTimePattern(Locale.getDefault(), "EEEEdMMMM"), Date())
+            letterSpacing = 0.02f
+            setPadding(0, dp(10), 0, dp(10))
+        }
+        val face = ClockFace(this, pressable = false)
+        face.apply(
+            look,
+            digitsSp = 100f * scale,
+            analogDp = 170f * scale,
+            labelSp = 13f * scale,
+            gravity = Gravity.START,
+            maxWidth = previewWidth,
+            date = date,
+            dateGap = dp(DATE_GAP_DP),
+            batteryGap = dp(BATTERY_GAP_DP),
+        )
+        // The battery as it is now: a sticky broadcast answers at once, with no receiver kept.
+        if (showBattery) {
+            registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))?.let(BatteryState::from)?.let { battery ->
+                face.battery.update(battery.fraction, battery.charging, battery.low)
+                face.battery.label = NumberFormat.getIntegerInstance().format((battery.fraction * 100).roundToInt())
+            }
+        } else {
+            // Room for the number, as the real one will have.
+            face.battery.label = "100"
+        }
+        return LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            val wrap = ViewGroup.LayoutParams.WRAP_CONTENT
+            addView(date, LinearLayout.LayoutParams(wrap, wrap))
+            addView(face, LinearLayout.LayoutParams(wrap, wrap))
+        }
     }
 
     /** The value after [value], back to the first after the last. */

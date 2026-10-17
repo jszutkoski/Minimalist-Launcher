@@ -15,7 +15,7 @@ import java.util.Locale
 import kotlin.random.Random
 
 /**
- * A bedside clock: time, battery line, date and weather, dimmed on black. The group drifts
+ * A bedside clock: date, time, battery and weather, dimmed on black. The group drifts
  * to a new spot every minute so no pixel stays lit in the same place. A tap calls [onExit].
  */
 class StandbyView(context: Context, private val onExit: () -> Unit) : FrameLayout(context) {
@@ -57,9 +57,9 @@ class StandbyView(context: Context, private val onExit: () -> Unit) : FrameLayou
             gravity = Gravity.CENTER_HORIZONTAL
             // Everything at half strength: readable in the dark, easy on the panel.
             alpha = 0.55f
-            addView(face, LinearLayout.LayoutParams(wrap, wrap))
             addView(date, LinearLayout.LayoutParams(wrap, wrap))
-            addView(weather, LinearLayout.LayoutParams(wrap, wrap).apply { topMargin = dp(6) })
+            addView(face, LinearLayout.LayoutParams(wrap, wrap))
+            addView(weather, LinearLayout.LayoutParams(wrap, wrap).apply { topMargin = dp(18) })
             addView(waiting, LinearLayout.LayoutParams(wrap, wrap).apply { topMargin = dp(22) })
         }
         setLook(ClockLook())
@@ -76,8 +76,9 @@ class StandbyView(context: Context, private val onExit: () -> Unit) : FrameLayou
         labelSp = 13f,
         gravity = Gravity.CENTER_HORIZONTAL,
         maxWidth = resources.displayMetrics.widthPixels - 2 * dp(SIDE_MARGIN_DP),
-        below = date,
-        gap = dp(GAP_DP),
+        date = date,
+        dateGap = dp(DATE_GAP_DP),
+        batteryGap = dp(BATTERY_GAP_DP),
     )
 
     /** A line glyph for each kind of message waiting; the row goes when there is nothing. */
@@ -147,8 +148,6 @@ class StandbyView(context: Context, private val onExit: () -> Unit) : FrameLayou
     }
 
     private companion object {
-        /** From the digits' baseline to the battery line, and from the line to the date. */
-        const val GAP_DP = 26
         const val DRIFT_DP = 6
     }
 }

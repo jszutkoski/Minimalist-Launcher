@@ -206,8 +206,8 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
 
         home = HomeColumn(this)
 
-        // The clock widget: the time, then the battery, a hairline exactly as wide as the time
-        // with the percentage set into it where the fill ends, or a ring; then the date.
+        // The clock widget, under the date: the time, then the battery, a hairline exactly as
+        // wide as the time with the percentage set into it where the fill ends, or a ring.
         face = ClockFace(this, pressable = true).apply {
             setOnTimeClick { SystemActions.openAlarms(this@MainActivity) }
             battery.setOnClickListener { SystemActions.openBatteryUsage(this@MainActivity) }
@@ -245,7 +245,7 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         screenTimeText = text("", 17f, Palette.SECONDARY, 400).apply {
             letterSpacing = 0.02f
             visibility = View.GONE
-            setPadding(0, dp(4), 0, dp(8))
+            setPadding(0, dp(18), 0, dp(8))
             setOnClickListener { SystemActions.openDigitalWellbeing(this@MainActivity) }
         }
         player = PlayerView(this, ::openPlayer)
@@ -257,9 +257,9 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
             addView(alarmDot)
             addView(alarmText)
         }
-        home.addView(face, LinearLayout.LayoutParams(wrap, wrap))
         home.addView(dateRow, LinearLayout.LayoutParams(wrap, wrap))
-        // Optional: today's screen time, on its own line under the date. The weather is for standby.
+        home.addView(face, LinearLayout.LayoutParams(wrap, wrap))
+        // Optional: today's screen time, on its own line under the battery. The weather is for standby.
         home.addView(screenTimeText, LinearLayout.LayoutParams(wrap, wrap))
         topSpace = Space(this)
         bottomSpace = Space(this)
@@ -337,8 +337,9 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
             labelSp = 13f * scale,
             gravity = if (prefs.centerFavorites) Gravity.CENTER_HORIZONTAL else Gravity.START,
             maxWidth = resources.displayMetrics.widthPixels - 2 * dp(SIDE_MARGIN_DP),
-            below = date,
-            gap = dp(26),
+            date = date,
+            dateGap = dp(DATE_GAP_DP),
+            batteryGap = dp(BATTERY_GAP_DP),
         )
         alarmDot.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f * scale)
         alarmText.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f * scale)

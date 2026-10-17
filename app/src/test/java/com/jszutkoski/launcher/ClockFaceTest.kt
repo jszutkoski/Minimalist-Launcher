@@ -20,7 +20,17 @@ class ClockFaceTest {
     private val date = TextView(context).apply { text = "Saturday, 17 October" }
 
     private fun show(look: ClockLook, maxWidth: Int = 1000) {
-        face.apply(look, digitsSp = 100f, analogDp = 170f, labelSp = 13f, gravity = 0, maxWidth = maxWidth, below = date, gap = 26)
+        face.apply(
+            look,
+            digitsSp = 100f,
+            analogDp = 170f,
+            labelSp = 13f,
+            gravity = 0,
+            maxWidth = maxWidth,
+            date = date,
+            dateGap = 20,
+            batteryGap = 26,
+        )
         face.measure(MeasureSpec.makeMeasureSpec(2000, MeasureSpec.AT_MOST), MeasureSpec.makeMeasureSpec(4000, MeasureSpec.AT_MOST))
     }
 

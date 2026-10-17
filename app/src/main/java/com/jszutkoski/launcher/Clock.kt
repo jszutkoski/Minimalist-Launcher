@@ -18,6 +18,12 @@ import kotlin.math.cos
 import kotlin.math.roundToInt
 import kotlin.math.sin
 
+/** From the date's baseline to the top of the clock's digits under it. */
+const val DATE_GAP_DP = 20
+
+/** From the clock's baseline to the battery line's centre. */
+const val BATTERY_GAP_DP = 26
+
 enum class ClockDesign(val label: Int) {
     LINE(R.string.clock_line),
     STACKED(R.string.clock_stacked),
@@ -93,7 +99,8 @@ object ClockFont {
 
 /**
  * The time and the battery under it, in the chosen design: digits on one line, hours over
- * minutes, or an analog face; then the battery as a line as wide as the time, or a ring.
+ * minutes, or an analog face; then the battery as a line as wide as the time, or a ring. The
+ * date sits just above, outside it.
  */
 class ClockFace(context: Context, pressable: Boolean) : LinearLayout(context) {
     private val color = if (pressable) pressable(Palette.TEXT) else ColorStateList.valueOf(Palette.TEXT)
@@ -139,7 +146,9 @@ class ClockFace(context: Context, pressable: Boolean) : LinearLayout(context) {
     /**
      * Shows [look] with the digits at [digitsSp] (the analog face as tall as [analogDp]) and
      * the battery's number at [labelSp], lined up by [gravity], never wider than [maxWidth]
-     * pixels, and spaced evenly against [below] (the date) by [gap] pixels.
+     * pixels. The clock's top hangs [dateGap] pixels under the baseline of the [date] above it,
+     * and the battery sits [batteryGap] pixels under the clock: both measured from the glyphs,
+     * not the text boxes, whose built-in ascent and descent would otherwise skew the spacing.
      */
     fun apply(
         look: ClockLook,
@@ -148,33 +157,42 @@ class ClockFace(context: Context, pressable: Boolean) : LinearLayout(context) {
         labelSp: Float,
         gravity: Int,
         maxWidth: Int,
-        below: TextView,
-        gap: Int,
+        date: TextView,
+        dateGap: Int,
+        batteryGap: Int,
     ) {
         val face = ClockFont.at(context, look.weight.weight)
         digital.visibility = if (look.design == ClockDesign.LINE) VISIBLE else GONE
         stack.visibility = if (look.design == ClockDesign.STACKED) VISIBLE else GONE
         analog.visibility = if (look.design == ClockDesign.ANALOG) VISIBLE else GONE
         val sizeSp = digitsSp * look.size.scale
-        val above: View = when (look.design) {
-            ClockDesign.LINE -> digital.also { showDigits(it, face, sizeSp, "00:00", maxWidth) }
+        // The view that starts the clock, the one whose glyphs are its top, and its last line.
+        val (first, top, last) = when (look.design) {
+            ClockDesign.LINE -> {
+                showDigits(digital, face, sizeSp, "00:00", maxWidth)
+                Triple(digital, digital, digital)
+            }
             ClockDesign.STACKED -> {
                 showDigits(hours, face, sizeSp, "00", maxWidth)
                 showDigits(minutes, face, sizeSp, "00", maxWidth)
                 // The minutes' digits an eighth of their height under the hours', not a whole
                 // line's worth of empty ascent and descent.
-                val metrics = hours.paint.fontMetrics
-                val digitTop = Rect().also { hours.paint.getTextBounds("0", 0, 1, it) }.top
-                val natural = metrics.descent + (digitTop - metrics.ascent)
-                (minutes.layoutParams as LayoutParams).topMargin = (-digitTop * STACKED_GAP - natural).roundToInt()
-                minutes
+                val natural = hours.paint.fontMetrics.descent + glyphInset(minutes)
+                (minutes.layoutParams as LayoutParams).topMargin = (digitHeight(hours) * STACKED_GAP - natural).roundToInt()
+                Triple(stack, hours, minutes)
             }
-            ClockDesign.ANALOG -> analog.also {
-                it.diameter = minOf(context.dp(analogDp * look.size.scale).roundToInt(), maxWidth)
-                it.stroke = context.dp(AnalogClock.strokeDp(look.weight.weight))
+            ClockDesign.ANALOG -> {
+                analog.diameter = minOf(context.dp(analogDp * look.size.scale).roundToInt(), maxWidth)
+                analog.stroke = context.dp(AnalogClock.strokeDp(look.weight.weight))
+                Triple(analog, analog, analog)
             }
         }
         for (view in listOf(digital, stack, hours, minutes, analog)) (view.layoutParams as LayoutParams).gravity = gravity
+
+        // Under the date: from its baseline, past its descent and padding, to the clock's glyphs.
+        val underDate = date.paint.fontMetrics.descent + date.paddingBottom
+        for (view in listOf(digital, stack, analog)) (view.layoutParams as LayoutParams).topMargin = 0
+        (first.layoutParams as LayoutParams).topMargin = (dateGap - underDate - glyphInset(top)).roundToInt()
 
         battery.design = look.battery
         battery.lineWidth = context.dp(look.batteryWeight.dp * if (look.battery == BatteryDesign.RING) RING_STROKE else 1f)
@@ -187,14 +205,30 @@ class ClockFace(context: Context, pressable: Boolean) : LinearLayout(context) {
             val ring = context.dp(RING_DP * labelSp / LABEL_SP * look.batterySize.scale).roundToInt()
             battery.ringDiameter = ring
             battery.setLabelSizePx(ring * RING_LABEL)
-            // A ring is tall: the gap from the digits to its top, and from its bottom to the date.
-            spaceEvenly(above, battery, battery.preferredHeight, below, gap + ring / 2)
         } else {
             battery.setLabelSize(labelSp * look.batterySize.scale)
-            // The battery line midway between the clock and the date.
-            spaceEvenly(above, battery, battery.preferredHeight, below, gap)
         }
+        // The last line's descent taken away, so the gap starts at the digits' baseline.
+        (last.layoutParams as LayoutParams).bottomMargin =
+            if (last is TextView) -(last.paint.fontMetrics.descent + last.paddingBottom).roundToInt() else 0
+        // The line's centre [batteryGap] under the digits; a ring's top a little nearer.
+        (battery.layoutParams as LayoutParams).topMargin = if (look.battery == BatteryDesign.RING) {
+            (batteryGap * RING_GAP).roundToInt()
+        } else {
+            batteryGap - battery.preferredHeight / 2
+        }
+        requestLayout()
     }
+
+    /** From the top of [view]'s box to the top of its digits; nothing for the analog face. */
+    private fun glyphInset(view: View): Float {
+        if (view !is TextView) return 0f
+        val boxTop = if (view.includeFontPadding) view.paint.fontMetrics.top else view.paint.fontMetrics.ascent
+        return view.paddingTop + (-digitHeight(view) - boxTop)
+    }
+
+    /** How tall [view]'s digits stand above the baseline. */
+    private fun digitHeight(view: TextView) = -Rect().also { view.paint.getTextBounds("0", 0, 1, it) }.top.toFloat()
 
     /** [view]'s digits in [face] at [sizeSp], or smaller when [widest] would not fit in [maxWidth]. */
     private fun showDigits(view: TextView, face: Typeface, sizeSp: Float, widest: String, maxWidth: Int) {
@@ -215,6 +249,9 @@ class ClockFace(context: Context, pressable: Boolean) : LinearLayout(context) {
         /** The ring at the default text size; it grows with the battery's number. */
         const val RING_DP = 50f
         const val LABEL_SP = 13f * 1.1f
+
+        /** A ring's top is nearer the digits than a line's centre would be. */
+        const val RING_GAP = 0.7f
 
         /** The ring's stroke is drawn a little heavier than the line's, as it is shorter. */
         const val RING_STROKE = 1.3f
