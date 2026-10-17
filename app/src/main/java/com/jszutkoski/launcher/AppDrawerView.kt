@@ -7,6 +7,7 @@ import android.graphics.drawable.GradientDrawable
 import android.text.Editable
 import android.text.InputType
 import android.text.TextWatcher
+import android.text.format.DateFormat
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.MotionEvent
@@ -25,6 +26,7 @@ import android.widget.LinearLayout
 import android.widget.ListView
 import android.widget.TextView
 import java.text.DecimalFormatSymbols
+import java.util.Calendar
 import kotlin.math.abs
 
 /**
@@ -244,7 +246,10 @@ class AppDrawerView(context: Context, private val callbacks: Callbacks) : Linear
         if (result is SearchResult.AppHit) callbacks.onLaunch(result.app, source) else callbacks.onResult(result, source)
     }
 
-    /** A sum's answer, then apps, contacts and settings, and the web last. */
+    /**
+     * A sum's answer or a timer or alarm, then apps, contacts and settings, the clock app's own
+     * pages for its word alone, and the web last.
+     */
     private fun filter(fromTyping: Boolean) {
         val query = search.text.toString()
         val q = query.trim()
@@ -253,12 +258,15 @@ class AppDrawerView(context: Context, private val callbacks: Callbacks) : Linear
         val found = if (waiting) emptyList() else AppSearch.filter(apps, query)
         val people = ContactSearch.filter(contacts, q).takeIf { q.length >= 2 }.orEmpty().take(MAX_CONTACTS)
         val settings = SettingSearch.filter(q).take(MAX_SETTINGS)
+        val (pages, clock) = ClockSearch.parse(q).partition { it is ClockCommand.Page }
         adapter.items = buildList {
             Calculator.evaluate(q, DecimalFormatSymbols.getInstance(numbers).decimalSeparator)
                 ?.let { add(SearchResult.Answer(it, numbers)) }
+            clock.mapTo(this, SearchResult::Clock)
             found.mapTo(this, SearchResult::AppHit)
             people.mapTo(this, SearchResult::ContactHit)
             settings.mapTo(this, SearchResult::SettingHit)
+            pages.mapTo(this, SearchResult::Clock)
             if (q.isNotEmpty()) add(SearchResult.Web(q))
         }
 
@@ -266,7 +274,7 @@ class AppDrawerView(context: Context, private val callbacks: Callbacks) : Linear
         val grew = query.length > lastQueryLength
         lastQueryLength = query.length
         if (fromTyping && grew && autoLaunch &&
-            AppSearch.opensAlone(q, found.map { it.searchKey }, people.size, settings.size)
+            AppSearch.opensAlone(q, found.map { it.searchKey }, people.size, settings.size + clock.size + pages.size)
         ) {
             callbacks.onLaunch(found[0], search)
         }
@@ -396,6 +404,24 @@ private class ResultAdapter(private val context: Context, private val onWhatsApp
                         else -> R.string.result_turn_on
                     },
                 )
+            }
+            is SearchResult.Clock -> when (val command = item.command) {
+                is ClockCommand.Timer -> {
+                    title = context.getString(R.string.result_timer, ClockSearch.describe(command.seconds))
+                    hint = context.getString(R.string.result_start)
+                }
+                is ClockCommand.Alarm -> {
+                    val at = Calendar.getInstance().apply {
+                        set(Calendar.HOUR_OF_DAY, command.hour)
+                        set(Calendar.MINUTE, command.minute)
+                    }
+                    title = context.getString(R.string.result_alarm, DateFormat.getTimeFormat(context).format(at.time))
+                    hint = context.getString(R.string.result_set)
+                }
+                is ClockCommand.Page -> {
+                    title = context.getString(if (command.alarms) R.string.clock_alarms else R.string.clock_timers)
+                    hint = context.getString(R.string.result_open)
+                }
             }
             is SearchResult.Web -> {
                 title = context.getString(R.string.result_web_title, item.query)

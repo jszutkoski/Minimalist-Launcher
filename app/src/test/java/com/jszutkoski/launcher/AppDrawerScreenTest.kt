@@ -74,6 +74,21 @@ class AppDrawerScreenTest {
     }
 
     @Test
+    fun aTimerComesFirstAndOpensNothingOnItsOwn() {
+        type("timer 10 min")
+        val first = items.first() as SearchResult.Clock
+        assertEquals(ClockCommand.Timer(600), first.command)
+        assertEquals("Timer for 10 min", list.adapter.getView(0, null, list).textViews().first().text.toString())
+        assertTrue(launched.isEmpty())
+    }
+
+    @Test
+    fun anAlarmIsOfferedForATimeOfDay() {
+        type("alarm 7:30")
+        assertEquals(ClockCommand.Alarm(7, 30), (items.first() as SearchResult.Clock).command)
+    }
+
+    @Test
     fun aLetterInsideANameOpensNothing() {
         type("q")
         assertTrue(launched.isEmpty())

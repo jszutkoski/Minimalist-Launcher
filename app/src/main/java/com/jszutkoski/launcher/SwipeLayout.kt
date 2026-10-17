@@ -22,6 +22,9 @@ class SwipeLayout(context: Context) : FrameLayout(context) {
         fun onSwipeDown()
         fun onDoubleTapEmpty()
         fun onPinchIn()
+
+        /** A sideways swipe; [toLeft] when the finger moved to the left. */
+        fun onSwipeSideways(toLeft: Boolean)
         fun onLongPressEmpty()
     }
 
@@ -143,7 +146,9 @@ class SwipeLayout(context: Context) : FrameLayout(context) {
         val tracker = velocity
         tracker?.computeCurrentVelocity(1000)
         val vy = tracker?.yVelocity ?: 0f
+        val vx = tracker?.xVelocity ?: 0f
         val dy = ev.y - downY
+        val dx = ev.x - downX
         when (mode) {
             Mode.UP -> {
                 val progress = (originY - ev.y) / dragDistance
@@ -151,8 +156,11 @@ class SwipeLayout(context: Context) : FrameLayout(context) {
             }
             Mode.DOWN -> if (!pulled && (dy > swipeDistance || vy > fling)) listener?.onSwipeDown()
             Mode.NONE -> detectDoubleTap(ev)
-            // Sideways movement only cancels a long-press; it has no action of its own.
-            Mode.SIDE, Mode.PINCH -> Unit
+            // Far enough, or flung, and still going the way it started.
+            Mode.SIDE -> if ((abs(dx) > swipeDistance || abs(vx) > fling) && dx * vx >= 0) {
+                listener?.onSwipeSideways(toLeft = dx < 0)
+            }
+            Mode.PINCH -> Unit
         }
         finish()
     }

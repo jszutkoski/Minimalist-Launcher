@@ -33,6 +33,13 @@ class StandbyView(context: Context, private val onExit: () -> Unit) : FrameLayou
         visibility = GONE
     }
     private val drift = Runnable { moveContent() }
+    private val clock = TextClock(context).apply {
+        format12Hour = "h:mm"
+        format24Hour = "HH:mm"
+        setTextColor(Palette.TEXT)
+        includeFontPadding = false
+    }
+    private val date: TextClock
 
     init {
         setBackgroundColor(Palette.BACKGROUND)
@@ -41,17 +48,8 @@ class StandbyView(context: Context, private val onExit: () -> Unit) : FrameLayou
         visibility = GONE
         alpha = 0f
 
-        val clock = TextClock(context).apply {
-            format12Hour = "h:mm"
-            format24Hour = "HH:mm"
-            setTextColor(Palette.TEXT)
-            typeface = weight(200)
-            textSize = 106f
-            letterSpacing = -0.02f
-            includeFontPadding = false
-        }
         val datePattern = DateFormat.getBestDateTimePattern(Locale.getDefault(), "EEEEdMMMM")
-        val date = TextClock(context).apply {
+        date = TextClock(context).apply {
             format12Hour = datePattern
             format24Hour = datePattern
             setTextColor(Palette.SECONDARY)
@@ -76,11 +74,18 @@ class StandbyView(context: Context, private val onExit: () -> Unit) : FrameLayou
             addView(weather, LinearLayout.LayoutParams(wrap, wrap).apply { topMargin = dp(6) })
             addView(waiting, LinearLayout.LayoutParams(wrap, wrap).apply { topMargin = dp(22) })
         }
-        // The line midway between the clock's digits and the date.
-        spaceEvenly(clock, battery, battery.preferredHeight, date, dp(GAP_DP))
+        setClockStyle(ClockStyle.THIN, ClockSize.DEFAULT)
         waiting.addView(chat)
         waiting.addView(mail, LinearLayout.LayoutParams(wrap, wrap).apply { leftMargin = dp(22) })
         addView(content, LayoutParams(wrap, wrap, Gravity.CENTER))
+    }
+
+    /** The face and size chosen in settings, kept clear of the screen's sides as it drifts. */
+    fun setClockStyle(style: ClockStyle, size: ClockSize) {
+        val width = resources.displayMetrics.widthPixels - 2 * dp(SIDE_MARGIN_DP)
+        clock.styleClock(style, 106f * size.scale, width)
+        // The line midway between the clock's digits and the date.
+        spaceEvenly(clock, battery, battery.preferredHeight, date, dp(GAP_DP))
     }
 
     /** A line glyph for each kind of message waiting; the row goes when there is nothing. */

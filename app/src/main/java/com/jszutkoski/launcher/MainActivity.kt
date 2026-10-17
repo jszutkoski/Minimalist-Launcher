@@ -212,8 +212,6 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
             format12Hour = "h:mm"
             format24Hour = "HH:mm"
             setTextColor(pressable(Palette.TEXT))
-            typeface = weight(200)
-            letterSpacing = -0.02f
             includeFontPadding = false
             setOnClickListener { SystemActions.openAlarms(this@MainActivity) }
         }
@@ -347,7 +345,8 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
     private fun render() {
         stale = false
         val scale = prefs.textSize.scale
-        clock.setTextSize(TypedValue.COMPLEX_UNIT_SP, 100f * scale)
+        val width = resources.displayMetrics.widthPixels - 2 * dp(SIDE_MARGIN_DP)
+        clock.styleClock(prefs.clockStyle, 100f * scale * prefs.clockSize.scale, width)
         date.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f * scale)
         batteryBar.setLabelSize(13f * scale)
         // The battery line midway between the clock's digits and the date, at any text size.
@@ -673,6 +672,12 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
     override fun onSwipeDown() = SystemActions.expandNotifications(this)
 
     override fun onPinchIn() = enterStandby()
+
+    /** The app chosen for that side in settings, through the pause like any other launch. */
+    override fun onSwipeSideways(toLeft: Boolean) {
+        val app = prefs.swipeApp(toLeft)?.let(repo::find) ?: return
+        launch(app, root)
+    }
 
     override fun onDoubleTapEmpty() {
         if (!prefs.doubleTapLock) return

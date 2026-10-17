@@ -89,6 +89,16 @@ class Prefs(context: Context) {
         }
         set(value) = prefs.edit().putInt(KEY_STATUS_BAR, value.ordinal).apply()
 
+    /** The clock's face, on the home screen and the bedside clock. */
+    var clockStyle: ClockStyle
+        get() = ClockStyle.entries.getOrElse(prefs.getInt(KEY_CLOCK_STYLE, 0)) { ClockStyle.THIN }
+        set(value) = prefs.edit().putInt(KEY_CLOCK_STYLE, value.ordinal).apply()
+
+    /** The clock's size, on top of the text size. */
+    var clockSize: ClockSize
+        get() = ClockSize.entries.getOrElse(prefs.getInt(KEY_CLOCK_SIZE, ClockSize.DEFAULT.ordinal)) { ClockSize.DEFAULT }
+        set(value) = prefs.edit().putInt(KEY_CLOCK_SIZE, value.ordinal).apply()
+
     /** Clock and pinned apps centred on the home screen, or left aligned with the apps near the thumb. */
     var centerFavorites: Boolean
         get() = prefs.getBoolean(KEY_CENTER_FAVORITES, true)
@@ -141,6 +151,15 @@ class Prefs(context: Context) {
         prefs.edit().apply { if (key == null) remove("$KEY_DOCK$slot") else putString("$KEY_DOCK$slot", key) }.apply()
     }
 
+    /** The app a sideways swipe on the home screen opens, or null for none. */
+    fun swipeApp(toLeft: Boolean): String? = prefs.getString(swipeKey(toLeft), null)
+
+    fun setSwipeApp(toLeft: Boolean, key: String?) {
+        prefs.edit().apply { if (key == null) remove(swipeKey(toLeft)) else putString(swipeKey(toLeft), key) }.apply()
+    }
+
+    private fun swipeKey(toLeft: Boolean) = if (toLeft) KEY_SWIPE_LEFT else KEY_SWIPE_RIGHT
+
     fun customName(key: String): String? = names.getString(key, null)
 
     fun setCustomName(key: String, name: String?) {
@@ -171,5 +190,9 @@ class Prefs(context: Context) {
         const val KEY_NOTIFICATION_DOTS = "notification_dots"
         const val KEY_LOCK_SCREEN_GLYPHS = "lock_screen_glyphs"
         const val KEY_PAUSE_APPS = "pause_apps"
+        const val KEY_CLOCK_STYLE = "clock_style"
+        const val KEY_CLOCK_SIZE = "clock_size"
+        const val KEY_SWIPE_LEFT = "swipe_left_app"
+        const val KEY_SWIPE_RIGHT = "swipe_right_app"
     }
 }

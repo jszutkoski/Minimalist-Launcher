@@ -3,6 +3,7 @@ package com.jszutkoski.launcher
 import android.Manifest
 import android.annotation.SuppressLint
 import android.app.Activity
+import android.graphics.Typeface
 import android.os.Build
 import android.os.Bundle
 import android.view.ViewGroup
@@ -135,6 +136,18 @@ class SettingsActivity : Activity() {
         row(getString(R.string.text_size), getString(prefs.textSize.label)) {
             prefs.textSize = TextSize.entries[(prefs.textSize.ordinal + 1) % TextSize.entries.size]
         }
+        // Each face's name is written in that face.
+        row(
+            getString(R.string.clock_style),
+            getString(prefs.clockStyle.label),
+            getString(R.string.clock_style_desc),
+            valueFace = prefs.clockStyle.typeface,
+        ) {
+            prefs.clockStyle = ClockStyle.entries[(prefs.clockStyle.ordinal + 1) % ClockStyle.entries.size]
+        }
+        row(getString(R.string.clock_size), getString(prefs.clockSize.label)) {
+            prefs.clockSize = ClockSize.entries[(prefs.clockSize.ordinal + 1) % ClockSize.entries.size]
+        }
         row(
             getString(R.string.layout),
             getString(if (prefs.centerFavorites) R.string.layout_centred else R.string.layout_left),
@@ -258,6 +271,12 @@ class SettingsActivity : Activity() {
     }
 
     private fun renderGestures() {
+        listOf(true to R.string.swipe_left, false to R.string.swipe_right).forEach { (toLeft, title) ->
+            val app = prefs.swipeApp(toLeft)?.let(repo::find)
+            row(getString(title), app?.label ?: getString(R.string.off), getString(R.string.swipe_desc)) {
+                pickSwipeApp(toLeft, getString(title))
+            }
+        }
         permissionRow(
             title = getString(R.string.double_tap),
             description = getString(R.string.double_tap_desc),
@@ -354,7 +373,13 @@ class SettingsActivity : Activity() {
         render()
     }
 
-    private fun row(title: String, value: String, description: String? = null, onClick: () -> Unit) {
+    private fun row(
+        title: String,
+        value: String,
+        description: String? = null,
+        valueFace: Typeface? = null,
+        onClick: () -> Unit,
+    ) {
         val row = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(0, dp(14), 0, dp(14))
@@ -370,6 +395,7 @@ class SettingsActivity : Activity() {
                 isDuplicateParentStateEnabled = true
                 isSingleLine = false
                 setPadding(0, dp(4), 0, 0)
+                if (valueFace != null) typeface = valueFace
             },
         )
         if (description != null) {
@@ -401,6 +427,19 @@ class SettingsActivity : Activity() {
                     render()
                 }
             }
+        sheet.show()
+    }
+
+    /** Nothing, or one of the visible apps, for a sideways swipe on the home screen. */
+    private fun pickSwipeApp(toLeft: Boolean, title: String) {
+        val sheet = Sheet(this, title)
+        sheet.option(getString(R.string.off), Palette.SECONDARY) { prefs.setSwipeApp(toLeft, null) }
+        sheet.divider()
+        sheet.appList(repo.visibleApps()) { app ->
+            prefs.setSwipeApp(toLeft, app.key)
+            sheet.dialog.dismiss()
+        }
+        sheet.onDismiss = { render() }
         sheet.show()
     }
 

@@ -27,6 +27,9 @@ sealed interface SearchResult {
 
     class SettingHit(val setting: SystemSetting) : SearchResult
 
+    /** A timer or an alarm for the clock app. */
+    class Clock(val command: ClockCommand) : SearchResult
+
     /** Always last: hand the words to the web. */
     class Web(val query: String) : SearchResult
 }

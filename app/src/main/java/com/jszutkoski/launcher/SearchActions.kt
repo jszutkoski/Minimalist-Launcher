@@ -6,11 +6,12 @@ import android.content.ClipboardManager
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
+import android.provider.AlarmClock
 import android.provider.ContactsContract
 import android.view.View
 import android.widget.Toast
 
-/** What tapping a search result does, for everything but an app: sums, contacts, settings, the web. */
+/** What tapping a search result does, for everything but an app: sums, timers, contacts, settings, the web. */
 class SearchActions(
     private val activity: Activity,
     private val repo: AppRepository,
@@ -23,6 +24,7 @@ class SearchActions(
             is SearchResult.Answer -> copy(Calculator.plain(result.value, result.numbers))
             is SearchResult.ContactHit -> showContact(result.contact)
             is SearchResult.SettingHit -> openSetting(result.setting)
+            is SearchResult.Clock -> openClock(result.command)
             is SearchResult.Web -> SystemActions.webSearch(activity, result.query)
         }
     }
@@ -61,6 +63,21 @@ class SearchActions(
     }
 
     private fun toast(text: String) = Toast.makeText(activity, text, Toast.LENGTH_SHORT).show()
+
+    /** Handed to the clock app, which shows the timer running or the alarm set, to change or undo. */
+    private fun openClock(command: ClockCommand) {
+        val intent = when (command) {
+            is ClockCommand.Timer -> Intent(AlarmClock.ACTION_SET_TIMER)
+                .putExtra(AlarmClock.EXTRA_LENGTH, command.seconds)
+                .putExtra(AlarmClock.EXTRA_SKIP_UI, false)
+            is ClockCommand.Alarm -> Intent(AlarmClock.ACTION_SET_ALARM)
+                .putExtra(AlarmClock.EXTRA_HOUR, command.hour)
+                .putExtra(AlarmClock.EXTRA_MINUTES, command.minute)
+                .putExtra(AlarmClock.EXTRA_SKIP_UI, false)
+            is ClockCommand.Page -> Intent(if (command.alarms) AlarmClock.ACTION_SHOW_ALARMS else AlarmClock.ACTION_SHOW_TIMERS)
+        }
+        if (!SystemActions.start(activity, intent)) toast(activity.getString(R.string.no_clock_app))
+    }
 
     private fun openSetting(setting: SystemSetting) {
         if (setting.isTorch) {

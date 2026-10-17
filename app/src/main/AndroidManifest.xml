@@ -21,6 +21,8 @@
     <uses-permission
         android:name="android.permission.ACCESS_HIDDEN_PROFILES"
         tools:ignore="ProtectedPermissions" />
+    <!-- "timer 10 min" and "alarme 7:30" in the search, handed to the clock app. -->
+    <uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
     <!-- Contacts in the search. Asked for only when that setting is turned on. -->
     <uses-permission android:name="android.permission.READ_CONTACTS" />
 

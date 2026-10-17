@@ -96,6 +96,26 @@ class SettingsScreenTest {
     }
 
     @Test
+    fun theClockFaceGoesRoundTheChoices() {
+        val activity = controller.get()
+        activity.tap(R.string.page_home)
+        activity.tap(R.string.clock_style)
+        assertEquals(ClockStyle.BOLD, Prefs(activity).clockStyle)
+        repeat(ClockStyle.entries.size - 1) { activity.tap(R.string.clock_style) }
+        assertEquals(ClockStyle.THIN, Prefs(activity).clockStyle)
+    }
+
+    @Test
+    fun aSidewaysSwipeCanBeLeftWithNoApp() {
+        val activity = controller.get()
+        Prefs(activity).setSwipeApp(toLeft = true, key = "pkg.Waze/.Main#0")
+        activity.tap(R.string.page_gestures)
+        activity.tap(R.string.swipe_left)
+        activity.choose(R.string.off)
+        assertNull(Prefs(activity).swipeApp(toLeft = true))
+    }
+
+    @Test
     @Config(qualifiers = "pt-rBR")
     fun speaksPortugueseOnAPhoneInPortuguese() {
         val texts = controller.get().content().textViews().map { it.text.toString() }
