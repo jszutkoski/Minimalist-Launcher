@@ -127,6 +127,23 @@ open class StandbyActivity : Activity() {
         if (this !is StandbyOverAppsActivity) finish()
     }
 
+    /**
+     * Something of the system's came over standby: the notification shade, quick settings or the
+     * power menu (a call or an alarm too, but those are left alone). On a phone that is still
+     * unlocked, past the grace period, the shade would hand anyone the messages and their reply
+     * boxes; so the phone locks there and then, as pressing home does. Over the lock screen the
+     * shade is Android's own, showing what its lock screen settings allow.
+     */
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        // Our own fingerprint prompt, standby closing, or the screen going off.
+        if (hasFocus || unlockAsked || isFinishing) return
+        if (getSystemService(PowerManager::class.java)?.isInteractive != true) return
+        if (LockService.inCall(this)) return
+        val locked = getSystemService(KeyguardManager::class.java)?.isKeyguardLocked == true
+        if (!locked && needsUnlock()) LockService.lock()
+    }
+
     // Android 11 and 12 only: from 13 on, back reaches the OnBackInvokedCallback instead.
     @SuppressLint("GestureBackNavigation")
     @Deprecated("Only reached below Android 13; newer versions use OnBackInvokedCallback.")

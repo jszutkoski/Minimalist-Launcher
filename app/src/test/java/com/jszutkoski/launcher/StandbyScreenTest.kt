@@ -11,6 +11,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Robolectric
@@ -24,8 +25,18 @@ class StandbyScreenTest {
     private val app = RuntimeEnvironment.getApplication()
     private val keyguard = shadowOf(app.getSystemService(KeyguardManager::class.java))
 
+    private val realLock = LockService.lockAction
+    private var locks = 0
+
+    @Before
+    fun countLocks() {
+        // The screen is on (Robolectric's default): this is someone at the phone.
+        LockService.lockAction = { locks++; true }
+    }
+
     @After
     fun tearDown() {
+        LockService.lockAction = realLock
         Notifications.update(emptySet())
         idle()
     }
@@ -48,6 +59,14 @@ class StandbyScreenTest {
     }
 
     private fun open() = Robolectric.buildActivity(StandbyActivity::class.java).setup().get()
+
+    /** Standby open for [seconds], then something of the system's (the shade) coming over it. */
+    private fun shadeOver(seconds: Long) {
+        val controller = Robolectric.buildActivity(StandbyActivity::class.java).setup()
+        idle(seconds * 1000)
+        controller.windowFocusChanged(false)
+        idle()
+    }
 
     private fun StandbyActivity.lit() =
         window.attributes.flags and WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON != 0
@@ -98,6 +117,39 @@ class StandbyScreenTest {
         assertTrue(standby.lit())
         battery(charging = false)
         assertFalse(standby.lit())
+    }
+
+    @Test
+    fun theShadeOverAnUnlockedStandbyLocksThePhone() {
+        phone(secure = true, locked = false)
+        battery(charging = true)
+        shadeOver(seconds = 11)
+        assertEquals(1, locks)
+    }
+
+    @Test
+    fun inTheFirstSecondsTheShadeIsAsOpenAsATap() {
+        phone(secure = true, locked = false)
+        battery(charging = true)
+        shadeOver(seconds = 3)
+        assertEquals(0, locks)
+    }
+
+    @Test
+    fun overTheLockScreenTheShadeIsAndroidsOwn() {
+        // Locking again would only turn the screen off: what the shade shows is Android's choice.
+        phone(secure = true, locked = true)
+        battery(charging = true)
+        shadeOver(seconds = 11)
+        assertEquals(0, locks)
+    }
+
+    @Test
+    fun withNoScreenLockThereIsNothingToLock() {
+        phone(secure = false, locked = false)
+        battery(charging = true)
+        shadeOver(seconds = 11)
+        assertEquals(0, locks)
     }
 
     private fun whatsAppWaiting() {

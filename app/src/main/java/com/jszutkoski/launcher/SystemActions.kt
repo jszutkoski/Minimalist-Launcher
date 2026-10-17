@@ -45,6 +45,12 @@ object SystemActions {
             ),
         ) || start(activity, Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
 
+    /** Android's own choice of what the lock screen shows of notifications; its page moves between makers. */
+    fun openLockScreenNotifications(activity: Activity) =
+        start(activity, Intent("android.settings.LOCK_SCREEN_SETTINGS")) ||
+            start(activity, Intent("android.settings.NOTIFICATION_SETTINGS")) ||
+            start(activity, Intent(Settings.ACTION_SETTINGS))
+
     fun openAccessibility(activity: Activity) = start(activity, Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
 
     /** Where Android hides "Allow restricted settings" for sideloaded apps. */

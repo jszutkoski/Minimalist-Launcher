@@ -106,10 +106,13 @@
     <string name="standby_charging">Standby while charging</string>
     <string name="standby_charging_desc">A dim bedside clock after 20 seconds on the home screen while charging. Pinch the home screen with two fingers to open it any time; tap to leave. Once the phone has locked it stays lit all night over the lock screen; while still unlocked it times out like any screen, so nobody can reach your notifications</string>
     <string name="standby_wake">Standby on every wake</string>
-    <string name="standby_wake_desc">Each time the screen turns on, the bedside clock shows first, over the lock screen. Tap it to unlock, or unlock with your fingerprint or face; you return to the app you were in. The same switch lets home or recents lock the phone when leaving a still-unlocked bedside clock</string>
+    <string name="standby_wake_desc">Each time the screen turns on, the bedside clock shows first, over the lock screen. Tap it to unlock, or unlock with your fingerprint or face; you return to the app you were in. The same switch lets home, recents or pulling down the notifications lock the phone on a still-unlocked bedside clock</string>
     <string name="grant_accessibility">Tap to turn on Minimalist in Accessibility</string>
     <string name="lock_glyphs">Message icons on the lock screen</string>
     <string name="lock_glyphs_desc">The WhatsApp and email icons on the bedside clock while the phone is locked. Off, they appear only once it is unlocked</string>
+    <string name="lock_notifications">Notifications on the lock screen</string>
+    <string name="lock_notifications_value">Set in Android</string>
+    <string name="lock_notifications_desc">Over the lock screen the notification shade is Android\'s own: choose there whether it shows your messages, hides what they say or shows nothing</string>
     <string name="weather">Weather</string>
     <string name="weather_desc">Temperature and sky under the date on the bedside clock, from Open-Meteo, for your approximate location</string>
     <string name="grant_location">Tap to allow approximate location</string>

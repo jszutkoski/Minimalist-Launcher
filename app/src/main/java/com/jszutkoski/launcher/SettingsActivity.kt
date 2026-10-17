@@ -221,6 +221,11 @@ class SettingsActivity : Activity() {
             onOff(prefs.lockScreenGlyphs),
             getString(R.string.lock_glyphs_desc),
         ) { prefs.lockScreenGlyphs = !prefs.lockScreenGlyphs }
+        row(
+            getString(R.string.lock_notifications),
+            getString(R.string.lock_notifications_value),
+            getString(R.string.lock_notifications_desc),
+        ) { SystemActions.openLockScreenNotifications(this) }
         permissionRow(
             title = getString(R.string.weather),
             description = getString(R.string.weather_desc),

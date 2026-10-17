@@ -19,7 +19,7 @@ import android.view.accessibility.AccessibilityEvent
 class LockService : AccessibilityService() {
     private val screenOff = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
-            if (!Prefs(context).standbyOnWake || inCall() || StandbyActivity.inFront) return
+            if (!Prefs(context).standbyOnWake || inCall(context) || StandbyActivity.inFront) return
             // Home was on screen: standby joins the home task, so unlocking fades back to home
             // instead of the system's sideways task animation.
             if (MainActivity.inFront) StandbyActivity.startOverHome(context) else StandbyActivity.startOnTop(context)
@@ -51,13 +51,6 @@ class LockService : AccessibilityService() {
         listening = false
     }
 
-    /** The proximity sensor turns the screen off during calls: never cover the call screen. */
-    private fun inCall(): Boolean {
-        val mode = getSystemService(AudioManager::class.java)?.mode ?: return false
-        return mode == AudioManager.MODE_IN_CALL || mode == AudioManager.MODE_IN_COMMUNICATION ||
-            mode == AudioManager.MODE_RINGTONE
-    }
-
     override fun onAccessibilityEvent(event: AccessibilityEvent?) = Unit
 
     override fun onInterrupt() = Unit
@@ -73,7 +66,17 @@ class LockService : AccessibilityService() {
             return enabled.split(':').any { ComponentName.unflattenFromString(it) == me }
         }
 
+        /** How the screen is locked: the service's global action. Replaced only by tests. */
+        internal var lockAction: () -> Boolean = { instance?.performGlobalAction(GLOBAL_ACTION_LOCK_SCREEN) == true }
+
         /** True when the screen was locked. */
-        fun lock(): Boolean = instance?.performGlobalAction(GLOBAL_ACTION_LOCK_SCREEN) == true
+        fun lock(): Boolean = lockAction()
+
+        /** Ringing or on a call: the call screen must never be covered, nor the phone locked under it. */
+        fun inCall(context: Context): Boolean {
+            val mode = context.getSystemService(AudioManager::class.java)?.mode ?: return false
+            return mode == AudioManager.MODE_IN_CALL || mode == AudioManager.MODE_IN_COMMUNICATION ||
+                mode == AudioManager.MODE_RINGTONE
+        }
     }
 }

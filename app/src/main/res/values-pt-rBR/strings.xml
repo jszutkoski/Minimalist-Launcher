@@ -106,10 +106,13 @@
     <string name="standby_charging">Descanso ao carregar</string>
     <string name="standby_charging_desc">Um relógio de cabeceira suave depois de 20 segundos na tela inicial carregando. Faça pinça com dois dedos na tela inicial para abrir quando quiser; toque para sair. Depois que o celular bloqueia, ele fica aceso a noite toda sobre a tela de bloqueio; ainda desbloqueado, apaga como qualquer tela, para ninguém chegar às suas notificações</string>
     <string name="standby_wake">Descanso a cada despertar</string>
-    <string name="standby_wake_desc">Sempre que a tela acende, o relógio de cabeceira aparece primeiro, sobre a tela de bloqueio. Toque para desbloquear, ou desbloqueie com a digital ou o rosto; você volta ao app em que estava. A mesma opção faz o início ou os recentes bloquearem o celular ao sair de um relógio ainda desbloqueado</string>
+    <string name="standby_wake_desc">Sempre que a tela acende, o relógio de cabeceira aparece primeiro, sobre a tela de bloqueio. Toque para desbloquear, ou desbloqueie com a digital ou o rosto; você volta ao app em que estava. A mesma opção faz o início, os recentes ou puxar as notificações bloquearem o celular num relógio ainda desbloqueado</string>
     <string name="grant_accessibility">Toque para ativar o Minimalist em Acessibilidade</string>
     <string name="lock_glyphs">Ícones de mensagem na tela de bloqueio</string>
     <string name="lock_glyphs_desc">Os ícones do WhatsApp e do e-mail no relógio de cabeceira com o celular bloqueado. Desligado, aparecem só depois de desbloquear</string>
+    <string name="lock_notifications">Notificações na tela de bloqueio</string>
+    <string name="lock_notifications_value">Definido no Android</string>
+    <string name="lock_notifications_desc">Sobre a tela de bloqueio, a cortina de notificações é do próprio Android: escolha lá se ela mostra suas mensagens, esconde o que dizem ou não mostra nada</string>
     <string name="weather">Clima</string>
     <string name="weather_desc">Temperatura e céu abaixo da data no relógio de cabeceira, do Open-Meteo, para a sua localização aproximada</string>
     <string name="grant_location">Toque para permitir a localização aproximada</string>
