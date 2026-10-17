@@ -60,6 +60,8 @@ android {
         abortOnError = true
         // Warnings are reported in the build log; only errors fail it.
         warningsAsErrors = false
+        textReport = true
+        textOutput = file("stdout")
     }
 
     compileOptions {
