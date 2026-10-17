@@ -14,13 +14,15 @@ import android.widget.LinearLayout
 import android.widget.Toast
 
 /**
- * The long-press menu of an app on home or in the list: its shortcuts, then pinning,
- * renaming, the pause, hiding, app info and uninstalling. [render] redraws home afterwards.
+ * The long-press menu of an app on home or in the list: its shortcuts, then pinning to home
+ * or to the bottom icons, renaming, the pause, hiding, app info and uninstalling. [render]
+ * redraws home afterwards.
  */
 class AppMenu(
     private val activity: Activity,
     private val prefs: Prefs,
     private val repo: AppRepository,
+    private val dock: DockApps,
     private val render: () -> Unit,
     private val openShortcut: (App, ShortcutInfo) -> Unit,
 ) {
@@ -36,6 +38,12 @@ class AppMenu(
                 if (index < favoriteKeys.lastIndex) option(activity.getString(R.string.menu_move_down)) { moveFavorite(app.key, 1) }
             } else {
                 option(activity.getString(R.string.menu_add_home)) { addFavorite(app) }
+            }
+            val docked = dock.shown().indexOf(app.key)
+            if (docked >= 0) {
+                option(activity.getString(R.string.dock_remove)) { dock.remove(docked); render() }
+            } else {
+                option(activity.getString(R.string.menu_add_dock)) { dock.offer(activity, app, render) }
             }
             option(activity.getString(R.string.menu_rename)) { showRename(app) }
             option(activity.getString(if (paused) R.string.menu_open_without_pause else R.string.menu_pause_before)) {

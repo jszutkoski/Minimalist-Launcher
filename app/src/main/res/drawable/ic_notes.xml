@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Notes: the page with a folded corner. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="26dp"
+    android:height="26dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:pathData="M6.5,3.5 L14,3.5 L18.5,8 L18.5,19 A1.5,1.5 0 0,1 17,20.5 L6.5,20.5 A1.5,1.5 0 0,1 5,19 L5,5 A1.5,1.5 0 0,1 6.5,3.5 Z"
+        android:strokeWidth="1.5"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+    <path
+        android:pathData="M14,3.5 L14,8 L18.5,8 M8.5,12.5 L15,12.5 M8.5,16 L13,16"
+        android:strokeWidth="1.5"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+</vector>

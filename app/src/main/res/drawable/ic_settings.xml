@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Settings: the gear. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="26dp"
+    android:height="26dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:pathData="M10.78,5.72 L10.95,3.46 L13.05,3.46 L13.22,5.72 L15.58,6.69 L17.29,5.22 L18.78,6.71 L17.31,8.42 L18.28,10.78 L20.54,10.95 L20.54,13.05 L18.28,13.22 L17.31,15.58 L18.78,17.29 L17.29,18.78 L15.58,17.31 L13.22,18.28 L13.05,20.54 L10.95,20.54 L10.78,18.28 L8.42,17.31 L6.71,18.78 L5.22,17.29 L6.69,15.58 L5.72,13.22 L3.46,13.05 L3.46,10.95 L5.72,10.78 L6.69,8.42 L5.22,6.71 L6.71,5.22 L8.42,6.69 Z"
+        android:strokeWidth="1.5"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+    <path
+        android:pathData="M14.8,12 A2.8,2.8 0 1,1 9.2,12 A2.8,2.8 0 1,1 14.8,12 Z"
+        android:strokeWidth="1.5"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+</vector>

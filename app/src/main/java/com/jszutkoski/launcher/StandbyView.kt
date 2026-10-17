@@ -28,8 +28,6 @@ class StandbyView(context: Context, private val onExit: () -> Unit) : FrameLayou
         visibility = GONE
     }
     private val content = LinearLayout(context)
-    private val chat = glyph(R.drawable.ic_chat, "WhatsApp")
-    private val mail = glyph(R.drawable.ic_mail, context.getString(R.string.glyph_email))
     private val waiting = LinearLayout(context).apply {
         orientation = LinearLayout.HORIZONTAL
         visibility = GONE
@@ -68,8 +66,6 @@ class StandbyView(context: Context, private val onExit: () -> Unit) : FrameLayou
             addView(waiting, LinearLayout.LayoutParams(wrap, wrap))
         }
         setLook(ClockLook())
-        waiting.addView(chat)
-        waiting.addView(mail, LinearLayout.LayoutParams(wrap, wrap).apply { leftMargin = dp(22) })
         addView(content, LayoutParams(wrap, wrap, Gravity.CENTER))
     }
 
@@ -105,22 +101,24 @@ class StandbyView(context: Context, private val onExit: () -> Unit) : FrameLayou
         spaceGlyphs(lines, dp(GAP_DP), trimEnds = true)
     }
 
-    /** A line glyph for each kind of message waiting; the row goes when there is nothing. */
-    fun showWaiting(whatsApp: Boolean, email: Boolean) {
-        chat.visibility = if (whatsApp) VISIBLE else GONE
-        mail.visibility = if (email) VISIBLE else GONE
-        // The gap only between two glyphs: a lone one sits exactly under the centre.
-        (mail.layoutParams as LinearLayout.LayoutParams).leftMargin = if (whatsApp) dp(22) else 0
-        mail.requestLayout()
-        waiting.visibility = if (whatsApp || email) VISIBLE else GONE
+    /**
+     * A line glyph for each app, or kind of app, with notifications waiting, each described by
+     * [describe]; the row goes when there is nothing.
+     */
+    fun showWaiting(icons: List<AppGlyphs.Waiting>, describe: (AppGlyphs.Waiting) -> String) {
+        waiting.removeAllViews()
+        icons.forEachIndexed { index, icon ->
+            val glyph = ImageView(context).apply {
+                setImageResource(icon.drawable)
+                imageTintList = ColorStateList.valueOf(Palette.TEXT)
+                contentDescription = describe(icon)
+            }
+            // The gap only between two glyphs: a lone one sits exactly under the centre.
+            val wrap = ViewGroup.LayoutParams.WRAP_CONTENT
+            waiting.addView(glyph, LinearLayout.LayoutParams(wrap, wrap).apply { if (index > 0) leftMargin = dp(22) })
+        }
+        waiting.visibility = if (icons.isEmpty()) GONE else VISIBLE
         space()
-    }
-
-    private fun glyph(drawable: Int, description: String) = ImageView(context).apply {
-        setImageResource(drawable)
-        imageTintList = ColorStateList.valueOf(Palette.TEXT)
-        contentDescription = description
-        visibility = GONE
     }
 
     fun updateBattery(state: BatteryState) = face.showBattery(state, number = false)

@@ -8,6 +8,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.PackageManager
 import android.hardware.biometrics.BiometricManager
 import android.hardware.biometrics.BiometricPrompt
 import android.os.Build
@@ -17,6 +18,7 @@ import android.os.Handler
 import android.os.Looper
 import android.os.PowerManager
 import android.os.SystemClock
+import android.telecom.TelecomManager
 import android.view.WindowInsetsController
 import android.view.WindowManager
 import android.window.OnBackInvokedDispatcher
@@ -282,15 +284,34 @@ open class StandbyActivity : Activity() {
     }
 
     /**
-     * WhatsApp or email waiting: a glyph each under the date, from the notification listener.
-     * Over the lock screen only if allowed, as they tell anyone looking that messages came in.
+     * A glyph for each app with notifications waiting, from the notification listener, leaving
+     * out the apps muted in settings. Over the lock screen only if allowed, as they tell anyone
+     * looking that messages came in.
      */
     private fun showWaiting() {
         val allowed = !(locked && secure) || prefs.lockScreenGlyphs
-        view.showWaiting(
-            whatsApp = allowed && Packages.WHATSAPP.any(Notifications::hasAny),
-            email = allowed && Packages.EMAIL.any(Notifications::hasAny),
-        )
+        if (!allowed) {
+            view.showWaiting(emptyList()) { "" }
+            return
+        }
+        val muted = prefs.standbyMuted
+        val dialer = getSystemService(TelecomManager::class.java)?.defaultDialerPackage
+        val apps = Notifications.waitingApps().filter { app ->
+            // Missed calls come from Android's call service: they belong to the phone app.
+            val call = app in Packages.CALLS
+            val owner = if (call) dialer ?: app else app
+            // Only apps with a home screen entry: not the system's own passing notes.
+            owner !in muted && (call || packageManager.getLaunchIntentForPackage(app) != null)
+        }
+        view.showWaiting(AppGlyphs.waiting(apps, AppGlyphs.lookup(this))) { icon ->
+            icon.packages.joinToString(", ") { label(if (it in Packages.CALLS) dialer ?: it else it) }
+        }
+    }
+
+    private fun label(packageName: String): String = try {
+        packageManager.getApplicationInfo(packageName, 0).loadLabel(packageManager).toString()
+    } catch (e: PackageManager.NameNotFoundException) {
+        packageName
     }
 
     /** The last reading under the clock, fetched again when it is over half an hour old. */

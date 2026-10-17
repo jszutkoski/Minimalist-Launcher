@@ -106,7 +106,7 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         repo.onChanged = ::render
         prefs.onChange { stale = true }
         dock = Dock(this, prefs, repo, ::launch, ::openShortcut)
-        appMenu = AppMenu(this, prefs, repo, ::render, ::openShortcut)
+        appMenu = AppMenu(this, prefs, repo, dock.apps, ::render, ::openShortcut)
         searchActions = SearchActions(this, repo, ::launch) { closeDrawer(animate = true) }
         addDock()
         repo.start()

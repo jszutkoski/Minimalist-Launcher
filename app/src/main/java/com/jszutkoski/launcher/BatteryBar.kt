@@ -12,8 +12,8 @@ import kotlin.math.ceil
 /**
  * A hairline under the clock, as wide as the time, filled to the battery level.
  * Where the fill ends sits a marker, the line parting around it: the [label] (the
- * percentage) and, while charging, a small bolt. Charging, it breathes slowly; full on
- * the charger, it turns green and pulses; low, it turns red.
+ * percentage), or with no label, a small bolt while charging. Charging, it breathes slowly;
+ * full on the charger, it turns green and pulses; low, it turns red.
  */
 class BatteryBar(context: Context) : View(context) {
     /** How thick the line is drawn: the clock's thickness setting. */
@@ -25,7 +25,6 @@ class BatteryBar(context: Context) : View(context) {
             invalidate()
         }
     private val gap = context.dp(7f)
-    private val boltGap = context.dp(3f)
     private val trackPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Palette.TRACK }
     private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val boltPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
@@ -127,31 +126,28 @@ class BatteryBar(context: Context) : View(context) {
     override fun onDraw(canvas: Canvas) {
         val w = width.toFloat()
         val text = label
-        if (text == null && !charging) {
+        // The breathing already says it is charging; the bolt only stands in for a missing number.
+        val bolt = charging && text == null
+        if (text == null && !bolt) {
             segment(canvas, 0f, w, trackPaint)
             if (level > 0f) segment(canvas, 0f, maxOf(w * level, thickness), fillPaint)
             return
         }
         // Filled line up to the marker, the marker, then the empty line after it.
-        val boltWidth = if (charging) boltSize * 0.62f else 0f
+        val boltWidth = if (bolt) boltSize * 0.62f else 0f
         val textWidth = text?.let(labelPaint::measureText) ?: 0f
-        val spacing = if (charging && text != null) boltGap else 0f
-        val half = (boltWidth + spacing + textWidth) / 2f
+        val half = (boltWidth + textWidth) / 2f
         val centre = (w * level).coerceIn(half, (w - half).coerceAtLeast(half))
         val fillEnd = centre - half - gap
         val trackStart = centre + half + gap
         if (fillEnd > 0f) segment(canvas, 0f, fillEnd, fillPaint)
         if (trackStart < w) segment(canvas, trackStart, w, trackPaint)
 
-        var x = centre - half
-        if (charging) {
-            drawBolt(canvas, x, boltWidth)
-            x += boltWidth + spacing
-        }
+        if (bolt) drawBolt(canvas, centre - half, boltWidth)
         if (text != null) {
             val baseline = height / 2f - (labelPaint.descent() + labelPaint.ascent()) / 2f
             labelPaint.textAlign = Paint.Align.LEFT
-            canvas.drawText(text, x, baseline, labelPaint)
+            canvas.drawText(text, centre - half, baseline, labelPaint)
         }
     }
 

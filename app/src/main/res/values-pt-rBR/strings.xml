@@ -62,8 +62,25 @@
     <string name="profile_private">%1$s · privado</string>
     <string name="dock_camera">Câmera</string>
     <string name="dock_change_app">Trocar app</string>
-    <string name="dock_back_to">Voltar para %1$s</string>
     <string name="choose_app">Escolha um app</string>
+    <string name="dock_move_left">Mover para a esquerda</string>
+    <string name="dock_move_right">Mover para a direita</string>
+    <string name="dock_remove">Tirar da barra inferior</string>
+    <string name="menu_add_dock">Pôr na barra inferior</string>
+    <string name="dock_replace_title">%1$s no lugar de</string>
+    <string name="page_dock">Barra inferior</string>
+    <string name="page_dock_summary">Quantos ícones e quais</string>
+    <string name="dock_count">Número de ícones</string>
+    <string name="dock_count_none">Nenhum</string>
+    <string name="dock_place">Ícone %1$d</string>
+    <string name="dock_add">Adicionar ícone</string>
+    <string name="dock_add_value">Qualquer app, ou a câmera</string>
+    <string name="dock_help">Os ícones vão da esquerda para a direita. Também dá para tocar e segurar um app da lista para pô-lo aqui, ou um ícone de baixo para trocá-lo.</string>
+    <string name="standby_icons">Ícones de notificação</string>
+    <string name="standby_icons_all">Todos os apps</string>
+    <string name="standby_icons_but">Todos os apps, menos %1$d</string>
+    <string name="standby_icons_desc">Um app com notificação mostra o ícone embaixo do relógio de cabeceira; os que não têm ícone próprio dividem três pontinhos. Toque para escolher quais podem</string>
+    <string name="standby_icons_title">Ícones no relógio de cabeceira</string>
     <string name="set_as_home">Definir como app de início</string>
     <string name="all_apps">Todos os apps</string>
     <string name="screen_time_today">%1$s hoje</string>
@@ -144,8 +161,8 @@
     <string name="accessibility_disclosure">O Minimalist usa o serviço de acessibilidade do Android só para duas coisas que um app comum não pode fazer: bloquear a tela (toque duplo na tela inicial, ou ao sair do relógio de cabeceira com o celular ainda desbloqueado) e mostrar o relógio de cabeceira quando a tela acende.\n\nEle não lê o que aparece na tela, não vê o que você digita, não observa outros apps e não envia nada para fora do celular. Você pode desativá-lo quando quiser nas configurações de acessibilidade do Android.</string>
     <string name="accessibility_agree">Concordo, abrir configurações</string>
     <string name="accessibility_decline">Agora não</string>
-    <string name="lock_glyphs">Ícones de mensagem na tela de bloqueio</string>
-    <string name="lock_glyphs_desc">Os ícones do WhatsApp e do e-mail no relógio de cabeceira com o celular bloqueado. Desligado, aparecem só depois de desbloquear</string>
+    <string name="lock_glyphs">Ícones de notificação na tela de bloqueio</string>
+    <string name="lock_glyphs_desc">Os ícones no relógio de cabeceira com o celular bloqueado. Desligado, aparecem só depois de desbloquear</string>
     <string name="lock_notifications">Notificações na tela de bloqueio</string>
     <string name="lock_notifications_value">Definido no Android</string>
     <string name="lock_notifications_desc">O que a tela de bloqueio mostra das notificações, também quando puxadas sobre o relógio de cabeceira: escolha lá se ela mostra suas mensagens, esconde o que dizem ou não mostra nada</string>
@@ -164,7 +181,11 @@
     <string name="uninstalled_app">App desinstalado</string>
     <string name="double_tap">Toque duplo para bloquear</string>
     <string name="double_tap_desc">Toque duas vezes num espaço vazio da tela inicial para apagar a tela</string>
-    <string name="gestures_help">Deslize para cima para os apps · para baixo para as notificações · para os lados para os apps escolhidos acima\nDigite uma conta, uma configuração, um nome, \"timer 10 min\" ou \"alarme 7:30\" na busca\nToque e segure um ícone de baixo para trocar o app\nPinça para o relógio de cabeceira · toque duplo para bloquear (se ligado)\nToque e segure um espaço vazio para as configurações</string>
+    <string name="gestures_help">Deslize para cima para os apps · para baixo para as notificações · para os lados para os apps escolhidos acima
+Digite uma conta, uma configuração, um nome, \"timer 10 min\" ou \"alarme 7:30\" na busca
+Toque e segure um ícone de baixo para trocar, mover ou tirar
+Pinça para o relógio de cabeceira · toque duplo para bloquear (se ligado)
+Toque e segure um espaço vazio para as configurações</string>
     <string name="setting_flashlight">Lanterna</string>
     <string name="setting_wifi">Wi-Fi</string>
     <string name="setting_bluetooth">Bluetooth</string>
@@ -193,7 +214,6 @@
     <string name="setting_about">Sobre o telefone</string>
     <string name="setting_developer">Opções do desenvolvedor</string>
     <string name="unlock">Desbloquear</string>
-    <string name="glyph_email">E-mail</string>
     <string name="weather_clear">Céu limpo</string>
     <string name="weather_mostly_clear">Poucas nuvens</string>
     <string name="weather_partly_cloudy">Parcialmente nublado</string>

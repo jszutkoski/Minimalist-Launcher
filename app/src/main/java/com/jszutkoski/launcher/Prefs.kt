@@ -151,6 +151,11 @@ class Prefs(context: Context) {
         get() = prefs.getBoolean(KEY_LOCK_SCREEN_GLYPHS, true)
         set(value) = prefs.edit().putBoolean(KEY_LOCK_SCREEN_GLYPHS, value).apply()
 
+    /** Apps, by package, whose notifications never show an icon on the bedside clock. */
+    var standbyMuted: Set<String>
+        get() = prefs.getStringSet(KEY_STANDBY_MUTED, null)?.toSet().orEmpty()
+        set(value) = prefs.edit().putStringSet(KEY_STANDBY_MUTED, value).apply()
+
     /** Small dots beside apps with notifications waiting (needs notification access). */
     var notificationDots: Boolean
         get() = prefs.getBoolean(KEY_NOTIFICATION_DOTS, false)
@@ -161,12 +166,23 @@ class Prefs(context: Context) {
         get() = prefs.getStringSet(KEY_PAUSE_APPS, null)?.toSet().orEmpty()
         set(value) = prefs.edit().putStringSet(KEY_PAUSE_APPS, value).apply()
 
-    /** App chosen for a bottom icon, or null for that slot's default. */
-    fun dockApp(slot: Int): String? = prefs.getString("$KEY_DOCK$slot", null)
+    /**
+     * The bottom icons, left to right, as app keys or [DOCK_CAMERA], including those past
+     * [dockCount] kept for when it grows again; null until first changed.
+     */
+    var dockApps: List<String>?
+        get() = prefs.getString(KEY_DOCK_APPS, null)?.split('\n')?.filter { it.isNotEmpty() }
+        set(value) = prefs.edit().apply {
+            if (value == null) remove(KEY_DOCK_APPS) else putString(KEY_DOCK_APPS, value.joinToString("\n"))
+        }.apply()
 
-    fun setDockApp(slot: Int, key: String?) {
-        prefs.edit().apply { if (key == null) remove("$KEY_DOCK$slot") else putString("$KEY_DOCK$slot", key) }.apply()
-    }
+    /** How many bottom icons there are. */
+    var dockCount: Int
+        get() = prefs.getInt(KEY_DOCK_COUNT, DEFAULT_DOCK_COUNT).coerceIn(0, MAX_DOCK)
+        set(value) = prefs.edit().putInt(KEY_DOCK_COUNT, value.coerceIn(0, MAX_DOCK)).apply()
+
+    /** From before the bottom icons were a list: the app chosen for one of the five, or null. */
+    fun oldDockApp(slot: Int): String? = prefs.getString("$KEY_DOCK$slot", null)
 
     /** The app a sideways swipe on the home screen opens, or null for none. */
     fun swipeApp(toLeft: Boolean): String? = prefs.getString(swipeKey(toLeft), null)
@@ -185,36 +201,44 @@ class Prefs(context: Context) {
         }.apply()
     }
 
-    private companion object {
-        const val KEY_FAVORITES = "favorites"
-        const val KEY_HIDDEN = "hidden"
-        const val KEY_TEXT_SIZE = "text_size"
-        const val KEY_AUTO_LAUNCH = "auto_launch"
-        const val KEY_SHOW_KEYBOARD = "show_keyboard"
-        const val KEY_SEARCH_ONLY = "search_only"
-        const val KEY_CONTACT_SEARCH = "contact_search"
-        const val KEY_WEATHER = "weather"
-        const val KEY_ASKED = "asked_"
-        const val KEY_HIDE_STATUS_BAR = "hide_status_bar"
-        const val KEY_STATUS_BAR = "status_bar"
-        const val KEY_CENTER_FAVORITES = "center_favorites"
-        const val KEY_SCREEN_TIME = "screen_time"
-        const val KEY_NOW_PLAYING = "now_playing"
-        const val KEY_DOUBLE_TAP_LOCK = "double_tap_lock"
-        const val KEY_DOCK = "dock_"
-        const val KEY_STANDBY = "standby"
-        const val KEY_STANDBY_ON_WAKE = "standby_on_wake"
-        const val KEY_NOTIFICATION_DOTS = "notification_dots"
-        const val KEY_LOCK_SCREEN_GLYPHS = "lock_screen_glyphs"
-        const val KEY_PAUSE_APPS = "pause_apps"
+    companion object {
+        /** In [dockApps], the camera: whichever app Android opens for a photo. */
+        const val DOCK_CAMERA = "camera"
+        const val MAX_DOCK = 6
+        const val DEFAULT_DOCK_COUNT = 5
+
+        private const val KEY_FAVORITES = "favorites"
+        private const val KEY_HIDDEN = "hidden"
+        private const val KEY_TEXT_SIZE = "text_size"
+        private const val KEY_AUTO_LAUNCH = "auto_launch"
+        private const val KEY_SHOW_KEYBOARD = "show_keyboard"
+        private const val KEY_SEARCH_ONLY = "search_only"
+        private const val KEY_CONTACT_SEARCH = "contact_search"
+        private const val KEY_WEATHER = "weather"
+        private const val KEY_ASKED = "asked_"
+        private const val KEY_HIDE_STATUS_BAR = "hide_status_bar"
+        private const val KEY_STATUS_BAR = "status_bar"
+        private const val KEY_CENTER_FAVORITES = "center_favorites"
+        private const val KEY_SCREEN_TIME = "screen_time"
+        private const val KEY_NOW_PLAYING = "now_playing"
+        private const val KEY_DOUBLE_TAP_LOCK = "double_tap_lock"
+        private const val KEY_DOCK = "dock_"
+        private const val KEY_STANDBY = "standby"
+        private const val KEY_STANDBY_ON_WAKE = "standby_on_wake"
+        private const val KEY_NOTIFICATION_DOTS = "notification_dots"
+        private const val KEY_LOCK_SCREEN_GLYPHS = "lock_screen_glyphs"
+        private const val KEY_PAUSE_APPS = "pause_apps"
         // Not "clock_design": that held three designs, of which two are gone.
-        const val KEY_CLOCK_DESIGN = "clock_layout"
-        const val KEY_CLOCK_WEIGHT = "clock_weight"
-        const val KEY_CLOCK_SIZE = "clock_size"
-        const val KEY_DATE_POSITION = "date_position"
-        const val KEY_HOME_WEATHER = "home_weather"
-        const val KEY_STANDBY_SCREEN_TIME = "standby_screen_time"
-        const val KEY_SWIPE_LEFT = "swipe_left_app"
-        const val KEY_SWIPE_RIGHT = "swipe_right_app"
+        private const val KEY_CLOCK_DESIGN = "clock_layout"
+        private const val KEY_CLOCK_WEIGHT = "clock_weight"
+        private const val KEY_CLOCK_SIZE = "clock_size"
+        private const val KEY_DATE_POSITION = "date_position"
+        private const val KEY_HOME_WEATHER = "home_weather"
+        private const val KEY_STANDBY_SCREEN_TIME = "standby_screen_time"
+        private const val KEY_SWIPE_LEFT = "swipe_left_app"
+        private const val KEY_SWIPE_RIGHT = "swipe_right_app"
+        private const val KEY_DOCK_APPS = "dock_apps"
+        private const val KEY_DOCK_COUNT = "dock_count"
+        private const val KEY_STANDBY_MUTED = "standby_muted"
     }
 }

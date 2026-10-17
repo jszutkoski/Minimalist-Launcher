@@ -63,8 +63,25 @@
     <string name="profile_private">%1$s · private</string>
     <string name="dock_camera">Camera</string>
     <string name="dock_change_app">Change app</string>
-    <string name="dock_back_to">Back to %1$s</string>
     <string name="choose_app">Choose an app</string>
+    <string name="dock_move_left">Move left</string>
+    <string name="dock_move_right">Move right</string>
+    <string name="dock_remove">Remove from the bottom bar</string>
+    <string name="menu_add_dock">Add to the bottom bar</string>
+    <string name="dock_replace_title">%1$s in place of</string>
+    <string name="page_dock">Bottom bar</string>
+    <string name="page_dock_summary">How many icons, and which</string>
+    <string name="dock_count">Number of icons</string>
+    <string name="dock_count_none">None</string>
+    <string name="dock_place">Icon %1$d</string>
+    <string name="dock_add">Add an icon</string>
+    <string name="dock_add_value">Any app, or the camera</string>
+    <string name="dock_help">Icons go from left to right. You can also long-press an app in the list to put it here, or an icon at the bottom to change it.</string>
+    <string name="standby_icons">Notification icons</string>
+    <string name="standby_icons_all">All apps</string>
+    <string name="standby_icons_but">All apps but %1$d</string>
+    <string name="standby_icons_desc">An app with notifications waiting shows its icon under the bedside clock; apps without an icon of their own share three dots. Tap to choose which apps may</string>
+    <string name="standby_icons_title">Icons on the bedside clock</string>
     <string name="set_as_home">Set as home app</string>
     <string name="all_apps">All apps</string>
     <string name="screen_time_today">%1$s today</string>
@@ -145,8 +162,8 @@
     <string name="accessibility_disclosure">Minimalist uses Android\'s accessibility service only for two things an ordinary app isn\'t allowed to do: lock the screen (a double-tap on the home screen, or leaving the bedside clock while the phone is still unlocked) and show the bedside clock when the screen turns on.\n\nIt doesn\'t read what is on your screen, sees nothing you type, watches no other app and sends nothing off your phone. You can turn it off at any time in Android\'s accessibility settings.</string>
     <string name="accessibility_agree">Agree and open settings</string>
     <string name="accessibility_decline">Not now</string>
-    <string name="lock_glyphs">Message icons on the lock screen</string>
-    <string name="lock_glyphs_desc">The WhatsApp and email icons on the bedside clock while the phone is locked. Off, they appear only once it is unlocked</string>
+    <string name="lock_glyphs">Notification icons on the lock screen</string>
+    <string name="lock_glyphs_desc">The icons on the bedside clock while the phone is locked. Off, they appear only once it is unlocked</string>
     <string name="lock_notifications">Notifications on the lock screen</string>
     <string name="lock_notifications_value">Set in Android</string>
     <string name="lock_notifications_desc">What the lock screen shows of your notifications, also when they are pulled down over the bedside clock: choose there whether it shows your messages, hides what they say or shows nothing</string>
@@ -165,7 +182,11 @@
     <string name="uninstalled_app">Uninstalled app</string>
     <string name="double_tap">Double-tap to lock</string>
     <string name="double_tap_desc">Double-tap an empty part of the home screen to turn the screen off</string>
-    <string name="gestures_help">Swipe up for apps · down for notifications · sideways for the apps chosen above\nType a sum, a setting, a name, \"timer 10 min\" or \"alarm 7:30\" in the search\nLong-press an icon at the bottom to change its app\nPinch for the bedside clock · double-tap to lock (if on)\nLong-press empty space for settings</string>
+    <string name="gestures_help">Swipe up for apps · down for notifications · sideways for the apps chosen above
+Type a sum, a setting, a name, \"timer 10 min\" or \"alarm 7:30\" in the search
+Long-press an icon at the bottom to change, move or remove it
+Pinch for the bedside clock · double-tap to lock (if on)
+Long-press empty space for settings</string>
     <string name="setting_flashlight">Flashlight</string>
     <string name="setting_wifi">Wi-Fi</string>
     <string name="setting_bluetooth">Bluetooth</string>
@@ -194,7 +215,6 @@
     <string name="setting_about">About phone</string>
     <string name="setting_developer">Developer options</string>
     <string name="unlock">Unlock</string>
-    <string name="glyph_email">Email</string>
     <string name="weather_clear">Clear</string>
     <string name="weather_mostly_clear">Mostly clear</string>
     <string name="weather_partly_cloudy">Partly cloudy</string>

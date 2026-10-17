@@ -164,6 +164,44 @@ class SettingsScreenTest {
         assertNull(Prefs(activity).swipeApp(toLeft = true))
     }
 
+    /** Waits for the app list, read off the main thread: changes to the bottom icons wait for it too. */
+    private fun SettingsActivity.appsLoaded() {
+        val repo = SettingsActivity::class.java.getDeclaredField("repo").apply { isAccessible = true }.get(this) as AppRepository
+        repeat(200) {
+            if (repo.loaded) return
+            Thread.sleep(10)
+            idle()
+        }
+    }
+
+    /** Taps the sheet option reading [text]. */
+    private fun chooseText(text: String) {
+        ShadowDialog.getLatestDialog().window!!.decorView.textViews().first { it.text == text }.performClick()
+        idle()
+    }
+
+    private fun Activity.rows(title: Int) = content().textViews().count { it.text.startsWith(getString(title, 0).dropLast(1)) }
+
+    @Test
+    fun aBottomIconCanGoAndComeBackWithTheNumber() {
+        val activity = controller.get()
+        activity.appsLoaded()
+        activity.tap(R.string.page_dock)
+        // With no apps installed, the camera is the one icon there is.
+        assertEquals(1, activity.rows(R.string.dock_place))
+        activity.content().textViews().first { it.text == activity.getString(R.string.dock_place, 1) }.let {
+            (it.parent as View).performClick()
+        }
+        idle()
+        activity.choose(R.string.dock_remove)
+        assertEquals(0, Prefs(activity).dockCount)
+        assertEquals(0, activity.rows(R.string.dock_place))
+        activity.tap(R.string.dock_count)
+        chooseText("1")
+        assertEquals(1, Prefs(activity).dockCount)
+        assertTrue(activity.content().textViews().any { it.text == activity.getString(R.string.dock_camera) })
+    }
+
     @Test
     @Config(qualifiers = "pt-rBR")
     fun speaksPortugueseOnAPhoneInPortuguese() {

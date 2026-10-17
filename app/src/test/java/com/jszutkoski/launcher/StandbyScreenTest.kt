@@ -1,15 +1,21 @@
 package com.jszutkoski.launcher
 
 import android.app.KeyguardManager
+import android.content.ComponentName
 import android.content.Intent
+import android.content.IntentFilter
+import android.content.pm.ApplicationInfo
+import android.content.pm.PackageInfo
 import android.os.BatteryManager
 import android.os.Process
 import android.view.View
 import android.view.WindowManager
 import android.widget.ImageView
+import android.widget.LinearLayout
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -71,8 +77,9 @@ class StandbyScreenTest {
     private fun StandbyActivity.lit() =
         window.attributes.flags and WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON != 0
 
+    /** WhatsApp's icon among the notification icons, or null when it isn't there. */
     private fun StandbyActivity.whatsApp() =
-        content().views().filterIsInstance<ImageView>().single { it.contentDescription == "WhatsApp" }
+        content().views().filterIsInstance<ImageView>().singleOrNull { it.contentDescription == "WhatsApp" }
 
     @Test
     fun unlockedOnTheChargerItTimesOutLikeAnyScreen() {
@@ -189,16 +196,74 @@ class StandbyScreenTest {
         assertEquals(0, locks)
     }
 
-    private fun whatsAppWaiting() {
-        Notifications.update(setOf("com.whatsapp" to Process.myUserHandle()))
+    /** An app on the phone, with a home screen entry, as Android would list it. */
+    private fun install(packageName: String, label: String) {
+        val pm = shadowOf(app.packageManager)
+        pm.installPackage(
+            PackageInfo().apply {
+                this.packageName = packageName
+                applicationInfo = ApplicationInfo().apply {
+                    this.packageName = packageName
+                    nonLocalizedLabel = label
+                }
+            },
+        )
+        val component = ComponentName(packageName, "$packageName.Main")
+        pm.addActivityIfNotPresent(component)
+        pm.addIntentFilterForActivity(
+            component,
+            IntentFilter(Intent.ACTION_MAIN).apply {
+                addCategory(Intent.CATEGORY_DEFAULT)
+                addCategory(Intent.CATEGORY_LAUNCHER)
+            },
+        )
+    }
+
+    private fun waiting(vararg packages: String) {
+        Notifications.update(packages.map { it to Process.myUserHandle() }.toSet())
         idle()
     }
+
+    private fun whatsAppWaiting() {
+        install("com.whatsapp", "WhatsApp")
+        waiting("com.whatsapp")
+    }
+
+    /** The descriptions of the notification icons, left to right. */
+    private fun StandbyActivity.icons() = content().views().filterIsInstance<ImageView>()
+        .filter { it.parent is LinearLayout && (it.parent as View).visibility == View.VISIBLE }
+        .map { it.contentDescription.toString() }
 
     @Test
     fun messageIconsShowOverTheLockScreenByDefault() {
         phone(secure = true, locked = true)
         whatsAppWaiting()
-        assertEquals(View.VISIBLE, open().whatsApp().visibility)
+        assertEquals(View.VISIBLE, open().whatsApp()?.visibility)
+    }
+
+    @Test
+    fun appsWithoutAnIconOfTheirOwnShareThreeDots() {
+        install("com.whatsapp", "WhatsApp")
+        install("org.example.notes", "Notes")
+        install("org.example.shop", "Shop")
+        waiting("org.example.notes", "com.whatsapp", "org.example.shop")
+        assertEquals(listOf("WhatsApp", "Notes, Shop"), open().icons())
+    }
+
+    @Test
+    fun aMutedAppShowsNoIcon() {
+        install("com.whatsapp", "WhatsApp")
+        install("org.example.notes", "Notes")
+        Prefs(app).standbyMuted = setOf("com.whatsapp")
+        waiting("com.whatsapp", "org.example.notes")
+        assertEquals(listOf("Notes"), open().icons())
+    }
+
+    @Test
+    fun theSystemsOwnPassingNotesShowNoIcon() {
+        // Nothing to open from the home screen: a screenshot saved, a cable plugged in.
+        waiting("com.android.systemui")
+        assertEquals(emptyList<String>(), open().icons())
     }
 
     @Test
@@ -207,11 +272,11 @@ class StandbyScreenTest {
         phone(secure = true, locked = true)
         whatsAppWaiting()
         val standby = open()
-        assertEquals(View.GONE, standby.whatsApp().visibility)
+        assertNull(standby.whatsApp())
         // Unlocked, the phone is in your hands: the icons come back on the next wake.
         keyguard.setKeyguardLocked(false)
         app.sendBroadcast(Intent(Intent.ACTION_SCREEN_ON))
         idle()
-        assertEquals(View.VISIBLE, standby.whatsApp().visibility)
+        assertEquals(View.VISIBLE, standby.whatsApp()?.visibility)
     }
 }

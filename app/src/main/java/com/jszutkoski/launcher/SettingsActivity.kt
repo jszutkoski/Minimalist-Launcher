@@ -5,6 +5,7 @@ import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.res.ColorStateList
 import android.graphics.Typeface
 import android.os.Build
 import android.os.Bundle
@@ -14,8 +15,10 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.WindowInsets
 import android.widget.FrameLayout
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
+import android.widget.Space
 import android.widget.TextView
 import android.window.OnBackInvokedCallback
 import android.window.OnBackInvokedDispatcher
@@ -83,6 +86,7 @@ class SettingsActivity : Activity() {
     /** The main list of groups, or one group's settings. */
     private enum class Page(val title: Int, val summary: Int) {
         HOME(R.string.page_home, R.string.page_home_summary),
+        DOCK(R.string.page_dock, R.string.page_dock_summary),
         CLOCK(R.string.page_clock, R.string.page_clock_summary),
         SEARCH(R.string.page_search, R.string.page_search_summary),
         STANDBY(R.string.page_standby, R.string.page_standby_summary),
@@ -130,6 +134,7 @@ class SettingsActivity : Activity() {
         when (current) {
             null -> renderMain()
             Page.HOME -> renderHome()
+            Page.DOCK -> renderDock()
             Page.CLOCK -> renderClock()
             Page.SEARCH -> renderSearch()
             Page.STANDBY -> renderStandby()
@@ -184,6 +189,89 @@ class SettingsActivity : Activity() {
             setEnabled = { prefs.nowPlaying = it },
             grant = { SystemActions.openNotificationAccess(this) },
         )
+    }
+
+    /**
+     * The bottom icons as they are, then how many there are, each one to change, move or remove,
+     * and a new one while there is room.
+     */
+    private fun renderDock() {
+        val dock = DockApps(this, prefs, repo)
+        val shown = dock.shown()
+        if (shown.isNotEmpty()) {
+            val inset = dp(Dock.INSET_DP)
+            content.addView(
+                dockPreview(dock, shown, inset),
+                LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                    // Out by the icon padding, as on the home screen, so the glyphs line up with the text.
+                    leftMargin = -inset
+                    rightMargin = -inset
+                    bottomMargin = dp(16)
+                },
+            )
+        }
+        row(getString(R.string.dock_count), dockCount(shown.size)) { pickDockCount(dock) }
+        shown.forEachIndexed { index, entry ->
+            row(getString(R.string.dock_place, index + 1), dock.label(entry)) { dockOptions(dock, index, shown.size) }
+        }
+        if (!dock.isFull) {
+            row(getString(R.string.dock_add), getString(R.string.dock_add_value)) {
+                dock.choose(this, getString(R.string.dock_add)) { entry ->
+                    dock.add(entry)
+                    render()
+                }
+            }
+        }
+        content.addView(
+            text(getString(R.string.dock_help), 14f, Palette.TERTIARY, 400).apply {
+                isSingleLine = false
+                setLineSpacing(dp(6f), 1f)
+                setPadding(0, dp(28), 0, 0)
+            },
+        )
+    }
+
+    /** The icons spread as on the home screen, only to look at. */
+    private fun dockPreview(dock: DockApps, entries: List<String>, inset: Int) = LinearLayout(this).apply {
+        orientation = LinearLayout.HORIZONTAL
+        gravity = Gravity.CENTER
+        val glyphs = AppGlyphs.lookup(context)
+        entries.forEachIndexed { index, entry ->
+            if (index > 0) addView(Space(context), LinearLayout.LayoutParams(0, 0, 1f))
+            val icon = ImageView(context).apply {
+                val glyph = dock.glyph(entry, glyphs)
+                if (glyph != null) setImageResource(glyph) else setImageDrawable(InitialGlyph(context, dock.label(entry)))
+                imageTintList = ColorStateList.valueOf(Palette.TEXT)
+                setPadding(inset, inset, inset, inset)
+                contentDescription = dock.label(entry)
+            }
+            val size = dp(Dock.ICON_DP) + 2 * inset
+            addView(icon, LinearLayout.LayoutParams(size, size))
+        }
+    }
+
+    private fun dockCount(count: Int) = if (count == 0) getString(R.string.dock_count_none) else count.toString()
+
+    private fun pickDockCount(dock: DockApps) {
+        val sheet = Sheet(this, getString(R.string.dock_count))
+        for (count in 0..Prefs.MAX_DOCK) sheet.option(dockCount(count)) { dock.setCount(count) }
+        sheet.onDismiss = { render() }
+        sheet.show()
+    }
+
+    private fun dockOptions(dock: DockApps, index: Int, count: Int) {
+        val sheet = Sheet(this, dock.label(dock.shown()[index]))
+        sheet.option(getString(R.string.dock_change_app)) {
+            dock.choose(this, getString(R.string.choose_app)) { entry ->
+                dock.replace(index, entry)
+                render()
+            }
+        }
+        if (index > 0) sheet.option(getString(R.string.dock_move_left)) { dock.move(index, -1) }
+        if (index < count - 1) sheet.option(getString(R.string.dock_move_right)) { dock.move(index, 1) }
+        sheet.option(getString(R.string.dock_remove)) { dock.remove(index) }
+        sheet.onDismiss = { render() }
+        sheet.show()
     }
 
     /** Whose clock the clock page shows and changes: the home screen's or the bedside clock's. */
@@ -385,6 +473,18 @@ class SettingsActivity : Activity() {
             setEnabled = { prefs.standbyOnWake = it },
             grant = { askForAccessibility { prefs.standbyOnWake = false } },
         )
+        val muted = prefs.standbyMuted.count { pkg -> repo.apps.any { it.component.packageName == pkg } }
+        row(
+            getString(R.string.standby_icons),
+            when {
+                !NowPlaying.hasAccess(this) -> getString(R.string.grant_notifications)
+                muted == 0 -> getString(R.string.standby_icons_all)
+                else -> getString(R.string.standby_icons_but, muted)
+            },
+            getString(R.string.standby_icons_desc),
+        ) {
+            if (NowPlaying.hasAccess(this)) pickStandbyApps() else SystemActions.openNotificationAccess(this)
+        }
         row(
             getString(R.string.lock_glyphs),
             onOff(prefs.lockScreenGlyphs),
@@ -596,6 +696,22 @@ class SettingsActivity : Activity() {
         sheet.appList(repo.visibleApps(), chosen = { it.key in chosen }) { app ->
             if (!chosen.remove(app.key)) chosen += app.key
             prefs.pauseApps = chosen.toSet()
+        }
+        sheet.onDismiss = { render() }
+        sheet.show()
+    }
+
+    /**
+     * Every app, hidden ones too as they still notify; tapping one lets it show its icon on the
+     * bedside clock, or not. Allowed apps are bright, the rest dim.
+     */
+    private fun pickStandbyApps() {
+        val muted = prefs.standbyMuted.toMutableSet()
+        val sheet = Sheet(this, getString(R.string.standby_icons_title))
+        sheet.appList(repo.apps.distinctBy { it.component.packageName }, chosen = { it.component.packageName !in muted }) { app ->
+            val pkg = app.component.packageName
+            if (!muted.remove(pkg)) muted += pkg
+            prefs.standbyMuted = muted.toSet()
         }
         sheet.onDismiss = { render() }
         sheet.show()

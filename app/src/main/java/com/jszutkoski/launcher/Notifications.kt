@@ -36,10 +36,11 @@ class MediaListener : NotificationListenerService() {
         Notifications.update(active.filter(::waiting).map { it.packageName to it.user }.toSet())
     }
 
-    /** Something to read: not a running player, download or call, and not our own. */
+    /** Something to read: not a player (even paused), download or call, and not our own. */
     private fun waiting(sbn: StatusBarNotification) =
         sbn.isClearable && !sbn.isOngoing && sbn.packageName != packageName &&
-            sbn.notification.flags and Notification.FLAG_FOREGROUND_SERVICE == 0
+            sbn.notification.flags and Notification.FLAG_FOREGROUND_SERVICE == 0 &&
+            !sbn.notification.extras.containsKey(Notification.EXTRA_MEDIA_SESSION)
 }
 
 /**
@@ -53,8 +54,8 @@ object Notifications {
 
     fun has(packageName: String, user: UserHandle) = (packageName to user) in packages
 
-    /** In any profile, for standby's glyphs. */
-    fun hasAny(packageName: String) = packages.any { it.first == packageName }
+    /** The apps with notifications waiting in any profile, for standby's glyphs. */
+    fun waitingApps(): Set<String> = packages.mapTo(LinkedHashSet()) { it.first }
 
     fun addListener(listener: () -> Unit) {
         listeners += listener

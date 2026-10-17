@@ -44,18 +44,3 @@ fun breathAlpha(start: Long, full: Boolean): Int {
     val phase = ((SystemClock.uptimeMillis() - start) % (2 * period)) / period.toDouble()
     return (low + (255 - low) * (0.5 + 0.5 * cos(PI * phase))).toInt()
 }
-
-/** Packages the launcher recognises by name. */
-object Packages {
-    val WHATSAPP = listOf("com.whatsapp", "com.whatsapp.w4b")
-    val EMAIL = listOf(
-        "com.google.android.gm",
-        "com.microsoft.office.outlook",
-        "ch.protonmail.android",
-        "com.yahoo.mobile.client.android.mail",
-        "com.samsung.android.email.provider",
-        "com.fsck.k9",
-        "net.thunderbird.android",
-        "com.fastmail.app",
-    )
-}
