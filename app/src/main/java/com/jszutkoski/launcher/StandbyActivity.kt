@@ -17,6 +17,7 @@ import android.os.PowerManager
 import android.os.SystemClock
 import android.view.WindowInsetsController
 import android.view.WindowManager
+import java.lang.ref.WeakReference
 import android.window.OnBackInvokedDispatcher
 
 /**
@@ -85,6 +86,7 @@ open class StandbyActivity : Activity() {
     override fun onResume() {
         super.onResume()
         shown += id
+        front = WeakReference(this)
         view.show()
         keepScreenOn()
         showWaiting()
@@ -96,12 +98,13 @@ open class StandbyActivity : Activity() {
         // Covered by something else with the screen on (a call, an alarm, an app opened from a
         // notification): no longer in front, so the next screen off must bring it back on top.
         // Stopped by the screen going off, it is still what the wake will show.
-        if (getSystemService(PowerManager::class.java)?.isInteractive == true) shown -= id
+        if (getSystemService(PowerManager::class.java)?.isInteractive == true) leaveFront()
     }
 
     override fun onDestroy() {
         Notifications.removeListener(notificationsChanged)
-        shown -= id
+        view.removeCallbacks(closeShadeAgain)
+        leaveFront()
         unregisterReceiver(batteryReceiver)
         unregisterReceiver(unlockReceiver)
         unregisterReceiver(screenOnReceiver)
@@ -119,7 +122,7 @@ open class StandbyActivity : Activity() {
         if (getSystemService(PowerManager::class.java)?.isInteractive == false) return
         // The PIN pad of our own prompt opening over standby.
         if (unlockAsked) return
-        shown -= id
+        leaveFront()
         // Home or recents on a phone that was never locked (the charger keeps the screen on,
         // so it never locks by itself): lock it now, or that swipe would get straight in.
         val locked = getSystemService(KeyguardManager::class.java)?.isKeyguardLocked == true
@@ -137,16 +140,45 @@ open class StandbyActivity : Activity() {
      */
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
-        // Our own fingerprint prompt, standby closing, or the screen going off.
-        if (hasFocus || unlockAsked || isFinishing) return
+        if (!hasFocus) systemCameOver(lostFocus = true)
+    }
+
+    /**
+     * Told by focus moving away, or by the accessibility service that a window of the system's
+     * appeared. Only losing focus locks an unlocked phone: the system also shows windows of its
+     * own (a notification popping up, the volume) that should not turn the screen off.
+     */
+    private fun systemCameOver(lostFocus: Boolean) {
+        // Our own fingerprint prompt or PIN pad, standby closing, or the screen going off.
+        if (unlockAsked || isFinishing) return
         if (getSystemService(PowerManager::class.java)?.isInteractive != true) return
         if (LockService.inCall(this)) return
         val keyguard = getSystemService(KeyguardManager::class.java)
         val locked = keyguard?.isKeyguardLocked == true
         when {
-            !locked -> if (needsUnlock()) LockService.lock()
-            keyguard?.isDeviceSecure == true && Prefs(this).closeShadeOnStandby -> LockService.closeShade()
+            !locked -> if (lostFocus && needsUnlock()) LockService.lock()
+            keyguard?.isDeviceSecure == true && Prefs(this).closeShadeOnStandby -> closeShade()
         }
+    }
+
+    /**
+     * Closed now, and again a few times over the next seconds: the finger is usually still
+     * pulling the shade down when it is noticed, and Android lets the drag win over one close.
+     */
+    private fun closeShade() {
+        LockService.closeShade()
+        view.removeCallbacks(closeShadeAgain)
+        SHADE_CLOSE_RETRIES_MS.forEach { view.postDelayed(closeShadeAgain, it) }
+    }
+
+    private val closeShadeAgain = Runnable {
+        val locked = getSystemService(KeyguardManager::class.java)?.isKeyguardLocked == true
+        if (locked && !unlockAsked && !isFinishing) LockService.closeShade()
+    }
+
+    private fun leaveFront() {
+        shown -= id
+        if (front?.get() === this) front = null
     }
 
     // Android 11 and 12 only: from 13 on, back reaches the OnBackInvokedCallback instead.
@@ -283,11 +315,22 @@ open class StandbyActivity : Activity() {
         /** How long after the screen comes on a still-unlocked phone opens without the fingerprint. */
         private const val GRACE_MS = 10_000L
 
+        /** When the shade is closed again after it was first seen, in case it was still being pulled. */
+        private val SHADE_CLOSE_RETRIES_MS = listOf(250L, 600L, 1_200L, 2_000L)
+
         /** The standby screens in front (or in front when the screen went off), by instance. */
         private val shown = mutableSetOf<Int>()
 
         /** A standby screen is showing, or was when the screen went off. */
         val inFront get() = shown.isNotEmpty()
+
+        /** The standby screen last in front, for the accessibility service's news. */
+        private var front: WeakReference<StandbyActivity>? = null
+
+        /** From the accessibility service: one of the system interface's windows appeared. */
+        fun systemWindowAppeared() {
+            front?.get()?.systemCameOver(lostFocus = false)
+        }
 
         /**
          * From the screen-off receiver: in a task of its own above whatever app was open, so

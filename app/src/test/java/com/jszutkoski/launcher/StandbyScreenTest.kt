@@ -150,6 +150,38 @@ class StandbyScreenTest {
     }
 
     @Test
+    fun theShadeIsClosedAgainWhileAFingerMayStillPullIt() {
+        phone(secure = true, locked = true)
+        battery(charging = true)
+        shadeOver(seconds = 1)
+        idle(2_500)
+        assertTrue("closed $shadesClosed times", shadesClosed >= 3)
+    }
+
+    @Test
+    fun theAccessibilityServiceSeeingTheShadeClosesItToo() {
+        // Some phones never move focus away from standby when the shade opens over the lock screen.
+        phone(secure = true, locked = true)
+        battery(charging = true)
+        Robolectric.buildActivity(StandbyActivity::class.java).setup()
+        StandbyActivity.systemWindowAppeared()
+        idle()
+        assertEquals(1, shadesClosed)
+    }
+
+    @Test
+    fun aSystemWindowOnAnUnlockedStandbyDoesNotTurnTheScreenOff() {
+        // A notification popping up or the volume: only the shade taking focus locks.
+        phone(secure = true, locked = false)
+        battery(charging = true)
+        Robolectric.buildActivity(StandbyActivity::class.java).setup()
+        idle(11_000)
+        StandbyActivity.systemWindowAppeared()
+        idle()
+        assertEquals(0, locks)
+    }
+
+    @Test
     fun theShadeCanBeLeftToAndroidsLockScreenSettings() {
         Prefs(app).closeShadeOnStandby = false
         phone(secure = true, locked = true)

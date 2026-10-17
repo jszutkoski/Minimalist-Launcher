@@ -3,7 +3,7 @@
     <string name="app_name">Minimalist</string>
     <string name="settings">Settings</string>
     <string name="lock_service_label">Minimalist</string>
-    <string name="lock_service_description">Lets Minimalist lock the screen when you double-tap an empty part of the home screen, show its bedside clock when the screen turns on, and close the notification shade pulled over that clock while the phone is locked. It doesn\'t read or change anything on your screen.</string>
+    <string name="lock_service_description">Lets Minimalist lock the screen when you double-tap an empty part of the home screen, show its bedside clock when the screen turns on, and close the notification shade pulled over that clock while the phone is locked. For that last one it is told when Android\'s own windows (the shade, quick settings) appear, never what they say. It doesn\'t read or change anything on your screen and hears nothing about other apps.</string>
     <string name="media_listener_label">Minimalist now playing</string>
     <string name="search_hint">Search</string>
     <string name="search_only_hint">Type an app name</string>

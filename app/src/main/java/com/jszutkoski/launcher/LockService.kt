@@ -13,9 +13,10 @@ import android.view.accessibility.AccessibilityEvent
 
 /**
  * The only way for an ordinary app to lock the screen, and to open a screen from the
- * background: Android lets an app whose accessibility service is on do both. It asks for no
- * events and never reads what is on screen. It locks on request and, with "Standby on every
- * wake", puts the bedside clock on top each time the screen turns off.
+ * background: Android lets an app whose accessibility service is on do both. It never reads
+ * what is on screen. It locks on request; with "Standby on every wake" it puts the bedside
+ * clock on top each time the screen turns off; and it hears, from the system's interface alone,
+ * that one of its windows appeared, so standby can close the notification shade pulled over it.
  */
 class LockService : AccessibilityService() {
     private val screenOff = object : BroadcastReceiver() {
@@ -52,7 +53,10 @@ class LockService : AccessibilityService() {
         listening = false
     }
 
-    override fun onAccessibilityEvent(event: AccessibilityEvent?) = Unit
+    /** One of the system interface's windows came up: only the fact is used, never its text. */
+    override fun onAccessibilityEvent(event: AccessibilityEvent?) {
+        if (event?.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) StandbyActivity.systemWindowAppeared()
+    }
 
     override fun onInterrupt() = Unit
 
