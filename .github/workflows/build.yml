@@ -7,6 +7,11 @@ on:
     tags: ['v*']
   pull_request:
   workflow_dispatch:
+    inputs:
+      version:
+        description: "Publish this build as a version release (for example 1.0); empty for none"
+        required: false
+        default: ""
 
 permissions:
   contents: write
@@ -30,7 +35,7 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
 
       - name: Require the signing key for published builds
-        if: github.event_name == 'push' && env.MINIMALIST_KEYSTORE == ''
+        if: (github.event_name == 'push' || inputs.version != '') && env.MINIMALIST_KEYSTORE == ''
         run: |
           echo "::error::The MINIMALIST_KEYSTORE secret is missing; refusing to publish an unsigned APK."
           exit 1
@@ -71,14 +76,18 @@ jobs:
             --notes "Built from ${GITHUB_SHA::7}." \
             --target "$GITHUB_SHA"
 
-      # A permanent release for each version tag, kept alongside the moving "latest".
+      # A permanent release for each version, kept alongside the moving "latest": from a
+      # pushed tag (v1.0), or from a manual run given a version number, which creates the tag.
       - name: Publish version release
-        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+        if: >-
+          (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) ||
+          (github.event_name == 'workflow_dispatch' && inputs.version != '')
         env:
           GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event_name == 'workflow_dispatch' && format('v{0}', inputs.version) || github.ref_name }}
         run: |
-          cp minimalist-launcher.apk "minimalist-launcher-$GITHUB_REF_NAME.apk"
-          gh release create "$GITHUB_REF_NAME" "minimalist-launcher-$GITHUB_REF_NAME.apk" \
-            --title "Minimalist $GITHUB_REF_NAME" \
-            --notes "Version $GITHUB_REF_NAME, built from ${GITHUB_SHA::7}." \
-            --verify-tag
+          cp minimalist-launcher.apk "minimalist-launcher-$TAG.apk"
+          gh release create "$TAG" "minimalist-launcher-$TAG.apk" \
+            --title "Minimalist $TAG" \
+            --notes "Version ${TAG#v}, built from ${GITHUB_SHA::7}." \
+            --target "$GITHUB_SHA"
