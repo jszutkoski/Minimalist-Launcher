@@ -94,7 +94,7 @@ open class StandbyActivity : Activity() {
         super.onResume()
         shown += id
         // Kept behind other apps for days, so the face chosen meanwhile is applied on each return.
-        view.setClockStyle(prefs.clockStyle, prefs.clockSize)
+        view.setLook(ClockLook.from(prefs))
         view.show()
         keepScreenOn()
         showWaiting()

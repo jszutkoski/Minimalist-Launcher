@@ -55,6 +55,19 @@ class HomeScreenTest {
     }
 
     @Test
+    fun theClockChosenInSettingsShowsOnReturn() {
+        val controller = home()
+        val face = controller.get().content().views().filterIsInstance<ClockFace>().single()
+        assertEquals(View.VISIBLE, face.digital.visibility)
+        // Settings opens on top and the choice is made there; home comes back to the front.
+        controller.pause().stop()
+        Prefs(app).clockDesign = ClockDesign.ANALOG
+        controller.restart().resume()
+        assertEquals(View.GONE, face.digital.visibility)
+        assertEquals(View.VISIBLE, face.analog.visibility)
+    }
+
+    @Test
     fun aMenuClosesWhenHomeIsLeft() {
         val controller = home()
         val sheet = Sheet(controller.get(), "Menu").apply { show() }

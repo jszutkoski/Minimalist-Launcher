@@ -71,10 +71,11 @@ fun Context.text(
  * digits in [above] to the line's centre, and [gap] again from there to the tops of the
  * capitals in [below]. Measured from the glyphs, not the text boxes, whose built-in space
  * (descent under the clock, ascent above the date) would otherwise push the line off centre.
+ * An [above] that is no text (the analog face) is measured from its bottom edge.
  * [above] and [line] must share a vertical LinearLayout; [below] may sit in the next one.
  */
-fun spaceEvenly(above: TextView, line: View, lineHeight: Int, below: TextView, gap: Int) {
-    val descent = above.paint.fontMetrics.descent + above.paddingBottom
+fun spaceEvenly(above: View, line: View, lineHeight: Int, below: TextView, gap: Int) {
+    val descent = if (above is TextView) above.paint.fontMetrics.descent + above.paddingBottom else 0f
     val metrics = below.paint.fontMetrics
     val boxTop = if (below.includeFontPadding) metrics.top else metrics.ascent
     val caps = Rect().also { below.paint.getTextBounds("H", 0, 1, it) }

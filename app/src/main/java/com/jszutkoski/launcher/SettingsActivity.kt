@@ -3,7 +3,11 @@ package com.jszutkoski.launcher
 import android.Manifest
 import android.annotation.SuppressLint
 import android.app.Activity
+import android.content.Intent
+import android.content.IntentFilter
 import android.graphics.Typeface
+import android.text.format.DateFormat
+import android.view.Gravity
 import android.os.Build
 import android.os.Bundle
 import android.view.ViewGroup
@@ -12,6 +16,10 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.window.OnBackInvokedCallback
 import android.window.OnBackInvokedDispatcher
+import java.text.NumberFormat
+import java.util.Date
+import java.util.Locale
+import kotlin.math.roundToInt
 
 class SettingsActivity : Activity() {
     private lateinit var prefs: Prefs
@@ -69,6 +77,7 @@ class SettingsActivity : Activity() {
     /** The main list of groups, or one group's settings. */
     private enum class Page(val title: Int, val summary: Int) {
         HOME(R.string.page_home, R.string.page_home_summary),
+        CLOCK(R.string.page_clock, R.string.page_clock_summary),
         SEARCH(R.string.page_search, R.string.page_search_summary),
         STANDBY(R.string.page_standby, R.string.page_standby_summary),
         APPS(R.string.page_apps, R.string.page_apps_summary),
@@ -115,6 +124,7 @@ class SettingsActivity : Activity() {
         when (current) {
             null -> renderMain()
             Page.HOME -> renderHome()
+            Page.CLOCK -> renderClock()
             Page.SEARCH -> renderSearch()
             Page.STANDBY -> renderStandby()
             Page.APPS -> renderApps()
@@ -135,18 +145,6 @@ class SettingsActivity : Activity() {
     private fun renderHome() {
         row(getString(R.string.text_size), getString(prefs.textSize.label)) {
             prefs.textSize = TextSize.entries[(prefs.textSize.ordinal + 1) % TextSize.entries.size]
-        }
-        // Each face's name is written in that face.
-        row(
-            getString(R.string.clock_style),
-            getString(prefs.clockStyle.label),
-            getString(R.string.clock_style_desc),
-            valueFace = prefs.clockStyle.typeface,
-        ) {
-            prefs.clockStyle = ClockStyle.entries[(prefs.clockStyle.ordinal + 1) % ClockStyle.entries.size]
-        }
-        row(getString(R.string.clock_size), getString(prefs.clockSize.label)) {
-            prefs.clockSize = ClockSize.entries[(prefs.clockSize.ordinal + 1) % ClockSize.entries.size]
         }
         row(
             getString(R.string.layout),
@@ -190,6 +188,63 @@ class SettingsActivity : Activity() {
             grant = { SystemActions.openNotificationAccess(this) },
         )
     }
+
+    /** A live preview on top, then each choice, going round its values on every tap. */
+    private fun renderClock() {
+        val look = ClockLook.from(prefs)
+        val date = text("", 17f, Palette.SECONDARY, 400).apply {
+            text = DateFormat.format(DateFormat.getBestDateTimePattern(Locale.getDefault(), "EEEEdMMMM"), Date())
+            letterSpacing = 0.02f
+        }
+        val preview = ClockFace(this, pressable = false)
+        content.addView(preview, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+        content.addView(
+            date,
+            LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                bottomMargin = dp(28)
+            },
+        )
+        val scale = prefs.textSize.scale
+        preview.apply(
+            look,
+            digitsSp = 100f * scale,
+            analogDp = 170f * scale,
+            labelSp = 13f * scale,
+            gravity = Gravity.START,
+            maxWidth = resources.displayMetrics.widthPixels - 2 * dp(SIDE_MARGIN_DP),
+            below = date,
+            gap = dp(26),
+        )
+        // The battery as it is now: a sticky broadcast answers at once, with no receiver kept.
+        registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))?.let(BatteryState::from)?.let { battery ->
+            preview.battery.update(battery.fraction, battery.charging, battery.low)
+            preview.battery.label = NumberFormat.getIntegerInstance().format((battery.fraction * 100).roundToInt())
+        }
+
+        row(getString(R.string.clock_design), getString(look.design.label)) { prefs.clockDesign = next(look.design) }
+        // Each weight's name is written in that weight.
+        row(
+            getString(R.string.clock_weight),
+            getString(look.weight.label),
+            valueFace = ClockFont.at(this, look.weight.weight),
+        ) { prefs.clockWeight = next(look.weight) }
+        row(getString(R.string.clock_size), getString(look.size.label)) { prefs.clockSize = next(look.size) }
+        row(getString(R.string.battery_design), getString(look.battery.label)) { prefs.batteryDesign = next(look.battery) }
+        row(getString(R.string.battery_weight), getString(look.batteryWeight.label)) {
+            prefs.batteryWeight = next(look.batteryWeight)
+        }
+        row(getString(R.string.battery_size), getString(look.batterySize.label)) { prefs.batterySize = next(look.batterySize) }
+        content.addView(
+            text(getString(R.string.clock_help), 14f, Palette.TERTIARY, 400).apply {
+                isSingleLine = false
+                setLineSpacing(dp(6f), 1f)
+                setPadding(0, dp(28), 0, 0)
+            },
+        )
+    }
+
+    /** The value after [value], back to the first after the last. */
+    private inline fun <reified T : Enum<T>> next(value: T): T = enumValues<T>().let { it[(value.ordinal + 1) % it.size] }
 
     private fun renderSearch() {
         row(getString(R.string.auto_launch), onOff(prefs.autoLaunch), getString(R.string.auto_launch_desc)) {

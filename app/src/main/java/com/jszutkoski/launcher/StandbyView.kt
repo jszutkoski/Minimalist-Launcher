@@ -19,8 +19,6 @@ import kotlin.random.Random
  * to a new spot every minute so no pixel stays lit in the same place. A tap calls [onExit].
  */
 class StandbyView(context: Context, private val onExit: () -> Unit) : FrameLayout(context) {
-    // Room for the charging bolt from the start, so plugging in never shifts the clock.
-    private val battery = BatteryBar(context).apply { roomForMarker = true }
     private val weather: TextView = context.text("", 17f, Palette.SECONDARY, 400).apply {
         letterSpacing = 0.02f
         visibility = GONE
@@ -33,12 +31,7 @@ class StandbyView(context: Context, private val onExit: () -> Unit) : FrameLayou
         visibility = GONE
     }
     private val drift = Runnable { moveContent() }
-    private val clock = TextClock(context).apply {
-        format12Hour = "h:mm"
-        format24Hour = "HH:mm"
-        setTextColor(Palette.TEXT)
-        includeFontPadding = false
-    }
+    private val face = ClockFace(context, pressable = false)
     private val date: TextClock
 
     init {
@@ -59,34 +52,33 @@ class StandbyView(context: Context, private val onExit: () -> Unit) : FrameLayou
         }
 
         val wrap = ViewGroup.LayoutParams.WRAP_CONTENT
-        val clockBlock = LinearLayout(context).apply {
-            orientation = LinearLayout.VERTICAL
-            addView(clock, LinearLayout.LayoutParams(wrap, wrap))
-            addView(battery, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, wrap))
-        }
         content.apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
             // Everything at half strength: readable in the dark, easy on the panel.
             alpha = 0.55f
-            addView(clockBlock, LinearLayout.LayoutParams(wrap, wrap))
+            addView(face, LinearLayout.LayoutParams(wrap, wrap))
             addView(date, LinearLayout.LayoutParams(wrap, wrap))
             addView(weather, LinearLayout.LayoutParams(wrap, wrap).apply { topMargin = dp(6) })
             addView(waiting, LinearLayout.LayoutParams(wrap, wrap).apply { topMargin = dp(22) })
         }
-        setClockStyle(ClockStyle.THIN, ClockSize.DEFAULT)
+        setLook(ClockLook())
         waiting.addView(chat)
         waiting.addView(mail, LinearLayout.LayoutParams(wrap, wrap).apply { leftMargin = dp(22) })
         addView(content, LayoutParams(wrap, wrap, Gravity.CENTER))
     }
 
-    /** The face and size chosen in settings, kept clear of the screen's sides as it drifts. */
-    fun setClockStyle(style: ClockStyle, size: ClockSize) {
-        val width = resources.displayMetrics.widthPixels - 2 * dp(SIDE_MARGIN_DP)
-        clock.styleClock(style, 106f * size.scale, width)
-        // The line midway between the clock's digits and the date.
-        spaceEvenly(clock, battery, battery.preferredHeight, date, dp(GAP_DP))
-    }
+    /** The clock and battery chosen in settings, kept clear of the screen's sides as it drifts. */
+    fun setLook(look: ClockLook) = face.apply(
+        look,
+        digitsSp = 106f,
+        analogDp = 190f,
+        labelSp = 13f,
+        gravity = Gravity.CENTER_HORIZONTAL,
+        maxWidth = resources.displayMetrics.widthPixels - 2 * dp(SIDE_MARGIN_DP),
+        below = date,
+        gap = dp(GAP_DP),
+    )
 
     /** A line glyph for each kind of message waiting; the row goes when there is nothing. */
     fun showWaiting(whatsApp: Boolean, email: Boolean) {
@@ -105,7 +97,7 @@ class StandbyView(context: Context, private val onExit: () -> Unit) : FrameLayou
         visibility = GONE
     }
 
-    fun updateBattery(fraction: Float, charging: Boolean, low: Boolean) = battery.update(fraction, charging, low)
+    fun updateBattery(fraction: Float, charging: Boolean, low: Boolean) = face.battery.update(fraction, charging, low)
 
     /** "18° Drizzle" under the date, or nothing. */
     fun showWeather(label: String?) {

@@ -51,9 +51,8 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
 
     private lateinit var root: SwipeLayout
     private lateinit var home: HomeColumn
-    private lateinit var clock: TextClock
+    private lateinit var face: ClockFace
     private lateinit var date: TextClock
-    private lateinit var batteryBar: BatteryBar
     private lateinit var alarmDot: TextView
     private lateinit var alarmText: TextView
     private lateinit var pause: PauseView
@@ -61,7 +60,6 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
     private val dotsChanged: () -> Unit = { showDots() }
     private lateinit var favorites: LinearLayout
     private lateinit var setDefault: TextView
-    private lateinit var clockBlock: LinearLayout
     private lateinit var dateRow: LinearLayout
     private lateinit var topSpace: Space
     private lateinit var bottomSpace: Space
@@ -208,17 +206,11 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
 
         home = HomeColumn(this)
 
-        clock = TextClock(this).apply {
-            format12Hour = "h:mm"
-            format24Hour = "HH:mm"
-            setTextColor(pressable(Palette.TEXT))
-            includeFontPadding = false
-            setOnClickListener { SystemActions.openAlarms(this@MainActivity) }
-        }
-        batteryBar = BatteryBar(this).apply {
-            // Its height never changes with the number or the bolt, so the spacing holds.
-            roomForMarker = true
-            setOnClickListener { SystemActions.openBatteryUsage(this@MainActivity) }
+        // The clock widget: the time, then the battery, a hairline exactly as wide as the time
+        // with the percentage set into it where the fill ends, or a ring; then the date.
+        face = ClockFace(this, pressable = true).apply {
+            setOnTimeClick { SystemActions.openAlarms(this@MainActivity) }
+            battery.setOnClickListener { SystemActions.openBatteryUsage(this@MainActivity) }
         }
         val datePattern = DateFormat.getBestDateTimePattern(Locale.getDefault(), "EEEEdMMMM")
         date = TextClock(this).apply {
@@ -259,21 +251,13 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         player = PlayerView(this, ::openPlayer)
 
         val wrap = ViewGroup.LayoutParams.WRAP_CONTENT
-        // The clock widget: time, a battery hairline exactly as wide as the time with the
-        // percentage set into it where the fill ends, then the date on one quiet line.
-        clockBlock = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        clockBlock.addView(clock, LinearLayout.LayoutParams(wrap, wrap))
-        clockBlock.addView(
-            batteryBar,
-            LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, wrap),
-        )
         dateRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             addView(date)
             addView(alarmDot)
             addView(alarmText)
         }
-        home.addView(clockBlock, LinearLayout.LayoutParams(wrap, wrap))
+        home.addView(face, LinearLayout.LayoutParams(wrap, wrap))
         home.addView(dateRow, LinearLayout.LayoutParams(wrap, wrap))
         // Optional: today's screen time, on its own line under the date. The weather is for standby.
         home.addView(screenTimeText, LinearLayout.LayoutParams(wrap, wrap))
@@ -310,11 +294,11 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         root.addView(home)
 
         // The battery line is a few dp tall: its touch area reaches 48dp, like any button.
-        batteryBar.addOnLayoutChangeListener { bar, _, _, _, _, _, _, _, _ ->
+        face.battery.addOnLayoutChangeListener { bar, _, _, _, _, _, _, _, _ ->
             val area = Rect().also(bar::getHitRect)
             val extra = ((dp(48) - area.height()) / 2).coerceAtLeast(0)
             area.inset(0, -extra)
-            clockBlock.touchDelegate = TouchDelegate(area, bar)
+            face.touchDelegate = TouchDelegate(area, bar)
         }
 
         drawer = AppDrawerView(this, this).apply {
@@ -345,12 +329,17 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
     private fun render() {
         stale = false
         val scale = prefs.textSize.scale
-        val width = resources.displayMetrics.widthPixels - 2 * dp(SIDE_MARGIN_DP)
-        clock.styleClock(prefs.clockStyle, 100f * scale * prefs.clockSize.scale, width)
         date.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f * scale)
-        batteryBar.setLabelSize(13f * scale)
-        // The battery line midway between the clock's digits and the date, at any text size.
-        spaceEvenly(clock, batteryBar, batteryBar.preferredHeight, date, dp(26))
+        face.apply(
+            ClockLook.from(prefs),
+            digitsSp = 100f * scale,
+            analogDp = 170f * scale,
+            labelSp = 13f * scale,
+            gravity = if (prefs.centerFavorites) Gravity.CENTER_HORIZONTAL else Gravity.START,
+            maxWidth = resources.displayMetrics.widthPixels - 2 * dp(SIDE_MARGIN_DP),
+            below = date,
+            gap = dp(26),
+        )
         alarmDot.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f * scale)
         alarmText.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f * scale)
         pause.setTextScale(scale)
@@ -370,10 +359,10 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
 
     private fun updateBattery(intent: Intent) {
         val battery = BatteryState.from(intent) ?: return
-        batteryBar.update(battery.fraction, battery.charging, battery.low)
-        // Just the number: set into the battery line, it needs no percent sign.
-        batteryBar.label = NumberFormat.getIntegerInstance().format((battery.fraction * 100).roundToInt())
-        batteryBar.contentDescription = NumberFormat.getPercentInstance().format(battery.fraction.toDouble())
+        face.battery.update(battery.fraction, battery.charging, battery.low)
+        // Just the number: set into the battery line or ring, it needs no percent sign.
+        face.battery.label = NumberFormat.getIntegerInstance().format((battery.fraction * 100).roundToInt())
+        face.battery.contentDescription = NumberFormat.getPercentInstance().format(battery.fraction.toDouble())
         if (battery.charging != charging) {
             charging = battery.charging
             scheduleStandby()
@@ -498,9 +487,9 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         (screenTimeText.layoutParams as LinearLayout.LayoutParams).gravity = alignment
         player.setAlignment(alignment)
         // The clock widget follows the same alignment as the pinned apps.
-        (clockBlock.layoutParams as LinearLayout.LayoutParams).gravity = alignment
+        (face.layoutParams as LinearLayout.LayoutParams).gravity = alignment
         (dateRow.layoutParams as LinearLayout.LayoutParams).gravity = alignment
-        clockBlock.requestLayout()
+        face.requestLayout()
         // Centred: in the middle of the free space. Left aligned: down near the thumb.
         bottomSpace.layoutParams = (bottomSpace.layoutParams as LinearLayout.LayoutParams).apply {
             weight = if (center) 1f else 0f

@@ -89,15 +89,35 @@ class Prefs(context: Context) {
         }
         set(value) = prefs.edit().putInt(KEY_STATUS_BAR, value.ordinal).apply()
 
-    /** The clock's face, on the home screen and the bedside clock. */
-    var clockStyle: ClockStyle
-        get() = ClockStyle.entries.getOrElse(prefs.getInt(KEY_CLOCK_STYLE, 0)) { ClockStyle.THIN }
-        set(value) = prefs.edit().putInt(KEY_CLOCK_STYLE, value.ordinal).apply()
+    // The clock and the battery under it, on the home screen and the bedside clock.
+    var clockDesign: ClockDesign
+        get() = choice(KEY_CLOCK_DESIGN, ClockDesign.LINE)
+        set(value) = prefs.edit().putInt(KEY_CLOCK_DESIGN, value.ordinal).apply()
 
-    /** The clock's size, on top of the text size. */
-    var clockSize: ClockSize
-        get() = ClockSize.entries.getOrElse(prefs.getInt(KEY_CLOCK_SIZE, ClockSize.DEFAULT.ordinal)) { ClockSize.DEFAULT }
+    var clockWeight: ClockWeight
+        get() = choice(KEY_CLOCK_WEIGHT, ClockWeight.THIN)
+        set(value) = prefs.edit().putInt(KEY_CLOCK_WEIGHT, value.ordinal).apply()
+
+    /** On top of the text size. */
+    var clockSize: SizeStep
+        get() = choice(KEY_CLOCK_SIZE, SizeStep.DEFAULT)
         set(value) = prefs.edit().putInt(KEY_CLOCK_SIZE, value.ordinal).apply()
+
+    var batteryDesign: BatteryDesign
+        get() = choice(KEY_BATTERY_DESIGN, BatteryDesign.LINE)
+        set(value) = prefs.edit().putInt(KEY_BATTERY_DESIGN, value.ordinal).apply()
+
+    var batteryWeight: LineWeight
+        get() = choice(KEY_BATTERY_WEIGHT, LineWeight.MEDIUM)
+        set(value) = prefs.edit().putInt(KEY_BATTERY_WEIGHT, value.ordinal).apply()
+
+    var batterySize: SizeStep
+        get() = choice(KEY_BATTERY_SIZE, SizeStep.DEFAULT)
+        set(value) = prefs.edit().putInt(KEY_BATTERY_SIZE, value.ordinal).apply()
+
+    /** One of [default]'s values, stored by position; the default when unset or out of range. */
+    private inline fun <reified T : Enum<T>> choice(key: String, default: T): T =
+        enumValues<T>().getOrElse(prefs.getInt(key, default.ordinal)) { default }
 
     /** Clock and pinned apps centred on the home screen, or left aligned with the apps near the thumb. */
     var centerFavorites: Boolean
@@ -190,8 +210,12 @@ class Prefs(context: Context) {
         const val KEY_NOTIFICATION_DOTS = "notification_dots"
         const val KEY_LOCK_SCREEN_GLYPHS = "lock_screen_glyphs"
         const val KEY_PAUSE_APPS = "pause_apps"
-        const val KEY_CLOCK_STYLE = "clock_style"
+        const val KEY_CLOCK_DESIGN = "clock_design"
+        const val KEY_CLOCK_WEIGHT = "clock_weight"
         const val KEY_CLOCK_SIZE = "clock_size"
+        const val KEY_BATTERY_DESIGN = "battery_design"
+        const val KEY_BATTERY_WEIGHT = "battery_weight"
+        const val KEY_BATTERY_SIZE = "battery_size"
         const val KEY_SWIPE_LEFT = "swipe_left_app"
         const val KEY_SWIPE_RIGHT = "swipe_right_app"
     }

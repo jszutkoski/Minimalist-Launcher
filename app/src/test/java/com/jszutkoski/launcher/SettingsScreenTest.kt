@@ -96,13 +96,25 @@ class SettingsScreenTest {
     }
 
     @Test
-    fun theClockFaceGoesRoundTheChoices() {
+    fun theClockGoesRoundItsDesigns() {
         val activity = controller.get()
-        activity.tap(R.string.page_home)
-        activity.tap(R.string.clock_style)
-        assertEquals(ClockStyle.BOLD, Prefs(activity).clockStyle)
-        repeat(ClockStyle.entries.size - 1) { activity.tap(R.string.clock_style) }
-        assertEquals(ClockStyle.THIN, Prefs(activity).clockStyle)
+        activity.tap(R.string.page_clock)
+        activity.tap(R.string.clock_design)
+        assertEquals(ClockDesign.STACKED, Prefs(activity).clockDesign)
+        activity.tap(R.string.clock_design)
+        assertEquals(ClockDesign.ANALOG, Prefs(activity).clockDesign)
+        activity.tap(R.string.clock_design)
+        assertEquals(ClockDesign.LINE, Prefs(activity).clockDesign)
+    }
+
+    @Test
+    fun theBatteryCanBeARingOfAnyThickness() {
+        val activity = controller.get()
+        activity.tap(R.string.page_clock)
+        activity.tap(R.string.battery_design)
+        activity.tap(R.string.battery_weight)
+        assertEquals(BatteryDesign.RING, Prefs(activity).batteryDesign)
+        assertEquals(LineWeight.THICK, Prefs(activity).batteryWeight)
     }
 
     @Test
