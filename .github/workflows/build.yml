@@ -63,6 +63,9 @@ jobs:
       - name: Test, lint and build the release APK
         run: ./gradlew testReleaseUnitTest lintRelease assembleRelease --stacktrace
 
+      - name: Show the lint findings
+        run: cat app/build/reports/lint-results-release.txt
+
       - name: Name the APK and its checksum
         # "-unsigned" in the name when built without the key (pull requests from forks).
         run: |
