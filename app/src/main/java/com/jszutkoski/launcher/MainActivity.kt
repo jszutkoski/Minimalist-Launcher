@@ -3,6 +3,7 @@ package com.jszutkoski.launcher
 import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
 import android.animation.ValueAnimator
+import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.ActivityOptions
 import android.app.AlarmManager
@@ -190,6 +191,8 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         super.onDestroy()
     }
 
+    // Android 11 and 12 only: from 13 on, back reaches the OnBackInvokedCallback instead.
+    @SuppressLint("GestureBackNavigation")
     @Deprecated("Only reached below Android 13; newer versions use OnBackInvokedCallback.")
     override fun onBackPressed() {
         // A home screen never finishes itself.

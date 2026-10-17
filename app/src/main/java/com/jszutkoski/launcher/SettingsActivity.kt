@@ -1,6 +1,7 @@
 package com.jszutkoski.launcher
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.app.Activity
 import android.os.Build
 import android.os.Bundle
@@ -96,6 +97,8 @@ class SettingsActivity : Activity() {
         content.animate().alpha(1f).setDuration(180).start()
     }
 
+    // Android 11 and 12 only: from 13 on, back reaches the OnBackInvokedCallback instead.
+    @SuppressLint("GestureBackNavigation")
     @Deprecated("Only reached below Android 13; newer versions use OnBackInvokedCallback.")
     override fun onBackPressed() {
         @Suppress("DEPRECATION")

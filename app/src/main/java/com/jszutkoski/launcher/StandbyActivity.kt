@@ -1,5 +1,6 @@
 package com.jszutkoski.launcher
 
+import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.ActivityOptions
 import android.app.KeyguardManager
@@ -126,6 +127,8 @@ open class StandbyActivity : Activity() {
         if (this !is StandbyOverAppsActivity) finish()
     }
 
+    // Android 11 and 12 only: from 13 on, back reaches the OnBackInvokedCallback instead.
+    @SuppressLint("GestureBackNavigation")
     @Deprecated("Only reached below Android 13; newer versions use OnBackInvokedCallback.")
     override fun onBackPressed() = leave()
 
