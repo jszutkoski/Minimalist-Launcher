@@ -69,8 +69,10 @@ class ClockFaceTest {
     fun aClockTooWideForTheScreenShrinksToFit() {
         show(ClockLook(weight = ClockWeight.BOLD, size = SizeStep.LARGE), maxWidth = 300)
         assertTrue("${face.digital.measuredWidth}", face.digital.measuredWidth <= 300)
-        show(ClockLook(design = ClockDesign.ANALOG, size = SizeStep.LARGE), maxWidth = 300)
-        assertEquals(300, face.analog.measuredWidth)
+        // Wider than the room left: the face is cut down to it.
+        val wide = RuntimeEnvironment.getApplication().dp(220f * SizeStep.LARGE.scale).toInt()
+        show(ClockLook(design = ClockDesign.ANALOG, size = SizeStep.LARGE), maxWidth = wide / 2)
+        assertEquals(wide / 2, face.analog.measuredWidth)
     }
 
     @Test
