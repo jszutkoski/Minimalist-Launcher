@@ -2,6 +2,9 @@ package com.jszutkoski.launcher
 
 import android.content.Intent
 import android.os.BatteryManager
+import android.os.SystemClock
+import kotlin.math.PI
+import kotlin.math.cos
 
 /** Below this charge, and not charging, the battery shows in red. */
 const val LOW_BATTERY = 0.15f
@@ -21,6 +24,25 @@ class BatteryState(val fraction: Float, val charging: Boolean) {
             return BatteryState(level / scale.toFloat(), charging)
         }
     }
+}
+
+/** Charging: one breath in or out. Full on the charger: slower still, in green. */
+private const val BREATH_MS = 1400
+private const val SLOW_MS = 2400
+
+/**
+ * A breath drawn at these steps rather than every frame: the battery is lit all night on the
+ * charger, and redrawing it at 120 Hz would keep the panel and GPU busy for nothing. About 16
+ * steps a second: smooth enough for a slow fade.
+ */
+const val BREATH_FRAME_MS = 60L
+
+/** The charging battery's alpha now, fading in and out since [start] (uptime). */
+fun breathAlpha(start: Long, full: Boolean): Int {
+    val period = if (full) SLOW_MS else BREATH_MS
+    val low = if (full) 110 else 90
+    val phase = ((SystemClock.uptimeMillis() - start) % (2 * period)) / period.toDouble()
+    return (low + (255 - low) * (0.5 + 0.5 * cos(PI * phase))).toInt()
 }
 
 /** Packages the launcher recognises by name. */

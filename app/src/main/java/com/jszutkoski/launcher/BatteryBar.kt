@@ -4,48 +4,26 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Path
-import android.graphics.RectF
 import android.os.SystemClock
 import android.util.TypedValue
 import android.view.View
-import kotlin.math.PI
 import kotlin.math.ceil
-import kotlin.math.cos
 
 /**
- * The battery under the clock: a hairline as wide as the time, filled to the battery level,
- * or a ring that closes as it charges. On the line, where the fill ends sits a marker, the line
- * parting around it: the [label] (the percentage) and, while charging, a small bolt; in the
- * ring they sit in the middle. Charging, it breathes slowly; full on the charger, it turns green
- * and pulses; low, it turns red.
+ * A hairline under the clock, as wide as the time, filled to the battery level.
+ * Where the fill ends sits a marker, the line parting around it: the [label] (the
+ * percentage) and, while charging, a small bolt. Charging, it breathes slowly; full on
+ * the charger, it turns green and pulses; low, it turns red.
  */
 class BatteryBar(context: Context) : View(context) {
-    var design = BatteryDesign.LINE
+    /** How thick the line is drawn: the clock's thickness setting. */
+    var thickness = context.dp(3f)
         set(value) {
             if (field == value) return
             field = value
             requestLayout()
             invalidate()
         }
-
-    /** How thick the line or ring is drawn. */
-    var lineWidth = context.dp(3f)
-        set(value) {
-            if (field == value) return
-            field = value
-            requestLayout()
-            invalidate()
-        }
-
-    var ringDiameter = context.dp(50)
-        set(value) {
-            if (field == value) return
-            field = value
-            requestLayout()
-            invalidate()
-        }
-
-    private val ringBounds = RectF()
     private val gap = context.dp(7f)
     private val boltGap = context.dp(3f)
     private val trackPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Palette.TRACK }
@@ -65,22 +43,15 @@ class BatteryBar(context: Context) : View(context) {
     private var breathStart = 0L
     private var shown = false
 
-    /**
-     * A breath drawn at [FRAME_MS] steps rather than every frame: the line is lit all night on
-     * the charger, and redrawing it at 120 Hz would keep the panel and GPU busy for nothing.
-     * Stops whenever the line can't be seen.
-     */
+    /** A breath drawn at [BREATH_FRAME_MS] steps. Stops whenever the line can't be seen. */
     private val breath = object : Runnable {
         override fun run() {
-            val period = if (full) SLOW_MS else BREATH_MS
-            val low = if (full) 110 else 90
-            val phase = ((SystemClock.uptimeMillis() - breathStart) % (2 * period)) / period.toDouble()
-            val alpha = (low + (255 - low) * (0.5 + 0.5 * cos(PI * phase))).toInt()
+            val alpha = breathAlpha(breathStart, full)
             fillPaint.alpha = alpha
             labelPaint.alpha = alpha
             boltPaint.alpha = alpha
             invalidate()
-            postDelayed(this, FRAME_MS)
+            postDelayed(this, BREATH_FRAME_MS)
         }
     }
 
@@ -100,12 +71,8 @@ class BatteryBar(context: Context) : View(context) {
             requestLayout()
         }
 
-    fun setLabelSize(sp: Float) =
-        setLabelSizePx(TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, sp, resources.displayMetrics))
-
-    fun setLabelSizePx(px: Float) {
-        if (labelPaint.textSize == px) return
-        labelPaint.textSize = px
+    fun setLabelSize(sp: Float) {
+        labelPaint.textSize = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, sp, resources.displayMetrics)
         requestLayout()
         invalidate()
     }
@@ -145,30 +112,24 @@ class BatteryBar(context: Context) : View(context) {
     /** As tall as the digits' capitals. */
     private val boltSize get() = labelPaint.textSize * 0.82f
 
-    /** The height it takes: the ring, or the line alone, or the marker's when there is or may be one. */
+    /** The height it takes: the line alone, or the marker's when there is or may be one. */
     val preferredHeight: Int
         get() {
-            if (design == BatteryDesign.RING) return ringDiameter
-            val line = lineWidth.toInt().coerceAtLeast(1)
+            val line = thickness.toInt().coerceAtLeast(1)
             val marker = label != null || charging || roomForMarker
             return if (marker) maxOf(line, markerHeight) else line
         }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-        val width = if (design == BatteryDesign.RING) ringDiameter else MeasureSpec.getSize(widthMeasureSpec)
-        setMeasuredDimension(width, preferredHeight)
+        setMeasuredDimension(MeasureSpec.getSize(widthMeasureSpec), preferredHeight)
     }
 
     override fun onDraw(canvas: Canvas) {
-        if (design == BatteryDesign.RING) {
-            drawRing(canvas)
-            return
-        }
         val w = width.toFloat()
         val text = label
         if (text == null && !charging) {
             segment(canvas, 0f, w, trackPaint)
-            if (level > 0f) segment(canvas, 0f, maxOf(w * level, lineWidth), fillPaint)
+            if (level > 0f) segment(canvas, 0f, maxOf(w * level, thickness), fillPaint)
             return
         }
         // Filled line up to the marker, the marker, then the empty line after it.
@@ -182,38 +143,16 @@ class BatteryBar(context: Context) : View(context) {
         if (fillEnd > 0f) segment(canvas, 0f, fillEnd, fillPaint)
         if (trackStart < w) segment(canvas, trackStart, w, trackPaint)
 
-        drawMarker(canvas, centre - half, boltWidth, spacing)
-    }
-
-    /** The bolt while charging, then the number, from [left], centred on the view's middle. */
-    private fun drawMarker(canvas: Canvas, left: Float, boltWidth: Float, spacing: Float) {
-        var x = left
+        var x = centre - half
         if (charging) {
             drawBolt(canvas, x, boltWidth)
             x += boltWidth + spacing
         }
-        val text = label ?: return
-        val baseline = height / 2f - (labelPaint.descent() + labelPaint.ascent()) / 2f
-        labelPaint.textAlign = Paint.Align.LEFT
-        canvas.drawText(text, x, baseline, labelPaint)
-    }
-
-    /** The whole circle faint, the charge bright from the top clockwise, the marker inside. */
-    private fun drawRing(canvas: Canvas) {
-        val inset = lineWidth / 2f
-        ringBounds.set(inset, inset, width - inset, height - inset)
-        for (paint in listOf(trackPaint, fillPaint)) {
-            paint.style = Paint.Style.STROKE
-            paint.strokeWidth = lineWidth
-            paint.strokeCap = Paint.Cap.ROUND
+        if (text != null) {
+            val baseline = height / 2f - (labelPaint.descent() + labelPaint.ascent()) / 2f
+            labelPaint.textAlign = Paint.Align.LEFT
+            canvas.drawText(text, x, baseline, labelPaint)
         }
-        canvas.drawArc(ringBounds, 0f, 360f, false, trackPaint)
-        if (level > 0f) canvas.drawArc(ringBounds, -90f, 360f * level, false, fillPaint)
-        for (paint in listOf(trackPaint, fillPaint)) paint.style = Paint.Style.FILL
-        val boltWidth = if (charging) boltSize * 0.62f else 0f
-        val textWidth = label?.let(labelPaint::measureText) ?: 0f
-        val spacing = if (charging && label != null) boltGap else 0f
-        drawMarker(canvas, (width - boltWidth - spacing - textWidth) / 2f, boltWidth, spacing)
     }
 
     /** A lightning bolt, [width] wide, centred on the line. */
@@ -236,9 +175,9 @@ class BatteryBar(context: Context) : View(context) {
     /** A rounded stretch of line, centred vertically. */
     private fun segment(canvas: Canvas, from: Float, to: Float, paint: Paint) {
         if (to <= from) return
-        val top = (height - lineWidth) / 2f
-        val radius = lineWidth / 2f
-        canvas.drawRoundRect(from, top, maxOf(to, from + lineWidth), top + lineWidth, radius, radius, paint)
+        val top = (height - thickness) / 2f
+        val radius = thickness / 2f
+        canvas.drawRoundRect(from, top, maxOf(to, from + thickness), top + thickness, radius, radius, paint)
     }
 
     override fun onVisibilityAggregated(isVisible: Boolean) {
@@ -264,14 +203,5 @@ class BatteryBar(context: Context) : View(context) {
             boltPaint.alpha = 255
             invalidate()
         }
-    }
-
-    private companion object {
-        /** Charging: one breath in or out. Full on the charger: slower still, in green. */
-        const val BREATH_MS = 1400
-        const val SLOW_MS = 2400
-
-        /** About 16 steps a second: smooth enough for a slow fade. */
-        const val FRAME_MS = 60L
     }
 }

@@ -89,9 +89,9 @@ class Prefs(context: Context) {
         }
         set(value) = prefs.edit().putInt(KEY_STATUS_BAR, value.ordinal).apply()
 
-    // The clock and the battery under it, on the home screen and the bedside clock.
+    // The clock and the battery with it, on the home screen and the bedside clock.
     var clockDesign: ClockDesign
-        get() = choice(KEY_CLOCK_DESIGN, ClockDesign.LINE)
+        get() = choice(KEY_CLOCK_DESIGN, ClockDesign.DIGITAL)
         set(value) = prefs.edit().putInt(KEY_CLOCK_DESIGN, value.ordinal).apply()
 
     var clockWeight: ClockWeight
@@ -103,17 +103,9 @@ class Prefs(context: Context) {
         get() = choice(KEY_CLOCK_SIZE, SizeStep.DEFAULT)
         set(value) = prefs.edit().putInt(KEY_CLOCK_SIZE, value.ordinal).apply()
 
-    var batteryDesign: BatteryDesign
-        get() = choice(KEY_BATTERY_DESIGN, BatteryDesign.LINE)
-        set(value) = prefs.edit().putInt(KEY_BATTERY_DESIGN, value.ordinal).apply()
-
-    var batteryWeight: LineWeight
-        get() = choice(KEY_BATTERY_WEIGHT, LineWeight.MEDIUM)
-        set(value) = prefs.edit().putInt(KEY_BATTERY_WEIGHT, value.ordinal).apply()
-
-    var batterySize: SizeStep
-        get() = choice(KEY_BATTERY_SIZE, SizeStep.DEFAULT)
-        set(value) = prefs.edit().putInt(KEY_BATTERY_SIZE, value.ordinal).apply()
+    var datePosition: DatePosition
+        get() = choice(KEY_DATE_POSITION, DatePosition.ABOVE)
+        set(value) = prefs.edit().putInt(KEY_DATE_POSITION, value.ordinal).apply()
 
     /** One of [default]'s values, stored by position; the default when unset or out of range. */
     private inline fun <reified T : Enum<T>> choice(key: String, default: T): T =
@@ -210,12 +202,11 @@ class Prefs(context: Context) {
         const val KEY_NOTIFICATION_DOTS = "notification_dots"
         const val KEY_LOCK_SCREEN_GLYPHS = "lock_screen_glyphs"
         const val KEY_PAUSE_APPS = "pause_apps"
-        const val KEY_CLOCK_DESIGN = "clock_design"
+        // Not "clock_design": that held three designs, of which two are gone.
+        const val KEY_CLOCK_DESIGN = "clock_layout"
         const val KEY_CLOCK_WEIGHT = "clock_weight"
         const val KEY_CLOCK_SIZE = "clock_size"
-        const val KEY_BATTERY_DESIGN = "battery_design"
-        const val KEY_BATTERY_WEIGHT = "battery_weight"
-        const val KEY_BATTERY_SIZE = "battery_size"
+        const val KEY_DATE_POSITION = "date_position"
         const val KEY_SWIPE_LEFT = "swipe_left_app"
         const val KEY_SWIPE_RIGHT = "swipe_right_app"
     }

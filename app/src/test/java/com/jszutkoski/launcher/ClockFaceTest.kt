@@ -2,6 +2,7 @@ package com.jszutkoski.launcher
 
 import android.view.View
 import android.view.View.MeasureSpec
+import android.widget.LinearLayout
 import android.widget.TextView
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -11,7 +12,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.GraphicsMode
 
-/** The clock widget in each design, measured with real text as on a phone. */
+/** The clock block in each design, measured with real text as on a phone. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class ClockFaceTest {
@@ -23,56 +24,64 @@ class ClockFaceTest {
         face.apply(
             look,
             digitsSp = 100f,
-            analogDp = 170f,
+            analogDp = 220f,
             labelSp = 13f,
             gravity = 0,
             maxWidth = maxWidth,
             date = date,
             dateGap = 20,
-            batteryGap = 26,
+            gap = 26,
         )
         face.measure(MeasureSpec.makeMeasureSpec(2000, MeasureSpec.AT_MOST), MeasureSpec.makeMeasureSpec(4000, MeasureSpec.AT_MOST))
     }
 
+    private val View.margins get() = layoutParams as LinearLayout.LayoutParams
+
     @Test
-    fun stackedPutsTheHoursOverTheMinutes() {
-        show(ClockLook(design = ClockDesign.STACKED))
-        assertEquals(View.GONE, face.digital.visibility)
-        assertEquals(View.VISIBLE, face.stack.visibility)
-        // Two rows of digits, closer together than two plain lines of text would be.
-        val rows = face.stack.measuredHeight
-        val line = (face.stack.getChildAt(0) as TextView).measuredHeight
-        assertTrue("$rows vs $line", rows < 2 * line)
+    fun digitalHasTheBatteryLineAsWideAsTheTime() {
+        show(ClockLook(design = ClockDesign.DIGITAL))
+        assertEquals(View.VISIBLE, face.battery.visibility)
+        assertEquals(View.GONE, face.analog.visibility)
+        assertEquals(face.digital.measuredWidth, face.battery.measuredWidth)
     }
 
     @Test
-    fun analogShowsTheFaceInsteadOfDigits() {
+    fun analogCarriesItsOwnBattery() {
         show(ClockLook(design = ClockDesign.ANALOG))
         assertEquals(View.GONE, face.digital.visibility)
-        assertEquals(View.VISIBLE, face.analog.visibility)
+        assertEquals(View.GONE, face.battery.visibility)
         assertEquals(face.analog.measuredWidth, face.analog.measuredHeight)
     }
 
     @Test
-    fun aRingIsRoundAndTheLineAsWideAsTheTime() {
-        show(ClockLook(battery = BatteryDesign.RING))
-        assertEquals(face.battery.measuredWidth, face.battery.measuredHeight)
-        show(ClockLook(battery = BatteryDesign.LINE))
-        assertEquals(face.digital.measuredWidth, face.battery.measuredWidth)
+    fun theDateAboveOrBelowMovesTheSpacing() {
+        show(ClockLook(date = DatePosition.ABOVE))
+        assertEquals(0, face.battery.margins.bottomMargin)
+        show(ClockLook(date = DatePosition.BELOW))
+        assertTrue(face.battery.margins.bottomMargin != 0)
+        assertEquals(0, face.digital.margins.topMargin)
+        show(ClockLook(date = DatePosition.HIDDEN))
+        assertEquals(0, face.battery.margins.bottomMargin)
+        assertEquals(0, face.digital.margins.topMargin)
     }
 
     @Test
     fun aClockTooWideForTheScreenShrinksToFit() {
         show(ClockLook(weight = ClockWeight.BOLD, size = SizeStep.LARGE), maxWidth = 300)
         assertTrue("${face.digital.measuredWidth}", face.digital.measuredWidth <= 300)
+        show(ClockLook(design = ClockDesign.ANALOG, size = SizeStep.LARGE), maxWidth = 300)
+        assertEquals(300, face.analog.measuredWidth)
     }
 
     @Test
-    fun thickerChoicesDrawThicker() {
-        show(ClockLook(batteryWeight = LineWeight.FINE))
-        val fine = face.battery.lineWidth
-        show(ClockLook(batteryWeight = LineWeight.THICK))
-        assertTrue(face.battery.lineWidth > fine)
-        assertTrue(AnalogClock.strokeDp(ClockWeight.BOLD.weight) > AnalogClock.strokeDp(ClockWeight.THIN.weight))
+    fun thicknessIsForTheWholeBlock() {
+        show(ClockLook(weight = ClockWeight.ULTRA_THIN))
+        val thin = face.battery.thickness
+        show(ClockLook(weight = ClockWeight.BOLD))
+        assertTrue(face.battery.thickness > thin)
+        show(ClockLook(design = ClockDesign.ANALOG, weight = ClockWeight.ULTRA_THIN))
+        val hands = face.analog.stroke
+        show(ClockLook(design = ClockDesign.ANALOG, weight = ClockWeight.BOLD))
+        assertTrue(face.analog.stroke > hands)
     }
 }

@@ -15,7 +15,7 @@ import java.util.Locale
 import kotlin.random.Random
 
 /**
- * A bedside clock: date, time, battery and weather, dimmed on black. The group drifts
+ * A bedside clock: time, battery, date and weather, dimmed on black. The group drifts
  * to a new spot every minute so no pixel stays lit in the same place. A tap calls [onExit].
  */
 class StandbyView(context: Context, private val onExit: () -> Unit) : FrameLayout(context) {
@@ -72,14 +72,18 @@ class StandbyView(context: Context, private val onExit: () -> Unit) : FrameLayou
     fun setLook(look: ClockLook) = face.apply(
         look,
         digitsSp = 106f,
-        analogDp = 190f,
+        analogDp = 240f,
         labelSp = 13f,
         gravity = Gravity.CENTER_HORIZONTAL,
         maxWidth = resources.displayMetrics.widthPixels - 2 * dp(SIDE_MARGIN_DP),
         date = date,
         dateGap = dp(DATE_GAP_DP),
-        batteryGap = dp(BATTERY_GAP_DP),
-    )
+        gap = dp(BATTERY_GAP_DP),
+    ).also {
+        content.removeView(date)
+        content.addView(date, content.indexOfChild(face) + if (look.date == DatePosition.ABOVE) 0 else 1)
+        date.visibility = if (look.date == DatePosition.HIDDEN) GONE else VISIBLE
+    }
 
     /** A line glyph for each kind of message waiting; the row goes when there is nothing. */
     fun showWaiting(whatsApp: Boolean, email: Boolean) {
@@ -98,7 +102,7 @@ class StandbyView(context: Context, private val onExit: () -> Unit) : FrameLayou
         visibility = GONE
     }
 
-    fun updateBattery(fraction: Float, charging: Boolean, low: Boolean) = face.battery.update(fraction, charging, low)
+    fun updateBattery(state: BatteryState) = face.showBattery(state, number = false)
 
     /** "18° Drizzle" under the date, or nothing. */
     fun showWeather(label: String?) {

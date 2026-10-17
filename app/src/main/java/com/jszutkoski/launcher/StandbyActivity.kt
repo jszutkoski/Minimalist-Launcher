@@ -263,7 +263,7 @@ open class StandbyActivity : Activity() {
     private fun updateBattery(intent: Intent) {
         val battery = BatteryState.from(intent) ?: return
         charging = battery.charging
-        view.updateBattery(battery.fraction, battery.charging, battery.low)
+        view.updateBattery(battery)
         keepScreenOn()
     }
 

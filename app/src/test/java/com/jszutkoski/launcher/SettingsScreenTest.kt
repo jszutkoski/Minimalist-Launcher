@@ -97,15 +97,13 @@ class SettingsScreenTest {
     }
 
     @Test
-    fun theClockGoesRoundItsDesigns() {
+    fun theClockIsDigitalOrAnalog() {
         val activity = controller.get()
         activity.tap(R.string.page_clock)
         activity.tap(R.string.clock_design)
-        assertEquals(ClockDesign.STACKED, Prefs(activity).clockDesign)
-        activity.tap(R.string.clock_design)
         assertEquals(ClockDesign.ANALOG, Prefs(activity).clockDesign)
         activity.tap(R.string.clock_design)
-        assertEquals(ClockDesign.LINE, Prefs(activity).clockDesign)
+        assertEquals(ClockDesign.DIGITAL, Prefs(activity).clockDesign)
     }
 
     @Test
@@ -116,18 +114,19 @@ class SettingsScreenTest {
         val before = previewHeight()
         activity.tap(R.string.clock_size)
         activity.tap(R.string.clock_design)
-        activity.tap(R.string.battery_design)
+        activity.tap(R.string.date_position)
         assertEquals(before, previewHeight())
     }
 
     @Test
-    fun theBatteryCanBeARingOfAnyThickness() {
+    fun theDateGoesAboveBelowOrNowhere() {
         val activity = controller.get()
+        assertEquals(DatePosition.ABOVE, Prefs(activity).datePosition)
         activity.tap(R.string.page_clock)
-        activity.tap(R.string.battery_design)
-        activity.tap(R.string.battery_weight)
-        assertEquals(BatteryDesign.RING, Prefs(activity).batteryDesign)
-        assertEquals(LineWeight.THICK, Prefs(activity).batteryWeight)
+        activity.tap(R.string.date_position)
+        assertEquals(DatePosition.BELOW, Prefs(activity).datePosition)
+        activity.tap(R.string.date_position)
+        assertEquals(DatePosition.HIDDEN, Prefs(activity).datePosition)
     }
 
     @Test

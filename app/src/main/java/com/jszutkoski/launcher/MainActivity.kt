@@ -38,11 +38,9 @@ import android.widget.TextClock
 import android.widget.TextView
 import android.widget.Toast
 import android.window.OnBackInvokedDispatcher
-import java.text.NumberFormat
 import java.util.Locale
 import java.util.concurrent.Executors
 import kotlin.math.abs
-import kotlin.math.roundToInt
 
 class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
     private lateinit var prefs: Prefs
@@ -206,8 +204,9 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
 
         home = HomeColumn(this)
 
-        // The clock widget, under the date: the time, then the battery, a hairline exactly as
-        // wide as the time with the percentage set into it where the fill ends, or a ring.
+        // The clock widget: the time with the battery, a hairline exactly as wide as the time
+        // with the percentage set into it where the fill ends, or an analog face with the
+        // battery set into it. The date goes above or below it, or nowhere.
         face = ClockFace(this, pressable = true).apply {
             setOnTimeClick { SystemActions.openAlarms(this@MainActivity) }
             battery.setOnClickListener { SystemActions.openBatteryUsage(this@MainActivity) }
@@ -330,17 +329,24 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         stale = false
         val scale = prefs.textSize.scale
         date.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f * scale)
+        val look = ClockLook.from(prefs)
         face.apply(
-            ClockLook.from(prefs),
+            look,
             digitsSp = 100f * scale,
-            analogDp = 170f * scale,
+            analogDp = 220f * scale,
             labelSp = 13f * scale,
             gravity = if (prefs.centerFavorites) Gravity.CENTER_HORIZONTAL else Gravity.START,
             maxWidth = resources.displayMetrics.widthPixels - 2 * dp(SIDE_MARGIN_DP),
             date = date,
             dateGap = dp(DATE_GAP_DP),
-            batteryGap = dp(BATTERY_GAP_DP),
+            gap = dp(BATTERY_GAP_DP),
         )
+        // The date's row above the clock or below it; hidden, only the next alarm stays there.
+        val rowParams = dateRow.layoutParams
+        home.removeView(dateRow)
+        home.addView(dateRow, home.indexOfChild(face) + if (look.date == DatePosition.ABOVE) 0 else 1, rowParams)
+        date.visibility = if (look.date == DatePosition.HIDDEN) View.GONE else View.VISIBLE
+        updateAlarm()
         alarmDot.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f * scale)
         alarmText.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f * scale)
         pause.setTextScale(scale)
@@ -360,10 +366,7 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
 
     private fun updateBattery(intent: Intent) {
         val battery = BatteryState.from(intent) ?: return
-        face.battery.update(battery.fraction, battery.charging, battery.low)
-        // Just the number: set into the battery line or ring, it needs no percent sign.
-        face.battery.label = NumberFormat.getIntegerInstance().format((battery.fraction * 100).roundToInt())
-        face.battery.contentDescription = NumberFormat.getPercentInstance().format(battery.fraction.toDouble())
+        face.showBattery(battery, number = true)
         if (battery.charging != charging) {
             charging = battery.charging
             scheduleStandby()
@@ -552,7 +555,8 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         root.removeCallbacks(alarmRefresh)
         val next = getSystemService(AlarmManager::class.java)?.nextAlarmClock?.triggerTime
         val visible = if (next != null) View.VISIBLE else View.GONE
-        alarmDot.visibility = visible
+        // The dot only parts the alarm from a date beside it.
+        alarmDot.visibility = if (date.visibility == View.VISIBLE) visible else View.GONE
         alarmText.visibility = visible
         if (next == null) return
         val untilWithinDay = next - System.currentTimeMillis() - DAY_MS

@@ -18,10 +18,8 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.window.OnBackInvokedCallback
 import android.window.OnBackInvokedDispatcher
-import java.text.NumberFormat
 import java.util.Date
 import java.util.Locale
-import kotlin.math.roundToInt
 
 class SettingsActivity : Activity() {
     private lateinit var prefs: Prefs
@@ -193,20 +191,13 @@ class SettingsActivity : Activity() {
 
     /**
      * A live preview on top, then each choice, going round its values on every tap. The preview
-     * keeps the height of the tallest clock and battery there are, so the rows never move.
+     * keeps the height of the tallest clock there is, with the date, so the rows never move.
      */
     private fun renderClock() {
         val look = ClockLook.from(prefs)
         val tallest = ClockDesign.entries.flatMap { design ->
-            BatteryDesign.entries.map { battery ->
-                look.copy(
-                    design = design,
-                    weight = ClockWeight.BOLD,
-                    size = SizeStep.entries.last(),
-                    battery = battery,
-                    batteryWeight = LineWeight.entries.last(),
-                    batterySize = SizeStep.entries.last(),
-                )
+            listOf(DatePosition.ABOVE, DatePosition.BELOW).map { date ->
+                look.copy(design = design, weight = ClockWeight.BOLD, size = SizeStep.entries.last(), date = date)
             }
         }.maxOf { candidate ->
             preview(candidate).run {
@@ -231,11 +222,7 @@ class SettingsActivity : Activity() {
             valueFace = ClockFont.at(this, look.weight.weight),
         ) { prefs.clockWeight = next(look.weight) }
         row(getString(R.string.clock_size), getString(look.size.label)) { prefs.clockSize = next(look.size) }
-        row(getString(R.string.battery_design), getString(look.battery.label)) { prefs.batteryDesign = next(look.battery) }
-        row(getString(R.string.battery_weight), getString(look.batteryWeight.label)) {
-            prefs.batteryWeight = next(look.batteryWeight)
-        }
-        row(getString(R.string.battery_size), getString(look.batterySize.label)) { prefs.batterySize = next(look.batterySize) }
+        row(getString(R.string.date_position), getString(look.date.label)) { prefs.datePosition = next(look.date) }
         content.addView(
             text(getString(R.string.clock_help), 14f, Palette.TERTIARY, 400).apply {
                 isSingleLine = false
@@ -259,29 +246,28 @@ class SettingsActivity : Activity() {
         face.apply(
             look,
             digitsSp = 100f * scale,
-            analogDp = 170f * scale,
+            analogDp = 220f * scale,
             labelSp = 13f * scale,
             gravity = Gravity.START,
             maxWidth = previewWidth,
             date = date,
             dateGap = dp(DATE_GAP_DP),
-            batteryGap = dp(BATTERY_GAP_DP),
+            gap = dp(BATTERY_GAP_DP),
         )
         // The battery as it is now: a sticky broadcast answers at once, with no receiver kept.
-        if (showBattery) {
-            registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))?.let(BatteryState::from)?.let { battery ->
-                face.battery.update(battery.fraction, battery.charging, battery.low)
-                face.battery.label = NumberFormat.getIntegerInstance().format((battery.fraction * 100).roundToInt())
-            }
+        val battery = if (showBattery) {
+            registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))?.let(BatteryState::from)
         } else {
-            // Room for the number, as the real one will have.
-            face.battery.label = "100"
+            null
         }
+        // Room for the number anyway, as the real one will have.
+        face.showBattery(battery ?: BatteryState(1f, charging = false), number = true)
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             val wrap = ViewGroup.LayoutParams.WRAP_CONTENT
-            addView(date, LinearLayout.LayoutParams(wrap, wrap))
+            if (look.date == DatePosition.ABOVE) addView(date, LinearLayout.LayoutParams(wrap, wrap))
             addView(face, LinearLayout.LayoutParams(wrap, wrap))
+            if (look.date == DatePosition.BELOW) addView(date, LinearLayout.LayoutParams(wrap, wrap))
         }
     }
 

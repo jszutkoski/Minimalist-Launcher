@@ -5,7 +5,9 @@ import android.content.res.ColorStateList
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Rect
+import android.graphics.RectF
 import android.graphics.Typeface
+import android.os.SystemClock
 import android.text.format.DateFormat
 import android.util.TypedValue
 import android.view.View
@@ -13,30 +15,33 @@ import android.view.ViewGroup
 import android.widget.LinearLayout
 import android.widget.TextClock
 import android.widget.TextView
+import java.text.NumberFormat
 import java.util.Calendar
 import kotlin.math.cos
 import kotlin.math.roundToInt
 import kotlin.math.sin
 
-/** From the date's baseline to the top of the clock's digits under it. */
+/** From the date's baseline to the top of the clock under it. */
 const val DATE_GAP_DP = 20
 
-/** From the clock's baseline to the battery line's centre. */
+/** From the clock's baseline to the battery line's centre, and from there to the date below. */
 const val BATTERY_GAP_DP = 26
 
 enum class ClockDesign(val label: Int) {
-    LINE(R.string.clock_line),
-    STACKED(R.string.clock_stacked),
+    /** The time on one line, the battery as a line under it. */
+    DIGITAL(R.string.clock_digital),
+
+    /** A face with hands, the battery as an arc along its right-hand edge. */
     ANALOG(R.string.clock_analog),
 }
 
-/** How heavy the digits are, or the hands of the analog clock. */
-enum class ClockWeight(val label: Int, val weight: Int) {
-    ULTRA_THIN(R.string.weight_ultra_thin, 100),
-    THIN(R.string.weight_thin, 200),
-    LIGHT(R.string.weight_light, 300),
-    MEDIUM(R.string.weight_medium, 500),
-    BOLD(R.string.weight_bold, 700),
+/** How heavy the clock is drawn: the digits and the battery line, or the hands and marks. */
+enum class ClockWeight(val label: Int, val weight: Int, val lineDp: Float) {
+    ULTRA_THIN(R.string.weight_ultra_thin, 100, 2f),
+    THIN(R.string.weight_thin, 200, 3f),
+    LIGHT(R.string.weight_light, 300, 3.5f),
+    MEDIUM(R.string.weight_medium, 500, 4.5f),
+    BOLD(R.string.weight_bold, 700, 6f),
 }
 
 enum class SizeStep(val label: Int, val scale: Float) {
@@ -45,36 +50,21 @@ enum class SizeStep(val label: Int, val scale: Float) {
     LARGE(R.string.text_large, 1.2f),
 }
 
-enum class BatteryDesign(val label: Int) {
-    LINE(R.string.battery_line),
-    RING(R.string.battery_ring),
+enum class DatePosition(val label: Int) {
+    ABOVE(R.string.date_above),
+    BELOW(R.string.date_below),
+    HIDDEN(R.string.date_hidden),
 }
 
-/** How thick the battery's line or ring is drawn. */
-enum class LineWeight(val label: Int, val dp: Float) {
-    FINE(R.string.line_fine, 2f),
-    MEDIUM(R.string.line_medium, 3f),
-    THICK(R.string.line_thick, 5f),
-}
-
-/** The clock and battery as chosen in settings, shared by the home screen and the bedside clock. */
+/** The clock as chosen in settings, shared by the home screen and the bedside clock. */
 data class ClockLook(
-    val design: ClockDesign = ClockDesign.LINE,
+    val design: ClockDesign = ClockDesign.DIGITAL,
     val weight: ClockWeight = ClockWeight.THIN,
     val size: SizeStep = SizeStep.DEFAULT,
-    val battery: BatteryDesign = BatteryDesign.LINE,
-    val batteryWeight: LineWeight = LineWeight.MEDIUM,
-    val batterySize: SizeStep = SizeStep.DEFAULT,
+    val date: DatePosition = DatePosition.ABOVE,
 ) {
     companion object {
-        fun from(prefs: Prefs) = ClockLook(
-            prefs.clockDesign,
-            prefs.clockWeight,
-            prefs.clockSize,
-            prefs.batteryDesign,
-            prefs.batteryWeight,
-            prefs.batterySize,
-        )
+        fun from(prefs: Prefs) = ClockLook(prefs.clockDesign, prefs.clockWeight, prefs.clockSize, prefs.datePosition)
     }
 }
 
@@ -98,57 +88,50 @@ object ClockFont {
 }
 
 /**
- * The time and the battery under it, in the chosen design: digits on one line, hours over
- * minutes, or an analog face; then the battery as a line as wide as the time, or a ring. The
- * date sits just above, outside it.
+ * The time and the battery as one block, in the chosen design: digits with the battery line
+ * under them, exactly as wide as the time, or an analog face with the battery set into it.
+ * The date sits outside it, above or below, and is spaced from the glyphs.
  */
 class ClockFace(context: Context, pressable: Boolean) : LinearLayout(context) {
-    private val color = if (pressable) pressable(Palette.TEXT) else ColorStateList.valueOf(Palette.TEXT)
-    val digital = digits(context, "h:mm", "HH:mm")
-
-    /** Hours over minutes: two lines of their own, so each is spaced from its own glyphs. */
-    val stack = LinearLayout(context).apply {
-        orientation = VERTICAL
-        visibility = GONE
+    val digital = TextClock(context).apply {
+        format12Hour = "h:mm"
+        format24Hour = "HH:mm"
+        includeFontPadding = false
+        isSingleLine = true
+        setTextColor(if (pressable) pressable(Palette.TEXT) else ColorStateList.valueOf(Palette.TEXT))
     }
-    private val hours = digits(context, "hh", "HH").apply { isDuplicateParentStateEnabled = true }
-    private val minutes = digits(context, "mm", "mm").apply { isDuplicateParentStateEnabled = true }
-    val analog = AnalogClock(context, pressable).apply { visibility = GONE }
 
     // Room for the charging bolt from the start, so plugging in never shifts the clock.
     val battery = BatteryBar(context).apply { roomForMarker = true }
+    val analog = AnalogClock(context, pressable).apply { visibility = GONE }
 
     init {
         orientation = VERTICAL
         val wrap = ViewGroup.LayoutParams.WRAP_CONTENT
         addView(digital, LayoutParams(wrap, wrap))
-        stack.addView(hours, LayoutParams(wrap, wrap))
-        stack.addView(minutes, LayoutParams(wrap, wrap))
-        addView(stack, LayoutParams(wrap, wrap))
-        addView(analog, LayoutParams(wrap, wrap))
         addView(battery, LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, wrap))
-    }
-
-    private fun digits(context: Context, format12: String, format24: String) = TextClock(context).apply {
-        format12Hour = format12
-        format24Hour = format24
-        includeFontPadding = false
-        isSingleLine = true
-        setTextColor(color)
+        addView(analog, LayoutParams(wrap, wrap))
     }
 
     fun setOnTimeClick(action: () -> Unit) {
         digital.setOnClickListener { action() }
-        stack.setOnClickListener { action() }
         analog.setOnClickListener { action() }
     }
 
+    /** The charge in both designs; [number] sets the percentage into the line as well. */
+    fun showBattery(state: BatteryState, number: Boolean) {
+        battery.update(state.fraction, state.charging, state.low)
+        // Just the number: set into the battery line, it needs no percent sign.
+        battery.label = if (number) NumberFormat.getIntegerInstance().format((state.fraction * 100).roundToInt()) else null
+        battery.contentDescription = NumberFormat.getPercentInstance().format(state.fraction.toDouble())
+        analog.updateBattery(state.fraction, state.charging, state.low)
+    }
+
     /**
-     * Shows [look] with the digits at [digitsSp] (the analog face as tall as [analogDp]) and
-     * the battery's number at [labelSp], lined up by [gravity], never wider than [maxWidth]
-     * pixels. The clock's top hangs [dateGap] pixels under the baseline of the [date] above it,
-     * and the battery sits [batteryGap] pixels under the clock: both measured from the glyphs,
-     * not the text boxes, whose built-in ascent and descent would otherwise skew the spacing.
+     * Shows [look] with the digits at [digitsSp] (the analog face [analogDp] across) and the
+     * battery's number at [labelSp], lined up by [gravity], never wider than [maxWidth] pixels.
+     * Above the clock, the [date]'s baseline sits [dateGap] pixels over the clock's top; below,
+     * the battery line sits midway, [gap] pixels from the digits and from the date.
      */
     fun apply(
         look: ClockLook,
@@ -159,111 +142,86 @@ class ClockFace(context: Context, pressable: Boolean) : LinearLayout(context) {
         maxWidth: Int,
         date: TextView,
         dateGap: Int,
-        batteryGap: Int,
+        gap: Int,
     ) {
-        val face = ClockFont.at(context, look.weight.weight)
-        digital.visibility = if (look.design == ClockDesign.LINE) VISIBLE else GONE
-        stack.visibility = if (look.design == ClockDesign.STACKED) VISIBLE else GONE
-        analog.visibility = if (look.design == ClockDesign.ANALOG) VISIBLE else GONE
-        val sizeSp = digitsSp * look.size.scale
-        // The view that starts the clock, the one whose glyphs are its top, and its last line.
-        val (first, top, last) = when (look.design) {
-            ClockDesign.LINE -> {
-                showDigits(digital, face, sizeSp, "00:00", maxWidth)
-                Triple(digital, digital, digital)
-            }
-            ClockDesign.STACKED -> {
-                showDigits(hours, face, sizeSp, "00", maxWidth)
-                showDigits(minutes, face, sizeSp, "00", maxWidth)
-                // The minutes' digits an eighth of their height under the hours', not a whole
-                // line's worth of empty ascent and descent.
-                val natural = hours.paint.fontMetrics.descent + glyphInset(minutes)
-                (minutes.layoutParams as LayoutParams).topMargin = (digitHeight(hours) * STACKED_GAP - natural).roundToInt()
-                Triple(stack, hours, minutes)
-            }
-            ClockDesign.ANALOG -> {
-                analog.diameter = minOf(context.dp(analogDp * look.size.scale).roundToInt(), maxWidth)
-                analog.stroke = context.dp(AnalogClock.strokeDp(look.weight.weight))
-                Triple(analog, analog, analog)
+        val digits = look.design == ClockDesign.DIGITAL
+        digital.visibility = if (digits) VISIBLE else GONE
+        battery.visibility = if (digits) VISIBLE else GONE
+        analog.visibility = if (digits) GONE else VISIBLE
+        for (view in listOf(digital, battery, analog)) {
+            (view.layoutParams as LayoutParams).apply {
+                this.gravity = gravity
+                topMargin = 0
+                bottomMargin = 0
             }
         }
-        for (view in listOf(digital, stack, hours, minutes, analog)) (view.layoutParams as LayoutParams).gravity = gravity
-
-        // Under the date: from its baseline, past its descent and padding, to the clock's glyphs.
+        // From the date's baseline, past its descent and padding, to the top of the box under it.
         val underDate = date.paint.fontMetrics.descent + date.paddingBottom
-        for (view in listOf(digital, stack, analog)) (view.layoutParams as LayoutParams).topMargin = 0
-        (first.layoutParams as LayoutParams).topMargin = (dateGap - underDate - glyphInset(top)).roundToInt()
-
-        battery.design = look.battery
-        battery.lineWidth = context.dp(look.batteryWeight.dp * if (look.battery == BatteryDesign.RING) RING_STROKE else 1f)
-        val wrap = ViewGroup.LayoutParams.WRAP_CONTENT
-        (battery.layoutParams as LayoutParams).apply {
-            width = if (look.battery == BatteryDesign.RING) wrap else ViewGroup.LayoutParams.MATCH_PARENT
-            this.gravity = gravity
-        }
-        if (look.battery == BatteryDesign.RING) {
-            val ring = context.dp(RING_DP * labelSp / LABEL_SP * look.batterySize.scale).roundToInt()
-            battery.ringDiameter = ring
-            battery.setLabelSizePx(ring * RING_LABEL)
+        if (digits) {
+            showDigits(look, digitsSp, maxWidth)
+            battery.thickness = context.dp(look.weight.lineDp)
+            battery.setLabelSize(labelSp * look.size.scale)
+            val half = battery.preferredHeight / 2
+            // The line's centre [gap] under the digits' baseline, not under their descent.
+            (digital.layoutParams as LayoutParams).bottomMargin =
+                -(digital.paint.fontMetrics.descent + digital.paddingBottom).roundToInt()
+            (battery.layoutParams as LayoutParams).topMargin = gap - half
+            when (look.date) {
+                DatePosition.ABOVE -> (digital.layoutParams as LayoutParams).topMargin =
+                    (dateGap - underDate - glyphInset(digital)).roundToInt()
+                DatePosition.BELOW -> (battery.layoutParams as LayoutParams).bottomMargin =
+                    (gap - half - capInset(date)).roundToInt()
+                DatePosition.HIDDEN -> Unit
+            }
         } else {
-            battery.setLabelSize(labelSp * look.batterySize.scale)
-        }
-        // The last line's descent taken away, so the gap starts at the digits' baseline.
-        (last.layoutParams as LayoutParams).bottomMargin =
-            if (last is TextView) -(last.paint.fontMetrics.descent + last.paddingBottom).roundToInt() else 0
-        // The line's centre [batteryGap] under the digits; a ring's top a little nearer.
-        (battery.layoutParams as LayoutParams).topMargin = if (look.battery == BatteryDesign.RING) {
-            (batteryGap * RING_GAP).roundToInt()
-        } else {
-            batteryGap - battery.preferredHeight / 2
+            // The line's widened touch area must not linger over the face once the line is gone.
+            touchDelegate = null
+            analog.diameter = minOf(context.dp(analogDp * look.size.scale).roundToInt(), maxWidth)
+            analog.weight = look.weight.weight
+            when (look.date) {
+                DatePosition.ABOVE -> (analog.layoutParams as LayoutParams).topMargin = (dateGap - underDate).roundToInt()
+                DatePosition.BELOW -> (analog.layoutParams as LayoutParams).bottomMargin = (gap - capInset(date)).roundToInt()
+                DatePosition.HIDDEN -> Unit
+            }
         }
         requestLayout()
     }
 
-    /** From the top of [view]'s box to the top of its digits; nothing for the analog face. */
-    private fun glyphInset(view: View): Float {
-        if (view !is TextView) return 0f
-        val boxTop = if (view.includeFontPadding) view.paint.fontMetrics.top else view.paint.fontMetrics.ascent
-        return view.paddingTop + (-digitHeight(view) - boxTop)
+    /** The digits in the chosen weight and size, or smaller when they would not fit in [maxWidth]. */
+    private fun showDigits(look: ClockLook, digitsSp: Float, maxWidth: Int) {
+        digital.typeface = ClockFont.at(context, look.weight.weight)
+        digital.letterSpacing = -0.02f
+        digital.setTextSize(TypedValue.COMPLEX_UNIT_SP, digitsSp * look.size.scale)
+        val width = digital.paint.measureText(WIDEST_TIME) * FIT_MARGIN + digital.paddingLeft + digital.paddingRight
+        if (maxWidth > 0 && width > maxWidth) digital.setTextSize(TypedValue.COMPLEX_UNIT_PX, digital.textSize * maxWidth / width)
     }
 
-    /** How tall [view]'s digits stand above the baseline. */
-    private fun digitHeight(view: TextView) = -Rect().also { view.paint.getTextBounds("0", 0, 1, it) }.top.toFloat()
+    /** From the top of [view]'s box to the top of its digits. */
+    private fun glyphInset(view: TextView) = view.paddingTop + (glyphTop(view, "0") - boxTop(view))
 
-    /** [view]'s digits in [face] at [sizeSp], or smaller when [widest] would not fit in [maxWidth]. */
-    private fun showDigits(view: TextView, face: Typeface, sizeSp: Float, widest: String, maxWidth: Int) {
-        view.typeface = face
-        view.letterSpacing = -0.02f
-        view.setTextSize(TypedValue.COMPLEX_UNIT_SP, sizeSp)
-        val width = view.paint.measureText(widest) * FIT_MARGIN + view.paddingLeft + view.paddingRight
-        if (maxWidth > 0 && width > maxWidth) view.setTextSize(TypedValue.COMPLEX_UNIT_PX, view.textSize * maxWidth / width)
-    }
+    /** From the top of [view]'s box to the top of its capitals. */
+    private fun capInset(view: TextView) = view.paddingTop + (glyphTop(view, "H") - boxTop(view))
+
+    private fun boxTop(view: TextView) =
+        if (view.includeFontPadding) view.paint.fontMetrics.top else view.paint.fontMetrics.ascent
+
+    private fun glyphTop(view: TextView, glyph: String) =
+        Rect().also { view.paint.getTextBounds(glyph, 0, glyph.length, it) }.top.toFloat()
 
     private companion object {
-        /** A little room to spare, for digits that are not quite all one width. */
+        /** Digits are all one width in the clock's font, so any four stand for every time of day. */
+        const val WIDEST_TIME = "00:00"
+
+        /** A little room to spare. */
         const val FIT_MARGIN = 1.04f
-
-        /** Between the hours and the minutes, against the digits' height. */
-        const val STACKED_GAP = 0.12f
-
-        /** The ring at the default text size; it grows with the battery's number. */
-        const val RING_DP = 50f
-        const val LABEL_SP = 13f * 1.1f
-
-        /** A ring's top is nearer the digits than a line's centre would be. */
-        const val RING_GAP = 0.7f
-
-        /** The ring's stroke is drawn a little heavier than the line's, as it is shorter. */
-        const val RING_STROKE = 1.3f
-
-        /** The number inside, against the ring's diameter. */
-        const val RING_LABEL = 0.3f
     }
 }
 
 /**
- * A plain analog face: a faint ring, twelve marks and two hands, redrawn on the minute.
- * The [stroke] follows the chosen weight.
+ * An analog face: a dark dial, the 12, 3, 6 and 9, a mark for every hour and minute, three
+ * hands, and the battery as a segmented arc along the right-hand edge with its icon and
+ * percentage beside the 3. The battery is green when full on the charger, red when low, and
+ * breathes while charging, as the battery line does.
  */
 class AnalogClock(context: Context, private val pressable: Boolean) : View(context) {
     var diameter = context.dp(180)
@@ -274,63 +232,164 @@ class AnalogClock(context: Context, private val pressable: Boolean) : View(conte
             invalidate()
         }
 
-    var stroke = context.dp(2f)
+    /** The font weight chosen: the hands, marks and numbers follow it. */
+    var weight = 200
         set(value) {
+            if (field == value) return
             field = value
+            numberPaint.typeface = ClockFont.at(context, value)
             invalidate()
         }
 
-    private val dialPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.STROKE
-        color = Palette.TRACK
+    private val dialPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Palette.SURFACE }
+    private val markPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { strokeCap = Paint.Cap.ROUND }
+    private val handPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { strokeCap = Paint.Cap.ROUND }
+    private val iconPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val numberPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        textAlign = Paint.Align.CENTER
+        typeface = ClockFont.at(context, 200)
     }
-    private val markPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.STROKE
-        strokeCap = Paint.Cap.ROUND
-        color = Palette.TERTIARY
+    private val arcPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
+    private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val percentPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        textAlign = Paint.Align.CENTER
+        typeface = ClockFont.at(context, 400)
     }
-    private val handPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.STROKE
-        strokeCap = Paint.Cap.ROUND
-    }
-    private val tick = Runnable { onMinute() }
+    private val arcBounds = RectF()
+    private val icon = RectF()
+    private val digitBounds = Rect()
+    private val percent = NumberFormat.getPercentInstance()
+
+    private var level = 1f
+    private var charging = false
+    private var full = false
+    private var low = false
+    private var breathStart = 0L
     private var shown = false
+    private var lastMinute = -1
+    private val frame = Runnable { onFrame() }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) = setMeasuredDimension(diameter, diameter)
+
+    fun updateBattery(level: Float, charging: Boolean, low: Boolean) {
+        this.level = level.coerceIn(0f, 1f)
+        val full = charging && this.level >= 1f
+        if (charging != this.charging || full != this.full) breathStart = SystemClock.uptimeMillis()
+        this.charging = charging
+        this.full = full
+        this.low = low
+        onFrame()
+    }
+
+    /** The minute hand's thickness for a font weight: 1dp at the thinnest, 6dp at bold. */
+    val stroke get() = context.dp(1f + (weight - 100) / 600f * 5f)
 
     override fun onDraw(canvas: Canvas) {
         val cx = width / 2f
         val cy = height / 2f
-        val radius = minOf(cx, cy) - stroke
-        dialPaint.strokeWidth = stroke * 0.6f
-        canvas.drawCircle(cx, cy, radius, dialPaint)
-        markPaint.strokeWidth = stroke * 0.8f
-        for (hour in 0 until 12) {
-            val angle = Math.toRadians(hour * 30.0)
-            // The quarters a little longer, as on a watch.
-            val inner = radius * if (hour % 3 == 0) 0.82f else 0.88f
-            val outer = radius * 0.93f
-            canvas.drawLine(
-                cx + inner * sin(angle).toFloat(),
-                cy - inner * cos(angle).toFloat(),
-                cx + outer * sin(angle).toFloat(),
-                cy - outer * cos(angle).toFloat(),
-                markPaint,
-            )
+        val r = minOf(cx, cy)
+        val s = stroke
+        val ink = if (pressable && isPressed) Palette.SECONDARY else Palette.TEXT
+        canvas.drawCircle(cx, cy, r, dialPaint)
+
+        // Every minute a short faint mark, every hour a long one; none by the 3, where the battery is.
+        for (minute in 0 until 60) {
+            if (minute in 13..17) continue
+            val hour = minute % 5 == 0
+            markPaint.color = if (hour) ink else Palette.TERTIARY
+            markPaint.strokeWidth = if (hour) s * 0.7f else s * 0.4f
+            radial(canvas, cx, cy, minute * 6.0, r * if (hour) 0.72f else 0.83f, r * 0.87f, markPaint)
         }
-        val now = Calendar.getInstance()
-        val minutes = now.get(Calendar.MINUTE)
-        val hours = now.get(Calendar.HOUR) + minutes / 60f
-        handPaint.color = if (pressable && isPressed) Palette.SECONDARY else Palette.TEXT
-        handPaint.strokeWidth = stroke * 1.4f
-        hand(canvas, cx, cy, hours * 30.0, radius * 0.5f)
-        handPaint.strokeWidth = stroke
-        hand(canvas, cx, cy, minutes * 6.0, radius * 0.76f)
+        numberPaint.textSize = r * 0.2f
+        numberPaint.color = ink
+        for ((hour, label) in listOf(0 to "12", 3 to "3", 6 to "6", 9 to "9")) {
+            val angle = Math.toRadians(hour * 30.0)
+            numberPaint.getTextBounds(label, 0, label.length, digitBounds)
+            val x = cx + r * 0.58f * sin(angle).toFloat()
+            val y = cy - r * 0.58f * cos(angle).toFloat() - digitBounds.exactCenterY()
+            canvas.drawText(label, x, y, numberPaint)
+        }
+        drawBattery(canvas, cx, cy, r, s)
+        drawHands(canvas, cx, cy, r, s, ink)
     }
 
-    private fun hand(canvas: Canvas, cx: Float, cy: Float, degrees: Double, length: Float) {
-        val angle = Math.toRadians(degrees)
-        canvas.drawLine(cx, cy, cx + length * sin(angle).toFloat(), cy - length * cos(angle).toFloat(), handPaint)
+    /** Ten segments from the 1 to the 5, lit from the top down; the icon and number by the 3. */
+    private fun drawBattery(canvas: Canvas, cx: Float, cy: Float, r: Float, s: Float) {
+        val color = when {
+            low -> Palette.LOW
+            full -> Palette.FULL
+            else -> Palette.TEXT
+        }
+        val alpha = if (charging) breathAlpha(breathStart, full) else 255
+        val arcRadius = r * 0.94f
+        arcPaint.strokeWidth = r * 0.025f + s * 0.5f
+        arcBounds.set(cx - arcRadius, cy - arcRadius, cx + arcRadius, cy + arcRadius)
+        val segment = ARC_DEGREES / SEGMENTS
+        val lit = level * ARC_DEGREES
+        for (i in 0 until SEGMENTS) {
+            val from = i * segment
+            val to = from + segment - SEGMENT_GAP
+            // Canvas angles start at 3 o'clock; the clock's at 12.
+            arcPaint.color = Palette.TRACK
+            canvas.drawArc(arcBounds, ARC_START - 90f + from, to - from, false, arcPaint)
+            val end = minOf(to, lit)
+            if (end > from) {
+                arcPaint.color = color
+                arcPaint.alpha = alpha
+                canvas.drawArc(arcBounds, ARC_START - 90f + from, end - from, false, arcPaint)
+            }
+        }
+
+        // A small battery filled to the charge, its terminal on the right, and the percentage under it.
+        val w = r * 0.14f
+        val h = r * 0.07f
+        val left = cx + r * 0.75f - w / 2
+        val top = cy - r * 0.04f - h
+        icon.set(left, top, left + w, top + h)
+        iconPaint.color = Palette.SECONDARY
+        iconPaint.style = Paint.Style.STROKE
+        iconPaint.strokeWidth = maxOf(context.dp(1f), s * 0.4f)
+        canvas.drawRoundRect(icon, h * 0.25f, h * 0.25f, iconPaint)
+        iconPaint.style = Paint.Style.FILL
+        canvas.drawRect(icon.right + h * 0.08f, top + h * 0.3f, icon.right + h * 0.22f, top + h * 0.7f, iconPaint)
+        val inset = iconPaint.strokeWidth * 1.5f
+        fillPaint.color = color
+        fillPaint.alpha = alpha
+        if (level > 0f) {
+            val right = icon.left + inset + (icon.width() - 2 * inset) * level
+            canvas.drawRect(icon.left + inset, icon.top + inset, right, icon.bottom - inset, fillPaint)
+        }
+        percentPaint.textSize = r * 0.085f
+        percentPaint.color = if (low || full) color else Palette.SECONDARY
+        percentPaint.alpha = alpha
+        canvas.drawText(percent.format(level.toDouble()), icon.centerX(), cy + r * 0.11f, percentPaint)
+    }
+
+    private fun drawHands(canvas: Canvas, cx: Float, cy: Float, r: Float, s: Float, ink: Int) {
+        val now = Calendar.getInstance()
+        val seconds = now.get(Calendar.SECOND)
+        val minutes = now.get(Calendar.MINUTE) + seconds / 60f
+        val hours = now.get(Calendar.HOUR) + minutes / 60f
+        handPaint.color = ink
+        handPaint.strokeWidth = maxOf(context.dp(2f), s * 1.8f)
+        radial(canvas, cx, cy, hours * 30.0, 0f, r * 0.48f, handPaint)
+        handPaint.strokeWidth = maxOf(context.dp(1.5f), s * 1.3f)
+        radial(canvas, cx, cy, minutes * 6.0, 0f, r * 0.74f, handPaint)
+        handPaint.strokeWidth = maxOf(context.dp(0.8f), s * 0.4f)
+        // The second hand runs a little past the centre, as on a watch.
+        radial(canvas, cx, cy, seconds * 6.0, -r * 0.12f, r * 0.82f, handPaint)
+        fillPaint.alpha = 255
+        fillPaint.color = Palette.TRACK
+        canvas.drawCircle(cx, cy, context.dp(4f) + s, fillPaint)
+        fillPaint.color = Palette.BACKGROUND
+        canvas.drawCircle(cx, cy, context.dp(1f) + s * 0.3f, fillPaint)
+    }
+
+    /** A line along the clock angle [degrees], from [from] to [to] away from the centre. */
+    private fun radial(canvas: Canvas, cx: Float, cy: Float, degrees: Double, from: Float, to: Float, paint: Paint) {
+        val dx = sin(Math.toRadians(degrees)).toFloat()
+        val dy = -cos(Math.toRadians(degrees)).toFloat()
+        canvas.drawLine(cx + from * dx, cy + from * dy, cx + to * dx, cy + to * dy, paint)
     }
 
     override fun drawableStateChanged() {
@@ -338,31 +397,42 @@ class AnalogClock(context: Context, private val pressable: Boolean) : View(conte
         if (pressable) invalidate()
     }
 
-    /** Redrawn, read out to TalkBack, and due again at the start of the next minute. */
-    private fun onMinute() {
-        contentDescription = DateFormat.getTimeFormat(context).format(Calendar.getInstance().time)
+    /**
+     * Redrawn once a second for the second hand, or at the breath's steps while charging, and
+     * only while in sight. TalkBack's reading of the time changes once a minute.
+     */
+    private fun onFrame() {
         invalidate()
-        removeCallbacks(tick)
-        if (shown) postDelayed(tick, MINUTE_MS - System.currentTimeMillis() % MINUTE_MS + 50)
+        removeCallbacks(frame)
+        if (!shown) return
+        val minute = Calendar.getInstance().get(Calendar.MINUTE)
+        if (minute != lastMinute) {
+            lastMinute = minute
+            contentDescription = DateFormat.getTimeFormat(context).format(Calendar.getInstance().time)
+        }
+        val delay = if (charging) BREATH_FRAME_MS else SECOND_MS - System.currentTimeMillis() % SECOND_MS + 5
+        postDelayed(frame, delay)
     }
 
     override fun onVisibilityAggregated(isVisible: Boolean) {
         super.onVisibilityAggregated(isVisible)
         shown = isVisible
-        // Back in sight: the time may have moved on, or been changed, meanwhile.
-        if (isVisible) onMinute() else removeCallbacks(tick)
+        onFrame()
     }
 
     override fun onDetachedFromWindow() {
         shown = false
-        removeCallbacks(tick)
+        removeCallbacks(frame)
         super.onDetachedFromWindow()
     }
 
-    companion object {
-        private const val MINUTE_MS = 60_000L
+    private companion object {
+        const val SECOND_MS = 1000L
 
-        /** The minute hand's thickness for a font weight: 1dp at the thinnest, 6dp at bold. */
-        fun strokeDp(weight: Int) = 1f + (weight - 100) / 600f * 5f
+        /** The battery arc: from the 1 to the 5, in ten segments with a sliver between them. */
+        const val ARC_START = 30f
+        const val ARC_DEGREES = 120f
+        const val SEGMENTS = 10
+        const val SEGMENT_GAP = 1.6f
     }
 }
