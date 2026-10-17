@@ -2,17 +2,12 @@ package com.jszutkoski.launcher
 
 import android.Manifest
 import android.app.Activity
-import android.graphics.drawable.ColorDrawable
 import android.os.Build
 import android.os.Bundle
-import android.view.View
 import android.view.ViewGroup
 import android.view.WindowInsets
-import android.widget.ArrayAdapter
 import android.widget.LinearLayout
-import android.widget.ListView
 import android.widget.ScrollView
-import android.widget.TextView
 import android.window.OnBackInvokedCallback
 import android.window.OnBackInvokedDispatcher
 
@@ -49,6 +44,13 @@ class SettingsActivity : Activity() {
         repo = AppRepository(this, prefs)
         repo.onChanged = ::render
         repo.start()
+        // Back on the same page after the screen is rebuilt (dark mode, font size).
+        savedInstanceState?.getString(KEY_PAGE)?.let { name -> Page.entries.firstOrNull { it.name == name }?.let(::open) }
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        page?.let { outState.putString(KEY_PAGE, it.name) }
     }
 
     override fun onResume() {
@@ -57,17 +59,18 @@ class SettingsActivity : Activity() {
     }
 
     override fun onDestroy() {
+        Sheet.dismissAll(this)
         repo.stop()
         super.onDestroy()
     }
 
     /** The main list of groups, or one group's settings. */
-    private enum class Page(val title: String, val summary: String) {
-        HOME("Home screen", "Text size, layout, status bar, screen time, dots, music"),
-        SEARCH("Search", "Opening apps as you type, search only, contacts"),
-        STANDBY("Standby", "The bedside clock, on every wake, weather"),
-        APPS("Apps", "Mindful pause, hidden apps, home app"),
-        GESTURES("Gestures", "Double-tap to lock, and every gesture there is"),
+    private enum class Page(val title: Int, val summary: Int) {
+        HOME(R.string.page_home, R.string.page_home_summary),
+        SEARCH(R.string.page_search, R.string.page_search_summary),
+        STANDBY(R.string.page_standby, R.string.page_standby_summary),
+        APPS(R.string.page_apps, R.string.page_apps_summary),
+        GESTURES(R.string.page_gestures, R.string.page_gestures_summary),
     }
 
     private var page: Page? = null
@@ -103,7 +106,7 @@ class SettingsActivity : Activity() {
         content.removeAllViews()
         val current = page
         content.addView(
-            text(current?.title ?: "Settings", 40f, fontWeight = 200).apply { setPadding(0, 0, 0, dp(20)) },
+            text(getString(current?.title ?: R.string.settings), 40f, fontWeight = 200).apply { setPadding(0, 0, 0, dp(20)) },
         )
         when (current) {
             null -> renderMain()
@@ -116,80 +119,80 @@ class SettingsActivity : Activity() {
     }
 
     private fun renderMain() {
-        Page.entries.forEach { group -> row(group.title, group.summary) { open(group) } }
+        Page.entries.forEach { group -> row(getString(group.title), getString(group.summary)) { open(group) } }
         row(
-            "Restricted setting?",
-            "Open app info",
-            "If Android says \"App was denied access\" for usage access, notification access or " +
-                "the screen lock: try once, then open app info, tap ⋮ and choose " +
-                "\"Allow restricted settings\".",
+            getString(R.string.restricted_title),
+            getString(R.string.restricted_value),
+            getString(R.string.restricted_desc),
         ) { SystemActions.openAppInfo(this) }
     }
 
     private fun renderHome() {
-        row("Text size", prefs.textSize.label) {
+        row(getString(R.string.text_size), getString(prefs.textSize.label)) {
             prefs.textSize = TextSize.entries[(prefs.textSize.ordinal + 1) % TextSize.entries.size]
         }
-        row("Layout", if (prefs.centerFavorites) "Centred" else "Left aligned", "Clock and pinned apps") {
+        row(
+            getString(R.string.layout),
+            getString(if (prefs.centerFavorites) R.string.layout_centred else R.string.layout_left),
+            getString(R.string.layout_desc),
+        ) {
             prefs.centerFavorites = !prefs.centerFavorites
         }
         row(
-            "Status bar",
-            prefs.statusBar.label,
-            "Dimmed: dark icons on black, almost invisible and never jumps. " +
-                "Hidden: gone, but Android slides it in and out with the notifications",
+            getString(R.string.status_bar),
+            getString(prefs.statusBar.label),
+            getString(R.string.status_bar_desc),
         ) {
             prefs.statusBar = StatusBarMode.entries[(prefs.statusBar.ordinal + 1) % StatusBarMode.entries.size]
         }
         permissionRow(
-            title = "Screen time",
-            description = "Today's time in apps, under the date",
+            title = getString(R.string.screen_time),
+            description = getString(R.string.screen_time_desc),
             enabled = prefs.screenTime,
             granted = ScreenTime.hasAccess(this),
-            missing = "Tap to allow usage access",
+            missing = getString(R.string.grant_usage),
             setEnabled = { prefs.screenTime = it },
             grant = { SystemActions.openUsageAccess(this) },
         )
         permissionRow(
-            title = "Notification dots",
-            description = "A small dot beside apps that have notifications waiting",
+            title = getString(R.string.dots),
+            description = getString(R.string.dots_desc),
             enabled = prefs.notificationDots,
             granted = NowPlaying.hasAccess(this),
-            missing = "Tap to allow notification access",
+            missing = getString(R.string.grant_notifications),
             setEnabled = { prefs.notificationDots = it },
             grant = { SystemActions.openNotificationAccess(this) },
         )
         permissionRow(
-            title = "Now playing",
-            description = "The playing song and its controls, just above the bottom icons",
+            title = getString(R.string.now_playing),
+            description = getString(R.string.now_playing_desc),
             enabled = prefs.nowPlaying,
             granted = NowPlaying.hasAccess(this),
-            missing = "Tap to allow notification access",
+            missing = getString(R.string.grant_notifications),
             setEnabled = { prefs.nowPlaying = it },
             grant = { SystemActions.openNotificationAccess(this) },
         )
     }
 
     private fun renderSearch() {
-        row("Open single match", onOff(prefs.autoLaunch), "Launch an app as soon as the search finds only one") {
+        row(getString(R.string.auto_launch), onOff(prefs.autoLaunch), getString(R.string.auto_launch_desc)) {
             prefs.autoLaunch = !prefs.autoLaunch
         }
-        row("Search only", onOff(prefs.searchOnly), "No app list to scroll: apps appear only as you type their name") {
+        row(getString(R.string.search_only), onOff(prefs.searchOnly), getString(R.string.search_only_desc)) {
             prefs.searchOnly = !prefs.searchOnly
         }
         // Search only always brings up the keyboard.
         if (!prefs.searchOnly) {
-            row("Keyboard with app list", onOff(prefs.showKeyboard), "Start typing as soon as the list opens") {
+            row(getString(R.string.keyboard), onOff(prefs.showKeyboard), getString(R.string.keyboard_desc)) {
                 prefs.showKeyboard = !prefs.showKeyboard
             }
         }
         permissionRow(
-            title = "Contacts in search",
-            description = "Type a name to call, text or open a WhatsApp chat. " +
-                "Search also answers sums (12*7), finds settings (wifi, brilho) and the flashlight",
+            title = getString(R.string.contacts),
+            description = getString(R.string.contacts_desc),
             enabled = prefs.contactSearch,
             granted = ContactSearch.hasAccess(this),
-            missing = "Tap to allow contacts",
+            missing = getString(R.string.grant_contacts),
             setEnabled = { prefs.contactSearch = it },
             grant = { askPermission(Manifest.permission.READ_CONTACTS) },
         )
@@ -197,28 +200,30 @@ class SettingsActivity : Activity() {
 
     private fun renderStandby() {
         row(
-            "Standby while charging",
+            getString(R.string.standby_charging),
             onOff(prefs.standbyWhenCharging),
-            "A dim bedside clock after 20 seconds on the home screen while charging. " +
-                "Pinch the home screen with two fingers to open it any time; tap to leave. " +
-                "It stays lit all night only with Minimalist on in Accessibility",
+            getString(R.string.standby_charging_desc),
         ) { prefs.standbyWhenCharging = !prefs.standbyWhenCharging }
         permissionRow(
-            title = "Standby on every wake",
-            description = "Each time the screen turns on, the bedside clock shows first, over the lock screen. " +
-                "Tap it to unlock, or unlock with your fingerprint or face; you return to the app you were in",
+            title = getString(R.string.standby_wake),
+            description = getString(R.string.standby_wake_desc),
             enabled = prefs.standbyOnWake,
             granted = LockService.isEnabled(this),
-            missing = "Tap to turn on Minimalist in Accessibility",
+            missing = getString(R.string.grant_accessibility),
             setEnabled = { prefs.standbyOnWake = it },
             grant = { SystemActions.openAccessibility(this) },
         )
+        row(
+            getString(R.string.lock_glyphs),
+            onOff(prefs.lockScreenGlyphs),
+            getString(R.string.lock_glyphs_desc),
+        ) { prefs.lockScreenGlyphs = !prefs.lockScreenGlyphs }
         permissionRow(
-            title = "Weather",
-            description = "Temperature and sky under the date on the bedside clock, from Open-Meteo, for your approximate location",
+            title = getString(R.string.weather),
+            description = getString(R.string.weather_desc),
             enabled = prefs.weather,
             granted = Weather.hasAccess(this),
-            missing = "Tap to allow approximate location",
+            missing = getString(R.string.grant_location),
             setEnabled = { prefs.weather = it },
             grant = { askPermission(Manifest.permission.ACCESS_COARSE_LOCATION) },
         )
@@ -227,35 +232,35 @@ class SettingsActivity : Activity() {
     private fun renderApps() {
         val paused = prefs.pauseApps.mapNotNull { repo.find(it)?.label }.sorted()
         row(
-            "Mindful pause",
-            if (paused.isEmpty()) "Off" else paused.joinToString(", "),
-            "A breath before these apps open. Choose here, or long-press an app → Pause before opening",
+            getString(R.string.pause),
+            if (paused.isEmpty()) getString(R.string.off) else paused.joinToString(", "),
+            getString(R.string.pause_desc),
         ) { pickPauseApps() }
-        val hiddenCount = prefs.hidden.size
-        row("Hidden apps", if (hiddenCount == 0) "None" else "$hiddenCount hidden") { showHidden() }
+        // Uninstalled apps stay listed in the sheet, to be cleared, but aren't counted here.
+        val hiddenCount = if (repo.loaded) prefs.hidden.count { repo.find(it) != null } else prefs.hidden.size
+        row(
+            getString(R.string.hidden_apps),
+            if (hiddenCount == 0) getString(R.string.hidden_none) else getString(R.string.hidden_count, hiddenCount),
+        ) { showHidden() }
         val isDefault = SystemActions.isDefaultHome(this)
-        row("Home app", if (isDefault) "Minimalist is your home app" else "Not your home app yet") {
+        row(getString(R.string.home_app), getString(if (isDefault) R.string.home_app_yes else R.string.home_app_no)) {
             if (isDefault) SystemActions.openHomeSettings(this) else SystemActions.requestDefaultHome(this)
         }
     }
 
     private fun renderGestures() {
         permissionRow(
-            title = "Double-tap to lock",
-            description = "Double-tap an empty part of the home screen to turn the screen off",
+            title = getString(R.string.double_tap),
+            description = getString(R.string.double_tap_desc),
             enabled = prefs.doubleTapLock,
             granted = LockService.isEnabled(this),
-            missing = "Tap to turn on Minimalist in Accessibility",
+            missing = getString(R.string.grant_accessibility),
             setEnabled = { prefs.doubleTapLock = it },
             grant = { SystemActions.openAccessibility(this) },
         )
         content.addView(
             text(
-                "Swipe up for apps · down for notifications\n" +
-                    "Type a sum, a setting or a name in the search\n" +
-                    "Long-press an icon at the bottom to change its app\n" +
-                    "Pinch for the bedside clock · double-tap to lock (if on)\n" +
-                    "Long-press empty space for settings",
+                getString(R.string.gestures_help),
                 14f,
                 Palette.TERTIARY,
                 400,
@@ -282,9 +287,9 @@ class SettingsActivity : Activity() {
         grant: () -> Unit,
     ) {
         val value = when {
-            !enabled -> "Off"
+            !enabled -> getString(R.string.off)
             !granted -> missing
-            else -> "On"
+            else -> getString(R.string.on)
         }
         row(title, value, description) {
             when {
@@ -344,13 +349,13 @@ class SettingsActivity : Activity() {
     }
 
     private fun showHidden() {
-        val sheet = Sheet(this, "Tap an app to show it again")
+        val sheet = Sheet(this, getString(R.string.hidden_sheet_title))
         val hidden = prefs.hidden
         if (hidden.isEmpty()) {
-            sheet.column.addView(text("No hidden apps", 19f, Palette.TERTIARY).apply { setPadding(0, dp(13), 0, dp(13)) })
+            sheet.column.addView(text(getString(R.string.hidden_empty), 19f, Palette.TERTIARY).apply { setPadding(0, dp(13), 0, dp(13)) })
         }
         hidden
-            .map { key -> key to (repo.find(key)?.label ?: "Uninstalled app") }
+            .map { key -> key to (repo.find(key)?.label ?: getString(R.string.uninstalled_app)) }
             .sortedBy { it.second.lowercase() }
             .forEach { (key, label) ->
                 sheet.option(label) {
@@ -363,37 +368,19 @@ class SettingsActivity : Activity() {
 
     /** Every visible app; tapping one adds or removes it. Chosen apps are bright, the rest dim. */
     private fun pickPauseApps() {
-        val apps = repo.visibleApps()
         val chosen = prefs.pauseApps.toMutableSet()
-        val sheet = Sheet(this, "Pause before opening")
-        val list = ListView(this).apply {
-            divider = null
-            selector = ColorDrawable(0)
-            isVerticalScrollBarEnabled = false
-        }
-        val adapter = object : ArrayAdapter<App>(this, 0, apps) {
-            override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
-                val row = convertView as? TextView ?: text("", 19f).apply { setPadding(0, dp(12), 0, dp(12)) }
-                val app = apps[position]
-                row.text = app.label
-                row.setTextColor(pressable(if (app.key in chosen) Palette.TEXT else Palette.TERTIARY))
-                return row
-            }
-        }
-        list.adapter = adapter
-        list.setOnItemClickListener { _, _, position, _ ->
-            val key = apps[position].key
-            if (!chosen.remove(key)) chosen += key
+        val sheet = Sheet(this, getString(R.string.menu_pause_before))
+        sheet.appList(repo.visibleApps(), chosen = { it.key in chosen }) { app ->
+            if (!chosen.remove(app.key)) chosen += app.key
             prefs.pauseApps = chosen.toSet()
-            adapter.notifyDataSetChanged()
         }
-        sheet.column.addView(
-            list,
-            LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, (resources.displayMetrics.heightPixels * 0.55f).toInt()),
-        )
-        sheet.dialog.setOnDismissListener { render() }
+        sheet.onDismiss = { render() }
         sheet.show()
     }
 
-    private fun onOff(value: Boolean) = if (value) "On" else "Off"
+    private fun onOff(value: Boolean) = getString(if (value) R.string.on else R.string.off)
+
+    private companion object {
+        const val KEY_PAGE = "page"
+    }
 }

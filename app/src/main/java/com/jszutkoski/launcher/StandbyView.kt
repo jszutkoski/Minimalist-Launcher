@@ -27,7 +27,7 @@ class StandbyView(context: Context, private val onExit: () -> Unit) : FrameLayou
     }
     private val content = LinearLayout(context)
     private val chat = glyph(R.drawable.ic_chat, "WhatsApp")
-    private val mail = glyph(R.drawable.ic_mail, "Email")
+    private val mail = glyph(R.drawable.ic_mail, context.getString(R.string.glyph_email))
     private val waiting = LinearLayout(context).apply {
         orientation = LinearLayout.HORIZONTAL
         visibility = GONE

@@ -17,15 +17,16 @@ import android.widget.LinearLayout
  * only appears after the pause; "Not now" is there from the start. Shows today's time in the
  * app when usage access is on.
  */
-class PauseView(context: Context, private val onOpen: (App) -> Unit, private val onCancel: () -> Unit) :
+class PauseView(context: Context, private val onCancel: () -> Unit) :
     FrameLayout(context) {
     private val title = context.text("", 40f, Palette.TEXT, 200)
     private val subtitle = context.text("", 17f, Palette.SECONDARY, 400)
     private val usage = context.text("", 15f, Palette.TERTIARY, 400)
     private val progress = BatteryBar(context)
     private val open = context.text("", 20f, Palette.TEXT, 400)
-    private val notNow = context.text("Not now", 17f, Palette.SECONDARY, 400)
-    private var app: App? = null
+    private val notNow = context.text(context.getString(R.string.pause_not_now), 17f, Palette.SECONDARY, 400)
+    /** What "Open" does once the pause is over: the app, or one of its shortcuts. */
+    private var pending: (() -> Unit)? = null
     private var timer: ValueAnimator? = null
 
     val isShowing get() = visibility == VISIBLE
@@ -48,17 +49,17 @@ class PauseView(context: Context, private val onOpen: (App) -> Unit, private val
         }
         open.setPadding(dp(16), dp(12), dp(16), dp(12))
         notNow.setPadding(dp(16), dp(12), dp(16), dp(12))
-        open.setOnClickListener { app?.let(onOpen) }
+        open.setOnClickListener { pending?.invoke() }
         notNow.setOnClickListener { onCancel() }
         addView(column, LayoutParams(wrap, wrap, Gravity.CENTER))
     }
 
-    fun show(app: App, minutesToday: String?) {
-        this.app = app
-        title.text = "Breathe in"
-        subtitle.text = "before ${app.label}"
+    fun show(app: App, minutesToday: String?, onOpen: () -> Unit) {
+        pending = onOpen
+        title.text = context.getString(R.string.breathe_in)
+        subtitle.text = context.getString(R.string.pause_before, app.label)
         setUsage(minutesToday)
-        open.text = "Open ${app.label}"
+        open.text = context.getString(R.string.pause_open, app.label)
         open.visibility = INVISIBLE
         progress.update(0f, charging = false, low = false)
 
@@ -74,7 +75,7 @@ class PauseView(context: Context, private val onOpen: (App) -> Unit, private val
             addUpdateListener {
                 val t = it.animatedFraction
                 progress.update(t, charging = false, low = false)
-                title.text = if (t < 0.5f) "Breathe in" else "Breathe out"
+                title.text = context.getString(if (t < 0.5f) R.string.breathe_in else R.string.breathe_out)
             }
             addListener(object : AnimatorListenerAdapter() {
                 private var cancelled = false
@@ -84,7 +85,7 @@ class PauseView(context: Context, private val onOpen: (App) -> Unit, private val
 
                 override fun onAnimationEnd(animation: Animator) {
                     if (cancelled) return
-                    title.text = "Still want it?"
+                    title.text = context.getString(R.string.pause_still)
                     open.alpha = 0f
                     open.visibility = VISIBLE
                     open.animate().alpha(1f).setDuration(250).start()
@@ -95,7 +96,7 @@ class PauseView(context: Context, private val onOpen: (App) -> Unit, private val
     }
 
     fun setUsage(minutesToday: String?) {
-        usage.text = minutesToday?.let { "$it today so far" }.orEmpty()
+        usage.text = minutesToday?.let { context.getString(R.string.pause_usage, it) }.orEmpty()
         usage.visibility = if (minutesToday != null) VISIBLE else GONE
     }
 
@@ -106,6 +107,7 @@ class PauseView(context: Context, private val onOpen: (App) -> Unit, private val
     }
 
     fun hide(animate: Boolean) {
+        pending = null
         timer?.cancel()
         animate().cancel()
         if (!animate) {

@@ -3,20 +3,20 @@ package com.jszutkoski.launcher
 import android.content.Context
 import android.content.SharedPreferences
 
-enum class TextSize(val label: String, val scale: Float) {
-    SMALL("Small", 0.95f),
-    DEFAULT("Default", 1.1f),
-    LARGE("Large", 1.26f),
+enum class TextSize(val label: Int, val scale: Float) {
+    SMALL(R.string.text_small, 0.95f),
+    DEFAULT(R.string.text_default, 1.1f),
+    LARGE(R.string.text_large, 1.26f),
 }
 
-enum class StatusBarMode(val label: String) {
-    VISIBLE("Visible"),
+enum class StatusBarMode(val label: Int) {
+    VISIBLE(R.string.bar_visible),
 
     /** Dark icons on the black background: nearly invisible, but never animates away and back. */
-    DIMMED("Dimmed"),
+    DIMMED(R.string.bar_dimmed),
 
     /** Gone; Android slides it back briefly with the notification shade or a swipe from the top. */
-    HIDDEN("Hidden"),
+    HIDDEN(R.string.bar_hidden),
 }
 
 class Prefs(context: Context) {
@@ -119,6 +119,11 @@ class Prefs(context: Context) {
         get() = prefs.getBoolean(KEY_STANDBY_ON_WAKE, false)
         set(value) = prefs.edit().putBoolean(KEY_STANDBY_ON_WAKE, value).apply()
 
+    /** The WhatsApp and email glyphs on standby also over the lock screen, not only once unlocked. */
+    var lockScreenGlyphs: Boolean
+        get() = prefs.getBoolean(KEY_LOCK_SCREEN_GLYPHS, true)
+        set(value) = prefs.edit().putBoolean(KEY_LOCK_SCREEN_GLYPHS, value).apply()
+
     /** Small dots beside apps with notifications waiting (needs notification access). */
     var notificationDots: Boolean
         get() = prefs.getBoolean(KEY_NOTIFICATION_DOTS, false)
@@ -164,6 +169,7 @@ class Prefs(context: Context) {
         const val KEY_STANDBY = "standby"
         const val KEY_STANDBY_ON_WAKE = "standby_on_wake"
         const val KEY_NOTIFICATION_DOTS = "notification_dots"
+        const val KEY_LOCK_SCREEN_GLYPHS = "lock_screen_glyphs"
         const val KEY_PAUSE_APPS = "pause_apps"
     }
 }

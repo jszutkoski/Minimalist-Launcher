@@ -1,24 +1,19 @@
 package com.jszutkoski.launcher
 
 import android.app.Activity
-import android.content.pm.LauncherApps
+import android.content.pm.ShortcutInfo
 import android.content.res.ColorStateList
 import android.graphics.Canvas
 import android.graphics.ColorFilter
 import android.graphics.Paint
 import android.graphics.PixelFormat
-import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.Drawable
 import android.os.Process
 import android.view.Gravity
 import android.view.View
-import android.view.ViewGroup
-import android.widget.ArrayAdapter
 import android.widget.ImageView
 import android.widget.LinearLayout
-import android.widget.ListView
 import android.widget.Space
-import android.widget.TextView
 
 /**
  * The row of line icons along the bottom. Each slot has a default; a long-press
@@ -30,17 +25,18 @@ class Dock(
     private val prefs: Prefs,
     private val repo: AppRepository,
     private val launch: (App, View) -> Unit,
+    private val openShortcut: (App, ShortcutInfo) -> Unit,
 ) {
     private class Slot(val label: String, val packages: List<String>, val glyph: Int) {
         val isCamera get() = packages.isEmpty()
     }
 
     private val slots = listOf(
-        Slot("WhatsApp", listOf("com.whatsapp", "com.whatsapp.w4b"), R.drawable.ic_chat),
+        Slot("WhatsApp", Packages.WHATSAPP, R.drawable.ic_chat),
         Slot("Waze", listOf("com.waze"), R.drawable.ic_waze),
         Slot("Google Photos", listOf("com.google.android.apps.photos"), R.drawable.ic_photos),
         Slot("Spotify", listOf("com.spotify.music"), R.drawable.ic_spotify),
-        Slot("Camera", emptyList(), R.drawable.ic_camera),
+        Slot(activity.getString(R.string.dock_camera), emptyList(), R.drawable.ic_camera),
     )
 
     /** Padding around each glyph; the dock is pulled out by this much so glyphs line up with the text. */
@@ -102,48 +98,30 @@ class Dock(
     /** A dot at the glyph's corner for slots whose app has notifications waiting. */
     fun showDots(enabled: Boolean) {
         dots.forEachIndexed { index, dot ->
-            dot.shown = enabled && slotApps[index]?.let { Notifications.has(it.component.packageName) } == true
+            dot.shown = enabled && slotApps[index]?.let { Notifications.has(it.component.packageName, it.user) } == true
         }
     }
 
     private fun showOptions(index: Int, slot: Slot, app: App?, customised: Boolean) {
         Sheet(activity, app?.label ?: slot.label).apply {
-            if (app != null) addShortcuts(activity, app)
-            option("Change app") { pickApp(index) }
-            if (customised) option("Back to ${slot.label}") {
+            if (app != null) addShortcuts(activity, app) { openShortcut(app, it) }
+            option(activity.getString(R.string.dock_change_app)) { pickApp(index) }
+            if (customised) option(activity.getString(R.string.dock_back_to, slot.label)) {
                 prefs.setDockApp(index, null)
                 render()
             }
-            if (app != null) option("App info") {
-                activity.getSystemService(LauncherApps::class.java)
-                    .startAppDetailsActivity(app.component, app.user, null, null)
-            }
+            if (app != null) option(activity.getString(R.string.menu_app_info)) { SystemActions.openAppDetails(activity, app) }
             show()
         }
     }
 
     private fun pickApp(index: Int) {
-        val apps = repo.visibleApps()
-        val sheet = Sheet(activity, "Choose an app")
-        val list = ListView(activity).apply {
-            divider = null
-            selector = ColorDrawable(0)
-            isVerticalScrollBarEnabled = false
-            adapter = object : ArrayAdapter<App>(activity, 0, apps) {
-                override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
-                    val row = convertView as? TextView ?: activity.text("", 19f).apply { setPadding(0, dp(12), 0, dp(12)) }
-                    row.text = apps[position].label
-                    return row
-                }
-            }
-            setOnItemClickListener { _, _, position, _ ->
-                prefs.setDockApp(index, apps[position].key)
-                sheet.dialog.dismiss()
-                render()
-            }
+        val sheet = Sheet(activity, activity.getString(R.string.choose_app))
+        sheet.appList(repo.visibleApps()) { app ->
+            prefs.setDockApp(index, app.key)
+            sheet.dialog.dismiss()
+            render()
         }
-        val height = (activity.resources.displayMetrics.heightPixels * 0.55f).toInt()
-        sheet.column.addView(list, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, height))
         sheet.show()
     }
 

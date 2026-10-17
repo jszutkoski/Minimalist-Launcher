@@ -13,8 +13,10 @@ android {
         applicationId = "com.jszutkoski.launcher"
         minSdk = 30
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        // Each CI run numbers its build, so a newer APK always installs over an older one and
+        // App info tells builds apart; a local build is 1.
+        versionCode = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 1
+        versionName = "1.1"
     }
 
     signingConfigs {
@@ -46,6 +48,17 @@ android {
         }
     }
 
+    testOptions {
+        // Plain JVM tests: the Android classes they touch only need to exist.
+        unitTests.isReturnDefaultValues = true
+    }
+
+    lint {
+        abortOnError = true
+        // Warnings are reported in the build log; only errors fail it.
+        warningsAsErrors = false
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -56,4 +69,8 @@ kotlin {
     compilerOptions {
         jvmTarget.set(JvmTarget.JVM_17)
     }
+}
+
+dependencies {
+    testImplementation("junit:junit:4.13.2")
 }

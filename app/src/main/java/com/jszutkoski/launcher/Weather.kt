@@ -8,12 +8,14 @@ import android.icu.util.ULocale
 import android.location.Location
 import android.location.LocationManager
 import android.os.Build
+import android.os.SystemClock
 import android.telephony.TelephonyManager
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URI
 import java.util.Locale
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.roundToInt
 
 /**
@@ -23,10 +25,16 @@ import kotlin.math.roundToInt
 object Weather {
     class Now(val temperature: Int, val code: Int, val time: Long) {
         /** "18° Cloudy". */
-        val label get() = describe(code).let { if (it.isEmpty()) "$temperature°" else "$temperature° $it" }
+        fun label(context: Context) = describe(code)?.let { "$temperature° ${context.getString(it)}" } ?: "$temperature°"
     }
 
     private val worker = Executors.newSingleThreadExecutor()
+    private val inFlight = AtomicBoolean(false)
+
+    @Volatile
+    private var lastTry = 0L
+    /** After an attempt, the next waits this long: offline, a night of wakes asks only a few times. */
+    const val RETRY_MS = 10 * 60 * 1000L
     private const val FRESH_MS = 30 * 60 * 1000L
     private const val SHOWN_MS = 3 * 60 * 60 * 1000L
     private const val LOCATION_MAX_AGE_MS = 60 * 60 * 1000L
@@ -52,8 +60,21 @@ object Weather {
 
     private fun unit(context: Context) = if (fahrenheit(context)) "fahrenheit" else "celsius"
 
-    /** Finds the place, then asks for the weather there. [done] runs on a background thread. */
-    fun refresh(context: Context, done: (Now?) -> Unit) {
+    /** Whether another attempt may start, [lastTry] and [now] on the same clock. */
+    fun due(lastTry: Long, now: Long) = lastTry == 0L || now - lastTry >= RETRY_MS
+
+    /**
+     * Finds the place, then asks for the weather there. [done] runs on a background thread. Does
+     * nothing while a request is under way or one was made in the last [RETRY_MS].
+     */
+    fun refresh(context: Context, onResult: (Now?) -> Unit) {
+        val now = SystemClock.elapsedRealtime()
+        if (!due(lastTry, now) || !inFlight.compareAndSet(false, true)) return
+        lastTry = now
+        val done: (Now?) -> Unit = { result ->
+            inFlight.set(false)
+            onResult(result)
+        }
         val app = context.applicationContext
         val locations = app.getSystemService(LocationManager::class.java)
         val last = locations?.let(::lastKnown)
@@ -68,7 +89,12 @@ object Weather {
         }
         try {
             locations.getCurrentLocation(provider, null, worker) { location -> done(fetch(app, location ?: last)) }
-        } catch (_: RuntimeException) {
+        } catch (e: SecurityException) {
+            // Location access withdrawn since it was checked.
+            warn("No current location", e)
+            worker.execute { done(fetch(app, last)) }
+        } catch (e: RuntimeException) {
+            warn("No current location", e)
             worker.execute { done(fetch(app, last)) }
         }
     }
@@ -126,8 +152,9 @@ object Weather {
             val now = Now(current.getDouble("temperature_2m").roundToInt(), current.getInt("weather_code"), System.currentTimeMillis())
             store.edit().putInt("temperature", now.temperature).putInt("code", now.code).putLong("time", now.time).putString("unit", unit).apply()
             now
-        } catch (_: Exception) {
+        } catch (e: Exception) {
             // Offline, a timeout or an unexpected answer: keep showing the last reading.
+            warn("Weather request failed", e)
             null
         }
     }
@@ -152,19 +179,19 @@ object Weather {
     private val FAHRENHEIT_COUNTRIES = setOf("US", "LR", "MM", "BS", "BZ", "KY", "PW", "FM", "MH")
 
     /** WMO weather codes, as Open-Meteo reports them. */
-    private fun describe(code: Int) = when (code) {
-        0 -> "Clear"
-        1 -> "Mostly clear"
-        2 -> "Partly cloudy"
-        3 -> "Cloudy"
-        45, 48 -> "Fog"
-        51, 53, 55, 56, 57 -> "Drizzle"
-        61, 63, 65, 66, 67 -> "Rain"
-        71, 73, 75, 77 -> "Snow"
-        80, 81, 82 -> "Showers"
-        85, 86 -> "Snow showers"
-        95, 96, 99 -> "Thunderstorm"
-        else -> ""
+    private fun describe(code: Int): Int? = when (code) {
+        0 -> R.string.weather_clear
+        1 -> R.string.weather_mostly_clear
+        2 -> R.string.weather_partly_cloudy
+        3 -> R.string.weather_cloudy
+        45, 48 -> R.string.weather_fog
+        51, 53, 55, 56, 57 -> R.string.weather_drizzle
+        61, 63, 65, 66, 67 -> R.string.weather_rain
+        71, 73, 75, 77 -> R.string.weather_snow
+        80, 81, 82 -> R.string.weather_showers
+        85, 86 -> R.string.weather_snow_showers
+        95, 96, 99 -> R.string.weather_thunderstorm
+        else -> null
     }
 
     // Its own file: the launcher's settings file marks home for a rebuild on every change.

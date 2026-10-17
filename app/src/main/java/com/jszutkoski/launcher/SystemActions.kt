@@ -8,6 +8,7 @@ import android.content.ActivityNotFoundException
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.pm.LauncherApps
 import android.net.Uri
 import android.os.Bundle
 import android.provider.AlarmClock
@@ -22,7 +23,8 @@ object SystemActions {
         try {
             val service = context.getSystemService("statusbar")
             Class.forName("android.app.StatusBarManager").getMethod("expandNotificationsPanel").invoke(service)
-        } catch (_: Throwable) {
+        } catch (e: Throwable) {
+            warn("Could not open the notification shade", e)
         }
     }
 
@@ -78,6 +80,16 @@ object SystemActions {
         start(activity, Intent(Intent.ACTION_WEB_SEARCH).putExtra(SearchManager.QUERY, query)) ||
             start(activity, Intent(Intent.ACTION_VIEW, Uri.parse("https://www.google.com/search?q=${Uri.encode(query)}")))
 
+    /** App info for an app, which may have been uninstalled since its menu opened. */
+    fun openAppDetails(activity: Activity, app: App) {
+        try {
+            activity.getSystemService(LauncherApps::class.java).startAppDetailsActivity(app.component, app.user, null, null)
+        } catch (e: RuntimeException) {
+            warn("No app info for ${app.component}", e)
+            start(activity, Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${app.component.packageName}")))
+        }
+    }
+
     fun openHomeSettings(activity: Activity) = start(activity, Intent(Settings.ACTION_HOME_SETTINGS))
 
     fun isDefaultHome(context: Context): Boolean =
@@ -100,9 +112,11 @@ object SystemActions {
     fun start(activity: Activity, intent: Intent, options: Bundle? = null): Boolean = try {
         activity.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), options)
         true
-    } catch (_: ActivityNotFoundException) {
+    } catch (e: ActivityNotFoundException) {
+        warn("Nothing opens $intent", e)
         false
-    } catch (_: SecurityException) {
+    } catch (e: SecurityException) {
+        warn("Not allowed to open $intent", e)
         false
     }
 }

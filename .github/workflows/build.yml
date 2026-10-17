@@ -9,12 +9,18 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Publish this build as a version release (for example 1.0); empty for none"
+        description: "Publish this build as a version release (for example 1.1); empty for none"
         required: false
         default: ""
 
+# Read-only unless a job asks for more: only publishing writes, and it never sees the key.
 permissions:
-  contents: write
+  contents: read
+
+# One build per branch or tag at a time, so two publishes never race on the same release.
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   build:
@@ -25,17 +31,18 @@ jobs:
       MINIMALIST_KEYSTORE: ${{ secrets.MINIMALIST_KEYSTORE }}
       MINIMALIST_KEYSTORE_PASSWORD: ${{ secrets.MINIMALIST_KEYSTORE_PASSWORD }}
     steps:
-      - uses: actions/checkout@v4
+      # Actions pinned to a commit, not a movable tag: a tag can be pointed at other code.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4.9.1
         with:
           distribution: temurin
           java-version: 17
 
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@748248ddd2a24f49513d8f472f81c3a07d4d50e1 # v4.4.4
 
       - name: Require the signing key for published builds
-        if: (github.event_name == 'push' || inputs.version != '') && env.MINIMALIST_KEYSTORE == ''
+        if: (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.version != '')) && env.MINIMALIST_KEYSTORE == ''
         run: |
           echo "::error::The MINIMALIST_KEYSTORE secret is missing; refusing to publish an unsigned APK."
           exit 1
@@ -46,48 +53,80 @@ jobs:
           echo "$MINIMALIST_KEYSTORE" | base64 -d > "$RUNNER_TEMP/release.p12"
           echo "MINIMALIST_KEYSTORE_FILE=$RUNNER_TEMP/release.p12" >> "$GITHUB_ENV"
 
-      - name: Build release APK
-        run: ./gradlew assembleRelease --stacktrace
+      # Unit tests and lint first: a failure stops the build before anything is published.
+      - name: Test, lint and build the release APK
+        run: ./gradlew testReleaseUnitTest lintRelease assembleRelease --stacktrace
 
-      - name: Name the APK
+      - name: Name the APK and its checksum
         # "-unsigned" in the name when built without the key (pull requests from forks).
-        run: cp app/build/outputs/apk/release/app-release*.apk minimalist-launcher.apk
+        run: |
+          cp app/build/outputs/apk/release/app-release*.apk minimalist-launcher.apk
+          sha256sum minimalist-launcher.apk > minimalist-launcher.apk.sha256
 
       - name: Clean up the signing key
         if: always()
         run: rm -f "$RUNNER_TEMP/release.p12"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: minimalist-launcher
-          path: minimalist-launcher.apk
+          path: |
+            minimalist-launcher.apk
+            minimalist-launcher.apk.sha256
 
-      # A single "latest" pre-release that always holds the newest APK, so it can
-      # be downloaded straight from the phone without unzipping anything.
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: failure()
+        with:
+          name: lint-report
+          path: app/build/reports/lint-results-release.html
+          if-no-files-found: ignore
+
+  publish:
+    needs: build
+    if: >-
+      (github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))) ||
+      (github.event_name == 'workflow_dispatch' && inputs.version != '')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: minimalist-launcher
+
+      # A single "latest" pre-release that always holds the newest APK, so it can be
+      # downloaded straight from the phone without unzipping anything. Updated in place:
+      # the old APK stays downloadable until the new one replaces it.
       - name: Publish latest build
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        env:
-          GH_TOKEN: ${{ github.token }}
+        if: github.ref == 'refs/heads/main'
         run: |
-          gh release delete latest --cleanup-tag --yes || true
-          gh release create latest minimalist-launcher.apk \
-            --prerelease \
-            --title "Latest build" \
-            --notes "Built from ${GITHUB_SHA::7}." \
-            --target "$GITHUB_SHA"
+          notes="Built from ${GITHUB_SHA::7}. SHA-256: $(cut -d' ' -f1 minimalist-launcher.apk.sha256)"
+          if gh release view latest > /dev/null 2>&1 &&
+            gh api -X PATCH "repos/$GH_REPO/git/refs/tags/latest" -f sha="$GITHUB_SHA" -F force=true > /dev/null; then
+            gh release upload latest minimalist-launcher.apk minimalist-launcher.apk.sha256 --clobber
+            gh release edit latest --notes "$notes"
+          else
+            gh release delete latest --cleanup-tag --yes || true
+            gh release create latest minimalist-launcher.apk minimalist-launcher.apk.sha256 \
+              --prerelease \
+              --title "Latest build" \
+              --notes "$notes" \
+              --target "$GITHUB_SHA"
+          fi
 
       # A permanent release for each version, kept alongside the moving "latest": from a
       # pushed tag (v1.0), or from a manual run given a version number, which creates the tag.
       - name: Publish version release
-        if: >-
-          (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) ||
-          (github.event_name == 'workflow_dispatch' && inputs.version != '')
+        if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.version != '')
         env:
-          GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.event_name == 'workflow_dispatch' && format('v{0}', inputs.version) || github.ref_name }}
         run: |
           cp minimalist-launcher.apk "minimalist-launcher-$TAG.apk"
-          gh release create "$TAG" "minimalist-launcher-$TAG.apk" \
+          sha256sum "minimalist-launcher-$TAG.apk" > "minimalist-launcher-$TAG.apk.sha256"
+          gh release create "$TAG" "minimalist-launcher-$TAG.apk" "minimalist-launcher-$TAG.apk.sha256" \
             --title "Minimalist $TAG" \
             --notes "Version ${TAG#v}, built from ${GITHUB_SHA::7}." \
             --target "$GITHUB_SHA"

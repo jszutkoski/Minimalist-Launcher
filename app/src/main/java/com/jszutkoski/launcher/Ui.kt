@@ -19,7 +19,8 @@ object Palette {
     const val SURFACE = 0xFF141414.toInt()
     const val TEXT = 0xFFF2F2F2.toInt()
     const val SECONDARY = 0xFF8A8A8A.toInt()
-    const val TERTIARY = 0xFF4D4D4D.toInt()
+    /** The quietest text that still reads: 4.5:1 on black, the WCAG minimum for small text. */
+    const val TERTIARY = 0xFF757575.toInt()
     const val HAIRLINE = 0xFF1F1F1F.toInt()
     const val TRACK = 0xFF262626.toInt()
     /** Only used to warn about a low battery. */

@@ -47,7 +47,7 @@ class AppDrawerView(context: Context, private val callbacks: Callbacks) : Linear
         set(value) {
             if (field == value) return
             field = value
-            search.hint = if (value) "Type an app name" else "Search"
+            search.hint = context.getString(if (value) R.string.search_only_hint else R.string.search_hint)
             filter(fromTyping = false)
         }
 
@@ -82,7 +82,7 @@ class AppDrawerView(context: Context, private val callbacks: Callbacks) : Linear
     private val hairline = View(context)
 
     /** Search only, for when the name is forgotten: the whole list, until the drawer closes. */
-    private val browse = context.text("Show all apps", 17f, Palette.SECONDARY, 400).apply {
+    private val browse = context.text(context.getString(R.string.show_all_apps), 17f, Palette.SECONDARY, 400).apply {
         letterSpacing = 0.02f
         setPadding(0, dp(12), 0, dp(12))
         visibility = GONE
@@ -103,7 +103,7 @@ class AppDrawerView(context: Context, private val callbacks: Callbacks) : Linear
         setBackgroundColor(Palette.BACKGROUND)
 
         search.apply {
-            hint = "Search"
+            hint = context.getString(R.string.search_hint)
             setHintTextColor(Palette.TERTIARY)
             setTextColor(Palette.TEXT)
             typeface = weight(300)
@@ -124,7 +124,8 @@ class AppDrawerView(context: Context, private val callbacks: Callbacks) : Linear
             })
             setOnEditorActionListener { _, actionId, _ ->
                 if (actionId == EditorInfo.IME_ACTION_GO) {
-                    adapter.items.firstOrNull()?.let { open(it, search) }
+                    // An empty search lists every app: Go would open whichever comes first.
+                    if (search.text.isBlank()) hideKeyboard() else adapter.items.firstOrNull()?.let { open(it, search) }
                     true
                 } else {
                     false
@@ -223,13 +224,11 @@ class AppDrawerView(context: Context, private val callbacks: Callbacks) : Linear
             if (q.isNotEmpty()) add(SearchResult.Web(q))
         }
 
-        // Only when the query grew: deleting letters should never launch anything. Only from
-        // two letters that begin the name or a word of it, so a question can still be typed.
-        // And only when the app is the one thing found, not a contact or setting.
+        // Only when the query grew: deleting letters should never launch anything.
         val grew = query.length > lastQueryLength
         lastQueryLength = query.length
-        if (fromTyping && grew && autoLaunch && q.length >= 2 && found.size == 1 &&
-            AppSearch.startsWord(found[0], q) && people.isEmpty() && settings.isEmpty()
+        if (fromTyping && grew && autoLaunch &&
+            AppSearch.opensAlone(q, found.map { it.searchKey }, people.size, settings.size)
         ) {
             callbacks.onLaunch(found[0], search)
         }
@@ -339,21 +338,27 @@ private class ResultAdapter(private val context: Context, private val onWhatsApp
         when (item) {
             is SearchResult.Answer -> {
                 title = "= ${Calculator.format(item.value)}"
-                hint = "Copy"
+                hint = context.getString(R.string.result_copy)
             }
             is SearchResult.ContactHit -> {
                 title = item.contact.name
-                hint = "Contact"
+                hint = context.getString(R.string.result_contact)
                 contact = item.contact.takeIf { whatsApp && it.whatsApp != null }
             }
             is SearchResult.SettingHit -> {
-                title = item.setting.label
-                hint = if (item.setting.isTorch) (if (Torch.on) "Turn off" else "Turn on") else "Settings"
+                title = context.getString(item.setting.label)
+                hint = context.getString(
+                    when {
+                        !item.setting.isTorch -> R.string.result_settings
+                        Torch.on -> R.string.result_turn_off
+                        else -> R.string.result_turn_on
+                    },
+                )
             }
             is SearchResult.Web -> {
-                title = "Search \u201c${item.query}\u201d"
+                title = context.getString(R.string.result_web_title, item.query)
                 color = Palette.SECONDARY
-                hint = "Web"
+                hint = context.getString(R.string.result_web)
             }
             is SearchResult.AppHit -> error("Apps use the plain row")
         }

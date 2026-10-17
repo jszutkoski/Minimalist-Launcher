@@ -18,35 +18,82 @@ object ScreenTime {
     }
 
     /**
-     * Adds up every stretch an app's activity spent in the foreground since midnight, for one
-     * app or, with [only] null, all of them. Time on this home screen is left out: it is the
-     * screen you see when not using the phone.
+     * One activity coming to the foreground ([resumed]) or leaving it. [home] marks this
+     * launcher coming back, which means nothing else is in front any more, whatever events
+     * went missing.
+     */
+    class Change(val activity: String, val resumed: Boolean, val time: Long, val home: Boolean = false)
+
+    /** Activities resumed before this much ahead of midnight are still counted from midnight. */
+    private const val LOOKBACK_MS = 6 * 60 * 60 * 1000L
+    private const val CACHE_MS = 60 * 1000L
+
+    @Volatile
+    private var cached: Pair<Long, Long>? = null // when it was worked out, and the total
+
+    /**
+     * Time in the foreground since midnight, for one app or, with [only] null, all of them. Time
+     * on this home screen is left out: it is the screen you see when not using the phone. The
+     * total for all apps is reused for a minute, as home asks for it each time it comes back.
      */
     fun today(context: Context, only: String? = null): Long {
-        val usage = context.getSystemService(UsageStatsManager::class.java) ?: return 0
-        val start = Calendar.getInstance().apply {
+        val now = System.currentTimeMillis()
+        val midnight = Calendar.getInstance().apply {
             set(Calendar.HOUR_OF_DAY, 0)
             set(Calendar.MINUTE, 0)
             set(Calendar.SECOND, 0)
             set(Calendar.MILLISECOND, 0)
         }.timeInMillis
-        val events = usage.queryEvents(start, System.currentTimeMillis()) ?: return 0
+        if (only == null) cached?.let { (at, total) -> if (now - at < CACHE_MS && at >= midnight) return total }
+        val usage = context.getSystemService(UsageStatsManager::class.java) ?: return 0
+        val events = usage.queryEvents(midnight - LOOKBACK_MS, now) ?: return 0
         val event = UsageEvents.Event()
-        val resumedAt = HashMap<String, Long>()
-        var total = 0L
+        val changes = ArrayList<Change>()
         while (events.hasNextEvent()) {
             events.getNextEvent(event)
-            if (event.packageName == context.packageName) continue
-            if (only != null && event.packageName != only) continue
-            val key = "${event.packageName}/${event.className}"
-            when (event.eventType) {
-                UsageEvents.Event.ACTIVITY_RESUMED -> resumedAt[key] = event.timeStamp
-                UsageEvents.Event.ACTIVITY_PAUSED, UsageEvents.Event.ACTIVITY_STOPPED ->
-                    resumedAt.remove(key)?.let { total += event.timeStamp - it }
+            if (event.packageName == context.packageName) {
+                if (event.eventType == UsageEvents.Event.ACTIVITY_RESUMED) changes += Change("", false, event.timeStamp, home = true)
+                continue
             }
+            if (only != null && event.packageName != only) continue
+            val resumed = when (event.eventType) {
+                UsageEvents.Event.ACTIVITY_RESUMED -> true
+                UsageEvents.Event.ACTIVITY_PAUSED, UsageEvents.Event.ACTIVITY_STOPPED -> false
+                else -> continue
+            }
+            changes += Change("${event.packageName}/${event.className}", resumed, event.timeStamp)
         }
+        val total = foreground(changes, midnight, now)
+        if (only == null) cached = now to total
         return total
     }
+
+    /**
+     * How long, between [from] and [until], at least one of the activities was in the
+     * foreground. Counted once when two share the screen, and from [from] for one opened
+     * before it; one still open at the end counts until [until].
+     */
+    fun foreground(changes: List<Change>, from: Long, until: Long): Long {
+        val open = HashSet<String>()
+        var since = 0L
+        var total = 0L
+        for (change in changes.sortedBy { it.time }) {
+            if (change.home) {
+                if (open.isNotEmpty()) total += span(since, change.time, from, until)
+                open.clear()
+            } else if (change.resumed) {
+                if (open.isEmpty()) since = change.time
+                open += change.activity
+            } else if (open.remove(change.activity) && open.isEmpty()) {
+                total += span(since, change.time, from, until)
+            }
+        }
+        if (open.isNotEmpty()) total += span(since, until, from, until)
+        return total
+    }
+
+    private fun span(start: Long, end: Long, from: Long, until: Long) =
+        (minOf(end, until) - maxOf(start, from)).coerceAtLeast(0)
 
     /** "2 h 14 min", "14 min" or "0 min". */
     fun format(millis: Long): String {

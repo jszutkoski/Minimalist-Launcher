@@ -40,11 +40,11 @@ class PlayerView(context: Context, private val onOpen: (packageName: String) -> 
         addView(artist, LayoutParams(full))
 
         controls.orientation = HORIZONTAL
-        val previous = button(R.drawable.ic_previous, "Previous") { track?.controls?.skipToPrevious() }
-        playPause = button(R.drawable.ic_play, "Play") {
+        val previous = button(R.drawable.ic_previous, context.getString(R.string.player_previous)) { track?.controls?.skipToPrevious() }
+        playPause = button(R.drawable.ic_play, context.getString(R.string.player_play)) {
             track?.let { if (it.playing) it.controls.pause() else it.controls.play() }
         }
-        val next = button(R.drawable.ic_next, "Next") { track?.controls?.skipToNext() }
+        val next = button(R.drawable.ic_next, context.getString(R.string.player_next)) { track?.controls?.skipToNext() }
         listOf(previous, playPause, next).forEachIndexed { index, button ->
             controls.addView(
                 button,
@@ -86,7 +86,7 @@ class PlayerView(context: Context, private val onOpen: (packageName: String) -> 
         // A blank line rather than none, so the height never changes.
         artist.text = track.artist ?: " "
         playPause.setImageResource(if (track.playing) R.drawable.ic_pause else R.drawable.ic_play)
-        playPause.contentDescription = if (track.playing) "Pause" else "Play"
+        playPause.contentDescription = context.getString(if (track.playing) R.string.player_pause else R.string.player_play)
         fade(visible = true)
     }
 

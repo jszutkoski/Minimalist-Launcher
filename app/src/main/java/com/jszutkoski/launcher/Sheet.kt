@@ -10,13 +10,19 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.Window
 import android.widget.FrameLayout
+import android.widget.ArrayAdapter
 import android.widget.LinearLayout
+import android.widget.ListView
+import android.widget.TextView
 
 /** A floating card at the bottom of the screen: a quiet title and a column of text actions. */
 class Sheet(activity: Activity, title: String?) {
     val dialog = Dialog(activity)
     val column = LinearLayout(activity)
     private val context = activity
+
+    /** Runs once the sheet closes, however it closes. */
+    var onDismiss: (() -> Unit)? = null
 
     init {
         column.orientation = LinearLayout.VERTICAL
@@ -48,6 +54,10 @@ class Sheet(activity: Activity, title: String?) {
             setDimAmount(0.6f)
             setWindowAnimations(android.R.style.Animation_InputMethod)
         }
+        dialog.setOnDismissListener {
+            open -= this
+            onDismiss?.invoke()
+        }
     }
 
     fun option(label: String, color: Int = Palette.TEXT, action: () -> Unit) {
@@ -63,6 +73,34 @@ class Sheet(activity: Activity, title: String?) {
         )
     }
 
+    /**
+     * A tall scrolling list of [apps]. With [chosen], the apps it picks out are bright and the
+     * rest dim, and the list redraws after each tap, for choosing several.
+     */
+    fun appList(apps: List<App>, chosen: ((App) -> Boolean)? = null, onPick: (App) -> Unit) {
+        val adapter = object : ArrayAdapter<App>(context, 0, apps) {
+            override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
+                val row = convertView as? TextView ?: context.text("", 19f).apply { setPadding(0, dp(12), 0, dp(12)) }
+                val app = apps[position]
+                row.text = app.label
+                if (chosen != null) row.setTextColor(pressable(if (chosen(app)) Palette.TEXT else Palette.TERTIARY))
+                return row
+            }
+        }
+        val list = ListView(context).apply {
+            divider = null
+            selector = ColorDrawable(0)
+            isVerticalScrollBarEnabled = false
+            this.adapter = adapter
+            setOnItemClickListener { _, _, position, _ ->
+                onPick(apps[position])
+                adapter.notifyDataSetChanged()
+            }
+        }
+        val height = (context.resources.displayMetrics.heightPixels * 0.55f).toInt()
+        column.addView(list, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, height))
+    }
+
     /** A hairline between groups of options. */
     fun divider() {
         column.addView(
@@ -74,5 +112,17 @@ class Sheet(activity: Activity, title: String?) {
         )
     }
 
-    fun show() = dialog.show()
+    fun show() {
+        open += this
+        dialog.show()
+    }
+
+    companion object {
+        private val open = mutableListOf<Sheet>()
+
+        /** Closes an activity's open sheets: pressing home or the screen going off closes menus. */
+        fun dismissAll(activity: Activity) {
+            open.filter { it.context === activity }.forEach { it.dialog.dismiss() }
+        }
+    }
 }

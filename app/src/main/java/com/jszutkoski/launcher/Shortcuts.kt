@@ -27,8 +27,9 @@ object Shortcuts {
                 // The app's fixed shortcuts first, then the changing ones, each in the app's own order.
                 .sortedWith(compareBy({ !it.isDeclaredInManifest }, { it.rank }))
                 .take(MAX)
-        } catch (_: RuntimeException) {
+        } catch (e: RuntimeException) {
             // The user is locked or the app went away.
+            warn("No shortcuts for ${app.component}", e)
             emptyList()
         }
     }
@@ -37,18 +38,22 @@ object Shortcuts {
         val bounds = source?.let { Rect().also(it::getGlobalVisibleRect) }
         try {
             context.getSystemService(LauncherApps::class.java)?.startShortcut(shortcut, bounds, null)
-        } catch (_: RuntimeException) {
-            Toast.makeText(context, "Can't open ${shortcut.shortLabel}", Toast.LENGTH_SHORT).show()
+        } catch (e: RuntimeException) {
+            warn("Shortcut ${shortcut.id} failed", e)
+            Toast.makeText(context, context.getString(R.string.cant_open, shortcut.shortLabel), Toast.LENGTH_SHORT).show()
         }
     }
 }
 
-/** Adds an app's shortcuts at the top of a long-press sheet, set apart by a hairline. */
-fun Sheet.addShortcuts(context: Context, app: App) {
+/**
+ * Adds an app's shortcuts at the top of a long-press sheet, set apart by a hairline. [open]
+ * starts one, so that a shortcut into a paused app still goes through the pause.
+ */
+fun Sheet.addShortcuts(context: Context, app: App, open: (ShortcutInfo) -> Unit) {
     val shortcuts = Shortcuts.forApp(context, app)
     if (shortcuts.isEmpty()) return
     shortcuts.forEach { shortcut ->
-        option(shortcut.shortLabel.toString()) { Shortcuts.start(context, shortcut, null) }
+        option(shortcut.shortLabel.toString()) { open(shortcut) }
     }
     divider()
 }

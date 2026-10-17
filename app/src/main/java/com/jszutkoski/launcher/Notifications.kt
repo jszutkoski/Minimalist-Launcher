@@ -9,6 +9,7 @@ import android.graphics.PixelFormat
 import android.graphics.drawable.Drawable
 import android.os.Handler
 import android.os.Looper
+import android.os.UserHandle
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 
@@ -28,10 +29,11 @@ class MediaListener : NotificationListenerService() {
     private fun refresh() {
         val active = try {
             activeNotifications
-        } catch (_: RuntimeException) {
+        } catch (e: RuntimeException) {
+            warn("Could not read the waiting notifications", e)
             null
         } ?: return
-        Notifications.update(active.filter(::waiting).map { it.packageName }.toSet())
+        Notifications.update(active.filter(::waiting).map { it.packageName to it.user }.toSet())
     }
 
     /** Something to read: not a running player, download or call, and not our own. */
@@ -40,13 +42,19 @@ class MediaListener : NotificationListenerService() {
             sbn.notification.flags and Notification.FLAG_FOREGROUND_SERVICE == 0
 }
 
-/** Which packages have notifications waiting, for the dots. Read and updated on the main thread. */
+/**
+ * Which apps have notifications waiting, for the dots, per user: the work copy of an app has
+ * its own. Read and updated on the main thread.
+ */
 object Notifications {
     private val main = Handler(Looper.getMainLooper())
-    private var packages: Set<String> = emptySet()
+    private var packages: Set<Pair<String, UserHandle>> = emptySet()
     private val listeners = mutableListOf<() -> Unit>()
 
-    fun has(packageName: String) = packageName in packages
+    fun has(packageName: String, user: UserHandle) = (packageName to user) in packages
+
+    /** In any profile, for standby's glyphs. */
+    fun hasAny(packageName: String) = packages.any { it.first == packageName }
 
     fun addListener(listener: () -> Unit) {
         listeners += listener
@@ -56,7 +64,7 @@ object Notifications {
         listeners -= listener
     }
 
-    fun update(newPackages: Set<String>) {
+    fun update(newPackages: Set<Pair<String, UserHandle>>) {
         main.post {
             if (newPackages == packages) return@post
             packages = newPackages

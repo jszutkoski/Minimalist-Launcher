@@ -7,35 +7,30 @@ import android.app.Activity
 import android.app.ActivityOptions
 import android.app.AlarmManager
 import android.content.BroadcastReceiver
-import android.content.ClipData
-import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.LauncherApps
+import android.content.pm.ShortcutInfo
 import android.database.ContentObserver
 import android.graphics.Insets
 import android.graphics.Rect
-import android.net.Uri
-import android.os.BatteryManager
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.os.PowerManager
 import android.provider.ContactsContract
-import android.text.InputType
 import android.text.format.DateFormat
 import android.util.TypedValue
 import android.view.Gravity
+import android.view.TouchDelegate
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowInsets
 import android.view.WindowInsetsController
-import android.view.WindowManager
+import android.view.accessibility.AccessibilityManager
 import android.view.animation.PathInterpolator
-import android.view.inputmethod.EditorInfo
-import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.Space
 import android.widget.TextClock
@@ -54,7 +49,7 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
     private lateinit var launcherApps: LauncherApps
 
     private lateinit var root: SwipeLayout
-    private lateinit var home: LinearLayout
+    private lateinit var home: HomeColumn
     private lateinit var clock: TextClock
     private lateinit var date: TextClock
     private lateinit var batteryBar: BatteryBar
@@ -71,12 +66,17 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
     private lateinit var bottomSpace: Space
     private lateinit var dock: Dock
     private lateinit var screenTimeText: TextView
+    /** Apps and settings as plain buttons, shown only to TalkBack, which can't make the swipes. */
+    private lateinit var accessibleRow: LinearLayout
+    private val touchExploration = AccessibilityManager.TouchExplorationStateChangeListener { showAccessibleRow() }
     private var contactsLoaded = false
     private val contactsObserver = object : ContentObserver(Handler(Looper.getMainLooper())) {
         override fun onChange(selfChange: Boolean) {
             contactsLoaded = false
         }
     }
+    private lateinit var appMenu: AppMenu
+    private lateinit var searchActions: SearchActions
     private lateinit var player: PlayerView
     private lateinit var nowPlaying: NowPlaying
     private val background = Executors.newSingleThreadExecutor()
@@ -103,12 +103,15 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         repo = AppRepository(this, prefs)
         repo.onChanged = ::render
         prefs.onChange { stale = true }
-        dock = Dock(this, prefs, repo, ::launch)
+        dock = Dock(this, prefs, repo, ::launch, ::openShortcut)
+        appMenu = AppMenu(this, prefs, repo, ::render, ::openShortcut)
+        searchActions = SearchActions(this, repo, ::launch) { closeDrawer(animate = true) }
         addDock()
         repo.start()
         nowPlaying = NowPlaying(this, ::showTrack)
         Notifications.addListener(dotsChanged)
         Torch.start(this)
+        getSystemService(AccessibilityManager::class.java)?.addTouchExplorationStateChangeListener(touchExploration)
     }
 
     private val batteryReceiver = object : BroadcastReceiver() {
@@ -118,6 +121,7 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
     private val alarmReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) = updateAlarm()
     }
+    private val alarmRefresh = Runnable { updateAlarm() }
 
     override fun onStart() {
         super.onStart()
@@ -134,6 +138,7 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         // coming back from an app costs next to nothing before home can draw.
         if (stale) render()
         setDefault.visibility = if (SystemActions.isDefaultHome(this)) View.GONE else View.VISIBLE
+        showAccessibleRow()
         applyStatusBar()
         player.reserveSpace = prefs.nowPlaying
         // Lookups that can wait for the first frame.
@@ -156,6 +161,9 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         inFront = getSystemService(PowerManager::class.java)?.isInteractive == false
         unregisterReceiver(batteryReceiver)
         unregisterReceiver(alarmReceiver)
+        root.removeCallbacks(alarmRefresh)
+        // Pressing home or the screen going off closes any menu left open.
+        Sheet.dismissAll(this)
         nowPlaying.stop()
         pause.hide(animate = false)
         // Coming back home should always land on the clock, never a stale search.
@@ -166,14 +174,17 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         // Home pressed while already home.
+        Sheet.dismissAll(this)
         if (pause.isShowing) cancelPause()
         if (progress > 0f) closeDrawer(animate = true)
     }
 
     override fun onDestroy() {
+        Sheet.dismissAll(this)
         repo.stop()
         Notifications.removeListener(dotsChanged)
         Torch.stop(this)
+        getSystemService(AccessibilityManager::class.java)?.removeTouchExplorationStateChangeListener(touchExploration)
         if (contactsObserverOn) contentResolver.unregisterContentObserver(contactsObserver)
         background.shutdownNow()
         super.onDestroy()
@@ -191,7 +202,7 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
             listener = this@MainActivity
         }
 
-        home = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        home = HomeColumn(this)
 
         clock = TextClock(this).apply {
             format12Hour = "h:mm"
@@ -231,7 +242,8 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
             setOnClickListener { SystemActions.openAlarms(this@MainActivity) }
         }
         favorites = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        setDefault = text("Set as home app", 14f, Palette.SECONDARY, 400).apply {
+        home.names = favorites
+        setDefault = text(getString(R.string.set_as_home), 14f, Palette.SECONDARY, 400).apply {
             gravity = Gravity.CENTER
             setPadding(0, dp(12), 0, dp(12))
             setOnClickListener { SystemActions.requestDefaultHome(this@MainActivity) }
@@ -276,7 +288,31 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
                 bottomMargin = dp(8)
             },
         )
+        accessibleRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            visibility = View.GONE
+            listOf(R.string.all_apps to { openDrawer() }, R.string.settings to { onLongPressEmpty() }).forEach { (label, action) ->
+                addView(
+                    text(getString(label), 17f, Palette.SECONDARY, 400).apply {
+                        setPadding(dp(16), dp(12), dp(16), dp(12))
+                        setOnClickListener { action() }
+                    },
+                )
+            }
+        }
+        home.addView(
+            accessibleRow,
+            LinearLayout.LayoutParams(wrap, wrap).apply { gravity = Gravity.CENTER_HORIZONTAL },
+        )
         root.addView(home)
+
+        // The battery line is a few dp tall: its touch area reaches 48dp, like any button.
+        batteryBar.addOnLayoutChangeListener { bar, _, _, _, _, _, _, _, _ ->
+            val area = Rect().also(bar::getHitRect)
+            val extra = ((dp(48) - area.height()) / 2).coerceAtLeast(0)
+            area.inset(0, -extra)
+            clockBlock.touchDelegate = TouchDelegate(area, bar)
+        }
 
         drawer = AppDrawerView(this, this).apply {
             visibility = View.INVISIBLE
@@ -284,7 +320,8 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         }
         root.addView(drawer)
 
-        pause = PauseView(this, onOpen = ::openAfterPause, onCancel = ::cancelPause)
+        // Hidden once home stops, so the app opens over the pause rather than over home.
+        pause = PauseView(this, onCancel = ::cancelPause)
         root.addView(pause)
 
         root.setOnApplyWindowInsetsListener { _, insets ->
@@ -322,19 +359,15 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         drawer.textScale = scale
         drawer.autoLaunch = prefs.autoLaunch
         drawer.searchOnly = prefs.searchOnly
-        drawer.whatsApp = whatsAppPackage() != null
+        drawer.whatsApp = searchActions.whatsAppPackage() != null
         drawer.setApps(repo.visibleApps())
     }
 
     private fun updateBattery(intent: Intent) {
-        val level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
-        val scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, 100)
-        if (level < 0 || scale <= 0) return
-        val fraction = level / scale.toFloat()
-        val status = intent.getIntExtra(BatteryManager.EXTRA_STATUS, BatteryManager.BATTERY_STATUS_UNKNOWN)
-        val charging = status == BatteryManager.BATTERY_STATUS_CHARGING || status == BatteryManager.BATTERY_STATUS_FULL
-        val low = !charging && fraction <= LOW_BATTERY
-        batteryBar.update(fraction, charging, low)
+        val battery = BatteryState.from(intent) ?: return
+        val fraction = battery.fraction
+        val charging = battery.charging
+        batteryBar.update(fraction, charging, battery.low)
         // Just the number: set into the battery line, it needs no percent sign.
         batteryBar.label = NumberFormat.getIntegerInstance().format((fraction * 100).roundToInt())
         batteryBar.contentDescription = NumberFormat.getPercentInstance().format(fraction.toDouble())
@@ -367,6 +400,11 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         // onResume doesn't run when it closes.
         if (hasFocus) applyStatusBar()
         if (hasFocus) scheduleStandby()
+    }
+
+    private fun showAccessibleRow() {
+        val talkBack = getSystemService(AccessibilityManager::class.java)?.isTouchExplorationEnabled == true
+        accessibleRow.visibility = if (talkBack) View.VISIBLE else View.GONE
     }
 
     private fun applyStatusBar() {
@@ -409,7 +447,7 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         background.execute {
             val total = ScreenTime.today(this)
             runOnUiThread {
-                screenTimeText.text = "${ScreenTime.format(total)} today"
+                screenTimeText.text = getString(R.string.screen_time_today, ScreenTime.format(total))
                 screenTimeText.visibility = View.VISIBLE
             }
         }
@@ -438,54 +476,9 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         }
     }
 
-    override fun onResult(result: SearchResult, source: View) {
-        when (result) {
-            is SearchResult.AppHit -> launch(result.app, source)
-            is SearchResult.Answer -> copy(Calculator.plain(result.value))
-            is SearchResult.ContactHit -> showContact(result.contact)
-            is SearchResult.SettingHit -> openSetting(result.setting)
-            is SearchResult.Web -> SystemActions.webSearch(this, result.query)
-        }
-    }
+    override fun onResult(result: SearchResult, source: View) = searchActions.open(result, source)
 
-    override fun onWhatsApp(contact: Contact) {
-        val pkg = whatsAppPackage() ?: return
-        val number = contact.whatsApp ?: return
-        SystemActions.start(this, Intent(Intent.ACTION_VIEW, Uri.parse("https://wa.me/$number")).setPackage(pkg))
-    }
-
-    private fun whatsAppPackage(): String? =
-        WHATSAPP.firstOrNull { pkg -> repo.apps.any { it.component.packageName == pkg } }
-
-    private fun copy(value: String) {
-        getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText("Result", value))
-        // Android 13+ confirms a copy on its own.
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) Toast.makeText(this, "Copied $value", Toast.LENGTH_SHORT).show()
-    }
-
-    private fun showContact(contact: Contact) {
-        Sheet(this, "${contact.name} · ${contact.phone}").apply {
-            if (contact.whatsApp != null && whatsAppPackage() != null) option("WhatsApp") { onWhatsApp(contact) }
-            option("Call") { SystemActions.start(this@MainActivity, Intent(Intent.ACTION_DIAL, Uri.fromParts("tel", contact.phone, null))) }
-            option("Message") { SystemActions.start(this@MainActivity, Intent(Intent.ACTION_SENDTO, Uri.fromParts("smsto", contact.phone, null))) }
-            option("Contact card") {
-                SystemActions.start(
-                    this@MainActivity,
-                    Intent(Intent.ACTION_VIEW, ContactsContract.Contacts.getLookupUri(contact.id, contact.lookupKey)),
-                )
-            }
-            show()
-        }
-    }
-
-    private fun openSetting(setting: SystemSetting) {
-        if (setting.isTorch) {
-            if (!Torch.toggle(this)) Toast.makeText(this, "The flashlight is unavailable", Toast.LENGTH_SHORT).show()
-            closeDrawer(animate = true)
-            return
-        }
-        setting.intents.any { SystemActions.start(this, it()) }
-    }
+    override fun onWhatsApp(contact: Contact) = searchActions.whatsApp(contact)
 
     private fun showTrack(track: NowPlaying.Track?) = player.show(track)
 
@@ -515,7 +508,7 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         if (apps.isEmpty()) {
             if (repo.loaded) {
                 favorites.addView(
-                    text("Swipe up for your apps.\nLong-press one to keep it here.", 17f * scale, Palette.SECONDARY).apply {
+                    text(getString(R.string.empty_home), 17f * scale, Palette.SECONDARY).apply {
                         gravity = alignment
                         isSingleLine = false
                         setLineSpacing(dp(6f), 1f)
@@ -524,13 +517,14 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
             }
             return
         }
+        home.namesChanged(TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, 30f * scale, resources.displayMetrics))
         favoriteViews = apps.map { app ->
             val view = text(app.label, 30f * scale).apply {
                 setPadding(0, dp(9), 0, dp(9))
                 compoundDrawablePadding = dp(12)
                 setOnClickListener { launch(app, it) }
                 setOnLongClickListener {
-                    showActions(app)
+                    appMenu.show(app)
                     true
                 }
             }
@@ -548,7 +542,7 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         val enabled = prefs.notificationDots && NowPlaying.hasAccess(this)
         val centred = prefs.centerFavorites
         favoriteViews.forEach { (view, app) ->
-            val dot = if (enabled && Notifications.has(app.component.packageName)) Dot(this) else null
+            val dot = if (enabled && Notifications.has(app.component.packageName, app.user)) Dot(this) else null
             // Centred names get an invisible twin on the other side, so the dot never pulls them off centre.
             val twin = if (dot != null && centred) Dot(this).apply { shown = false } else null
             dot?.setBounds(0, 0, dot.intrinsicWidth, dot.intrinsicHeight)
@@ -562,31 +556,30 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
 
     /** "6:30" within a day, "Sat 6:30" further out, gone when no alarm is set. */
     private fun updateAlarm() {
+        root.removeCallbacks(alarmRefresh)
         val next = getSystemService(AlarmManager::class.java)?.nextAlarmClock?.triggerTime
         val visible = if (next != null) View.VISIBLE else View.GONE
         alarmDot.visibility = visible
         alarmText.visibility = visible
         if (next == null) return
-        val skeleton = (if (next - System.currentTimeMillis() > DAY_MS) "EEE" else "") +
+        val untilWithinDay = next - System.currentTimeMillis() - DAY_MS
+        // Drop the weekday once the alarm is less than a day away, even if home stays open.
+        if (untilWithinDay > 0) root.postDelayed(alarmRefresh, untilWithinDay + 1000)
+        val skeleton = (if (untilWithinDay > 0) "EEE" else "") +
             (if (DateFormat.is24HourFormat(this)) "Hm" else "hm")
         alarmText.text = DateFormat.format(DateFormat.getBestDateTimePattern(Locale.getDefault(), skeleton), next)
     }
 
     // Mindful pause ------------------------------------------------------------------
 
-    private fun showPause(app: App) {
+    private fun showPause(app: App, open: () -> Unit) {
         root.gesturesEnabled = false
-        pause.show(app, null)
+        pause.show(app, null, open)
         if (!prefs.screenTime || !ScreenTime.hasAccess(this)) return
         background.execute {
             val spent = ScreenTime.today(this, app.component.packageName)
             runOnUiThread { if (pause.isShowing) pause.setUsage(ScreenTime.format(spent)) }
         }
-    }
-
-    private fun openAfterPause(app: App) {
-        launchNow(app, pause)
-        // Hidden once home stops, so the app opens over the pause rather than over home.
     }
 
     private fun cancelPause() {
@@ -680,7 +673,7 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
     override fun onDoubleTapEmpty() {
         if (!prefs.doubleTapLock) return
         if (!LockService.lock()) {
-            Toast.makeText(this, "Turn on the screen lock in Minimalist settings", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, getString(R.string.lock_needs_service), Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -695,7 +688,7 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
 
     override fun onLaunch(app: App, source: View) = launch(app, source)
 
-    override fun onAppLongPress(app: App) = showActions(app)
+    override fun onAppLongPress(app: App) = appMenu.show(app)
 
     override fun onCloseDrag(progress: Float) = onDrawerDrag(progress)
 
@@ -706,126 +699,27 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
     // Apps ----------------------------------------------------------------------
 
     /** Opens an app, through the breathing pause when it is on its list. */
-    private fun launch(app: App, source: View) {
-        if (app.key in prefs.pauseApps) showPause(app) else launchNow(app, source)
+    private fun launch(app: App, source: View) = throughPause(app) { launchNow(app, source) }
+
+    /** One of an app's shortcuts: a way into the app like any other, so paused apps pause. */
+    private fun openShortcut(app: App, shortcut: ShortcutInfo) =
+        throughPause(app) { Shortcuts.start(this, shortcut, null) }
+
+    /** Runs [open] now, or after the breathing pause for the apps on its list. */
+    private fun throughPause(app: App, open: () -> Unit) {
+        if (app.key in prefs.pauseApps) showPause(app, open) else open()
     }
 
     private fun launchNow(app: App, source: View) {
         val bounds = Rect().also { source.getGlobalVisibleRect(it) }
         try {
             launcherApps.startMainActivity(app.component, app.user, bounds, null)
-        } catch (_: RuntimeException) {
+        } catch (e: RuntimeException) {
             // ActivityNotFoundException or SecurityException: the app went away under us.
-            Toast.makeText(this, "Can't open ${app.label}", Toast.LENGTH_SHORT).show()
+            warn("Could not open ${app.component}", e)
+            Toast.makeText(this, getString(R.string.cant_open, app.label), Toast.LENGTH_SHORT).show()
             repo.reload()
         }
-    }
-
-    private fun showActions(app: App) {
-        val favoriteKeys = prefs.favorites
-        val index = favoriteKeys.indexOf(app.key)
-        val paused = app.key in prefs.pauseApps
-        Sheet(this, app.label).apply {
-            addShortcuts(this@MainActivity, app)
-            if (index >= 0) {
-                option("Remove from home") { prefs.favorites = favoriteKeys - app.key; render() }
-                if (index > 0) option("Move up") { moveFavorite(app.key, -1) }
-                if (index < favoriteKeys.lastIndex) option("Move down") { moveFavorite(app.key, 1) }
-            } else {
-                option("Add to home") { addFavorite(app) }
-            }
-            option("Rename") { showRename(app) }
-            option(if (paused) "Open without pause" else "Pause before opening") {
-                prefs.pauseApps = if (paused) prefs.pauseApps - app.key else prefs.pauseApps + app.key
-            }
-            if (index < 0) option("Hide") { hide(app) }
-            option("App info") { launcherApps.startAppDetailsActivity(app.component, app.user, null, null) }
-            if (!app.isSystem) option("Uninstall", Palette.SECONDARY) { uninstall(app) }
-            show()
-        }
-    }
-
-    private fun addFavorite(app: App) {
-        val current = prefs.favorites.filter { repo.find(it) != null }
-        if (current.size >= MAX_FAVORITES) {
-            Toast.makeText(this, "Home holds $MAX_FAVORITES apps. Remove one first.", Toast.LENGTH_SHORT).show()
-            return
-        }
-        prefs.favorites = current + app.key
-        render()
-    }
-
-    private fun moveFavorite(key: String, by: Int) {
-        val list = prefs.favorites.toMutableList()
-        val from = list.indexOf(key)
-        val to = from + by
-        if (from < 0 || to !in list.indices) return
-        list.add(to, list.removeAt(from))
-        prefs.favorites = list
-        render()
-    }
-
-    private fun hide(app: App) {
-        prefs.hidden = prefs.hidden + app.key
-        prefs.favorites = prefs.favorites - app.key
-        render()
-        Toast.makeText(this, "${app.label} hidden. Unhide it in Settings.", Toast.LENGTH_SHORT).show()
-    }
-
-    private fun uninstall(app: App) {
-        SystemActions.start(this, Intent(Intent.ACTION_DELETE, Uri.parse("package:${app.component.packageName}")))
-    }
-
-    private fun showRename(app: App) {
-        val sheet = Sheet(this, "Rename ${app.originalLabel}")
-        val input = EditText(this).apply {
-            setText(app.label)
-            selectAll()
-            setTextColor(Palette.TEXT)
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 22f)
-            typeface = weight(300)
-            isSingleLine = true
-            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_WORDS
-            imeOptions = EditorInfo.IME_ACTION_DONE
-            backgroundTintList = pressable(Palette.TERTIARY)
-        }
-        fun save(name: String?) {
-            prefs.setCustomName(app.key, name?.takeIf { it.isNotBlank() && it.trim() != app.originalLabel })
-            sheet.dialog.dismiss()
-            repo.rebuild()
-        }
-        input.setOnEditorActionListener { _, _, _ ->
-            save(input.text.toString())
-            true
-        }
-        sheet.column.addView(input)
-
-        val buttons = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.END
-            setPadding(0, dp(8), 0, 0)
-        }
-        buttons.addView(
-            text("Reset", 17f, Palette.SECONDARY, 400).apply {
-                setPadding(dp(16), dp(12), dp(16), dp(12))
-                setOnClickListener { save(null) }
-            },
-        )
-        buttons.addView(
-            text("Save", 17f, Palette.TEXT, 500).apply {
-                setPadding(dp(16), dp(12), 0, dp(12))
-                setOnClickListener { save(input.text.toString()) }
-            },
-        )
-        sheet.column.addView(buttons)
-
-        // Dialogs are not edge-to-edge, so resizing above the keyboard still applies.
-        @Suppress("DEPRECATION")
-        sheet.dialog.window?.setSoftInputMode(
-            WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE or WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE,
-        )
-        sheet.show()
-        input.requestFocus()
     }
 
     companion object {
@@ -833,8 +727,6 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         var inFront = false
             private set
 
-        private const val MAX_FAVORITES = 8
-        private val WHATSAPP = listOf("com.whatsapp", "com.whatsapp.w4b")
         private const val STANDBY_DELAY_MS = 20_000L
         private const val DAY_MS = 24 * 60 * 60 * 1000L
     }

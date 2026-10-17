@@ -49,7 +49,8 @@ class NowPlaying(private val context: Context, private val onChange: (Track?) ->
             sessions.addOnActiveSessionsChangedListener(sessionsListener, component, handler)
             started = true
             pick(activeSessions())
-        } catch (_: SecurityException) {
+        } catch (e: SecurityException) {
+            warn("No access to media sessions", e)
             onChange(null)
         }
     }

@@ -1,16 +1,15 @@
 package com.jszutkoski.launcher
 
-import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Path
+import android.os.SystemClock
 import android.util.TypedValue
 import android.view.View
+import kotlin.math.PI
 import kotlin.math.ceil
-
-/** Below this charge, and not charging, the battery shows in red. */
-const val LOW_BATTERY = 0.15f
+import kotlin.math.cos
 
 /**
  * A hairline under the clock, as wide as the time, filled to the battery level.
@@ -35,7 +34,28 @@ class BatteryBar(context: Context) : View(context) {
     private var level = 1f
     private var charging = false
     private var full = false
-    private var breathing: ValueAnimator? = null
+    private var breathing = false
+    private var breathStart = 0L
+    private var shown = false
+
+    /**
+     * A breath drawn at [FRAME_MS] steps rather than every frame: the line is lit all night on
+     * the charger, and redrawing it at 120 Hz would keep the panel and GPU busy for nothing.
+     * Stops whenever the line can't be seen.
+     */
+    private val breath = object : Runnable {
+        override fun run() {
+            val period = if (full) SLOW_MS else BREATH_MS
+            val low = if (full) 110 else 90
+            val phase = ((SystemClock.uptimeMillis() - breathStart) % (2 * period)) / period.toDouble()
+            val alpha = (low + (255 - low) * (0.5 + 0.5 * cos(PI * phase))).toInt()
+            fillPaint.alpha = alpha
+            labelPaint.alpha = alpha
+            boltPaint.alpha = alpha
+            invalidate()
+            postDelayed(this, FRAME_MS)
+        }
+    }
 
     /** The percentage, drawn at the end of the fill; null for no number. */
     var label: String? = null
@@ -77,8 +97,9 @@ class BatteryBar(context: Context) : View(context) {
         }
         boltPaint.color = if (full) Palette.FULL else Palette.TEXT
         if (changed) {
-            stopBreathing()
-            if (charging) breathe(slow = full)
+            breathing = charging
+            breathStart = SystemClock.uptimeMillis()
+            syncBreath()
             requestLayout()
         }
         invalidate()
@@ -161,38 +182,37 @@ class BatteryBar(context: Context) : View(context) {
         canvas.drawRoundRect(from, top, maxOf(to, from + thickness), top + thickness, radius, radius, paint)
     }
 
-    override fun onAttachedToWindow() {
-        super.onAttachedToWindow()
-        breathing?.start()
+    override fun onVisibilityAggregated(isVisible: Boolean) {
+        super.onVisibilityAggregated(isVisible)
+        shown = isVisible
+        syncBreath()
     }
 
     override fun onDetachedFromWindow() {
-        breathing?.cancel()
+        shown = false
+        syncBreath()
         super.onDetachedFromWindow()
     }
 
-    /** Charging: a slow breath. Full: slower still, in green. */
-    private fun breathe(slow: Boolean) {
-        breathing = ValueAnimator.ofInt(255, if (slow) 110 else 90).apply {
-            duration = if (slow) 2400 else 1400
-            repeatMode = ValueAnimator.REVERSE
-            repeatCount = ValueAnimator.INFINITE
-            addUpdateListener {
-                val alpha = it.animatedValue as Int
-                fillPaint.alpha = alpha
-                labelPaint.alpha = alpha
-                boltPaint.alpha = alpha
-                invalidate()
-            }
-            if (isAttachedToWindow) start()
+    /** Breathing while charging and in sight; steady and fully drawn otherwise. */
+    private fun syncBreath() {
+        removeCallbacks(breath)
+        if (breathing && shown) {
+            post(breath)
+        } else {
+            fillPaint.alpha = 255
+            labelPaint.alpha = 255
+            boltPaint.alpha = 255
+            invalidate()
         }
     }
 
-    private fun stopBreathing() {
-        breathing?.cancel()
-        breathing = null
-        fillPaint.alpha = 255
-        labelPaint.alpha = 255
-        boltPaint.alpha = 255
+    private companion object {
+        /** Charging: one breath in or out. Full on the charger: slower still, in green. */
+        const val BREATH_MS = 1400
+        const val SLOW_MS = 2400
+
+        /** About 16 steps a second: smooth enough for a slow fade. */
+        const val FRAME_MS = 60L
     }
 }
