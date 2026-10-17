@@ -13,6 +13,8 @@ import android.hardware.biometrics.BiometricPrompt
 import android.os.Build
 import android.os.Bundle
 import android.os.CancellationSignal
+import android.os.Handler
+import android.os.Looper
 import android.os.PowerManager
 import android.os.SystemClock
 import android.view.WindowInsetsController
@@ -48,8 +50,21 @@ open class StandbyActivity : Activity() {
             awakeSince = SystemClock.elapsedRealtime()
             // Android may have locked while the screen was off: now standby may stay lit.
             keepScreenOn()
+            scheduleLock()
             showWaiting()
         }
+    }
+
+    /** Main-thread timers that must run while the screen is off, too. */
+    private val handler = Handler(Looper.getMainLooper())
+
+    /** Standby locked the phone to stay lit: the next return to the front turns the screen on. */
+    private var relighting = false
+    private val lockOnCharger = Runnable { lockAndRelight() }
+    private val relight = Runnable {
+        // Brought to the front again, over the lock screen now; the activity's own request to
+        // turn the screen on is what lights it.
+        startActivity(Intent(this, javaClass).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP))
     }
     private val notificationsChanged: () -> Unit = { showWaiting() }
 
@@ -93,6 +108,10 @@ open class StandbyActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
+        if (relighting) {
+            relighting = false
+            setTurnScreenOn(false)
+        }
         shown += id
         // Kept behind other apps for days, so the face chosen meanwhile is applied on each return.
         view.setLook(prefs.clockLook(ClockScreen.STANDBY))
@@ -101,6 +120,30 @@ open class StandbyActivity : Activity() {
         showWaiting()
         showWeather()
         showScreenTime()
+        scheduleLock()
+    }
+
+    /**
+     * On the charger with the phone still unlocked, standby may not stay lit (anyone could pull
+     * down the notifications), so it would go dark at the screen timeout and leave the rest of
+     * the night to the lock screen. Instead, once the grace period passes untouched, it locks
+     * the phone itself and comes straight back on, over the lock screen, where it can stay lit.
+     * Needs Minimalist's accessibility service, which is what can lock.
+     */
+    private fun scheduleLock() {
+        handler.removeCallbacks(lockOnCharger)
+        if (charging && screenOn && !locked && secure && LockService.isEnabled(this)) {
+            val left = GRACE_MS - (SystemClock.elapsedRealtime() - awakeSince)
+            handler.postDelayed(lockOnCharger, left.coerceAtLeast(0))
+        }
+    }
+
+    private fun lockAndRelight() {
+        if (!charging || !screenOn || locked || unlockAsked || isFinishing || LockService.inCall(this)) return
+        if (!LockService.lock()) return
+        relighting = true
+        setTurnScreenOn(true)
+        handler.postDelayed(relight, RELIGHT_DELAY_MS)
     }
 
     override fun onStop() {
@@ -112,6 +155,7 @@ open class StandbyActivity : Activity() {
     }
 
     override fun onDestroy() {
+        handler.removeCallbacksAndMessages(null)
         Notifications.removeListener(notificationsChanged)
         leaveFront()
         unregisterReceiver(batteryReceiver)
@@ -279,6 +323,7 @@ open class StandbyActivity : Activity() {
         charging = battery.charging
         view.updateBattery(battery)
         keepScreenOn()
+        scheduleLock()
     }
 
     /**
@@ -298,6 +343,9 @@ open class StandbyActivity : Activity() {
     companion object {
         /** How long after the screen comes on a still-unlocked phone opens without the fingerprint. */
         private const val GRACE_MS = 10_000L
+
+        /** After locking on the charger, the moment for the lock screen to settle before lighting up again. */
+        private const val RELIGHT_DELAY_MS = 600L
 
         /** The standby screens in front (or in front when the screen went off), by instance. */
         private val shown = mutableSetOf<Int>()

@@ -137,7 +137,7 @@
     <string name="contacts_desc">Type a name to call, text or open a WhatsApp chat. Search also answers sums (12*7), finds settings (wifi, brilho) and the flashlight</string>
     <string name="grant_contacts">Tap to allow contacts</string>
     <string name="standby_charging">Standby while charging</string>
-    <string name="standby_charging_desc">A dim bedside clock after 20 seconds on the home screen while charging. Pinch the home screen with two fingers to open it any time; tap to leave. Once the phone has locked it stays lit all night over the lock screen; while still unlocked it times out like any screen, so nobody can reach your notifications</string>
+    <string name="standby_charging_desc">A dim bedside clock after 20 seconds on the home screen while charging. Pinch the home screen with two fingers to open it any time; tap to leave. It stays lit all night only over the lock screen, so nobody can reach your notifications: with Minimalist on in Accessibility, it locks the phone itself after 10 untouched seconds and lights straight up again, and it is back on top every time the screen turns off on the charger. Without it, a still-unlocked phone times out like any screen</string>
     <string name="standby_wake">Standby on every wake</string>
     <string name="standby_wake_desc">Each time the screen turns on, the bedside clock shows first, over the lock screen. Tap it to unlock, or unlock with your fingerprint or face; you return to the app you were in. The same switch lets home, recents or pulling down the notifications lock the phone on a still-unlocked bedside clock</string>
     <string name="grant_accessibility">Tap to turn on Minimalist in Accessibility</string>

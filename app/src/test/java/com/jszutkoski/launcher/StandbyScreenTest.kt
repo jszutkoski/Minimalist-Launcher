@@ -144,6 +144,43 @@ class StandbyScreenTest {
         assertEquals(0, locks)
     }
 
+    private fun serviceOn() {
+        val me = android.content.ComponentName(app, LockService::class.java).flattenToString()
+        android.provider.Settings.Secure.putString(app.contentResolver, android.provider.Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES, me)
+    }
+
+    @Test
+    fun unlockedOnTheChargerItLocksToStayLit() {
+        serviceOn()
+        phone(secure = true, locked = false)
+        battery(charging = true)
+        open()
+        idle(9_000)
+        assertEquals(0, locks)
+        idle(2_000)
+        assertEquals(1, locks)
+    }
+
+    @Test
+    fun offTheChargerItNeverLocksOnItsOwn() {
+        serviceOn()
+        phone(secure = true, locked = false)
+        battery(charging = false)
+        open()
+        idle(15_000)
+        assertEquals(0, locks)
+    }
+
+    @Test
+    fun alreadyLockedThereIsNothingToDo() {
+        serviceOn()
+        phone(secure = true, locked = true)
+        battery(charging = true)
+        open()
+        idle(15_000)
+        assertEquals(0, locks)
+    }
+
     @Test
     fun withNoScreenLockThereIsNothingToLock() {
         phone(secure = false, locked = false)
