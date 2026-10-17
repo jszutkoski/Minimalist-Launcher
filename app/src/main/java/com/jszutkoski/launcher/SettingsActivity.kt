@@ -416,7 +416,7 @@ class SettingsActivity : Activity() {
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
-            if (!home) alpha = 0.55f
+            if (!home) alpha = StandbyView.DIM
             val wrap = ViewGroup.LayoutParams.WRAP_CONTENT
             val lines = listOfNotNull(
                 date.takeIf { look.date == DatePosition.ABOVE },

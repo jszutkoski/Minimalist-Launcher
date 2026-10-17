@@ -57,8 +57,7 @@ class StandbyView(context: Context, private val onExit: () -> Unit) : FrameLayou
         content.apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
-            // Everything at half strength: readable in the dark, easy on the panel.
-            alpha = 0.55f
+            alpha = DIM
             addView(date, LinearLayout.LayoutParams(wrap, wrap))
             addView(face, LinearLayout.LayoutParams(wrap, wrap))
             addView(weather, LinearLayout.LayoutParams(wrap, wrap))
@@ -178,7 +177,10 @@ class StandbyView(context: Context, private val onExit: () -> Unit) : FrameLayou
         super.onDetachedFromWindow()
     }
 
-    private companion object {
-        const val DRIFT_DP = 6
+    companion object {
+        private const val DRIFT_DP = 6
+
+        /** Everything a little dimmed: easy to read across the room, gentle in the dark and on the panel. */
+        const val DIM = 0.8f
     }
 }
