@@ -28,9 +28,7 @@ class ClockFaceTest {
             labelSp = 13f,
             gravity = 0,
             maxWidth = maxWidth,
-            date = date,
-            dateGap = 20,
-            gap = 26,
+            gap = 24,
         )
         face.measure(MeasureSpec.makeMeasureSpec(2000, MeasureSpec.AT_MOST), MeasureSpec.makeMeasureSpec(4000, MeasureSpec.AT_MOST))
     }
@@ -54,15 +52,22 @@ class ClockFaceTest {
     }
 
     @Test
-    fun theDateAboveOrBelowMovesTheSpacing() {
-        show(ClockLook(date = DatePosition.ABOVE))
-        assertEquals(0, face.battery.margins.bottomMargin)
-        show(ClockLook(date = DatePosition.BELOW))
-        assertTrue(face.battery.margins.bottomMargin != 0)
-        assertEquals(0, face.digital.margins.topMargin)
-        show(ClockLook(date = DatePosition.HIDDEN))
-        assertEquals(0, face.battery.margins.bottomMargin)
-        assertEquals(0, face.digital.margins.topMargin)
+    fun everyGapIsTheSameGlyphToGlyph() {
+        // A column of date, clock and weather, as the screens build it.
+        show(ClockLook())
+        val column = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
+        val weather = TextView(context).apply { text = "18° Sunny" }
+        val wrap = LinearLayout.LayoutParams.WRAP_CONTENT
+        listOf(date, face, weather).forEach { column.addView(it, LinearLayout.LayoutParams(wrap, wrap)) }
+        spaceGlyphs(listOf(spacedText(date), face.spaced(), spacedText(weather)), 24)
+        column.measure(MeasureSpec.makeMeasureSpec(2000, MeasureSpec.AT_MOST), MeasureSpec.makeMeasureSpec(4000, MeasureSpec.AT_MOST))
+        column.layout(0, 0, column.measuredWidth, column.measuredHeight)
+        val dateBaseline = date.bottom + date.margins.bottomMargin
+        val clockTop = face.top + face.spaced().top
+        val lineCentre = face.bottom - face.spaced().bottom
+        val weatherCaps = weather.top + spacedText(weather).top
+        assertEquals(24f, clockTop - dateBaseline, 1.5f)
+        assertEquals(24f, weatherCaps - lineCentre, 1.5f)
     }
 
     @Test

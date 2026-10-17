@@ -63,9 +63,9 @@ class StandbyView(context: Context, private val onExit: () -> Unit) : FrameLayou
             alpha = 0.55f
             addView(date, LinearLayout.LayoutParams(wrap, wrap))
             addView(face, LinearLayout.LayoutParams(wrap, wrap))
-            addView(weather, LinearLayout.LayoutParams(wrap, wrap).apply { topMargin = dp(18) })
-            addView(screenTime, LinearLayout.LayoutParams(wrap, wrap).apply { topMargin = dp(18) })
-            addView(waiting, LinearLayout.LayoutParams(wrap, wrap).apply { topMargin = dp(22) })
+            addView(weather, LinearLayout.LayoutParams(wrap, wrap))
+            addView(screenTime, LinearLayout.LayoutParams(wrap, wrap))
+            addView(waiting, LinearLayout.LayoutParams(wrap, wrap))
         }
         setLook(ClockLook())
         waiting.addView(chat)
@@ -74,20 +74,35 @@ class StandbyView(context: Context, private val onExit: () -> Unit) : FrameLayou
     }
 
     /** The clock and battery chosen in settings, kept clear of the screen's sides as it drifts. */
-    fun setLook(look: ClockLook) = face.apply(
-        look,
-        digitsSp = 106f,
-        analogDp = 240f,
-        labelSp = 13f,
-        gravity = Gravity.CENTER_HORIZONTAL,
-        maxWidth = resources.displayMetrics.widthPixels - 2 * dp(SIDE_MARGIN_DP),
-        date = date,
-        dateGap = dp(DATE_GAP_DP),
-        gap = dp(BATTERY_GAP_DP),
-    ).also {
+    fun setLook(look: ClockLook) {
+        face.apply(
+            look,
+            digitsSp = 106f,
+            analogDp = 240f,
+            labelSp = 13f,
+            gravity = Gravity.CENTER_HORIZONTAL,
+            maxWidth = resources.displayMetrics.widthPixels - 2 * dp(SIDE_MARGIN_DP),
+            gap = dp(GAP_DP),
+        )
         content.removeView(date)
         content.addView(date, content.indexOfChild(face) + if (look.date == DatePosition.ABOVE) 0 else 1)
         date.visibility = if (look.date == DatePosition.HIDDEN) GONE else VISIBLE
+        space()
+    }
+
+    /**
+     * One gap between each shown line, glyph to glyph, and none at the ends: the glyphs
+     * themselves are what sits in the middle of the screen.
+     */
+    private fun space() {
+        val lines = (0 until content.childCount).map { i ->
+            when (val view = content.getChildAt(i)) {
+                face -> face.spaced()
+                is TextView -> spacedText(view)
+                else -> Spaced(view, 0f, 0f)
+            }
+        }
+        spaceGlyphs(lines, dp(GAP_DP), trimEnds = true)
     }
 
     /** A line glyph for each kind of message waiting; the row goes when there is nothing. */
@@ -98,6 +113,7 @@ class StandbyView(context: Context, private val onExit: () -> Unit) : FrameLayou
         (mail.layoutParams as LinearLayout.LayoutParams).leftMargin = if (whatsApp) dp(22) else 0
         mail.requestLayout()
         waiting.visibility = if (whatsApp || email) VISIBLE else GONE
+        space()
     }
 
     private fun glyph(drawable: Int, description: String) = ImageView(context).apply {
@@ -113,15 +129,14 @@ class StandbyView(context: Context, private val onExit: () -> Unit) : FrameLayou
     fun showWeather(label: String?) {
         weather.text = label.orEmpty()
         weather.visibility = if (label == null) GONE else VISIBLE
-        // Under the weather, screen time follows closely; alone, it keeps the gap from the clock.
-        (screenTime.layoutParams as LinearLayout.LayoutParams).topMargin = dp(if (label == null) 18 else 4)
-        screenTime.requestLayout()
+        space()
     }
 
     /** "2 h 5 min today" under the weather, or nothing. */
     fun showScreenTime(label: String?) {
         screenTime.text = label.orEmpty()
         screenTime.visibility = if (label == null) GONE else VISIBLE
+        space()
     }
 
     fun show() {

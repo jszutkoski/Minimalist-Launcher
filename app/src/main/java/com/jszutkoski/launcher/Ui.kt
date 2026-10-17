@@ -3,11 +3,13 @@ package com.jszutkoski.launcher
 import android.app.Activity
 import android.content.Context
 import android.content.res.ColorStateList
+import android.graphics.Rect
 import android.graphics.Typeface
 import android.os.Build
 import android.text.TextUtils
 import android.util.TypedValue
 import android.view.View
+import android.view.ViewGroup
 import android.widget.TextView
 import kotlin.math.roundToInt
 
@@ -69,5 +71,40 @@ fun Activity.edgeToEdge() {
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.VANILLA_ICE_CREAM) {
         @Suppress("DEPRECATION")
         window.setDecorFitsSystemWindows(false)
+    }
+}
+
+/** One element of a column spaced glyph to glyph: [view] is laid out, its glyphs [top] and [bottom] inset in it. */
+class Spaced(val view: View, val top: Float, val bottom: Float)
+
+/**
+ * A line of text as a [Spaced] element, from the top of its capitals to its baseline, measured
+ * on [text] but laid out as [view] (the row holding it, when there is one).
+ */
+fun spacedText(text: TextView, view: View = text): Spaced {
+    val metrics = text.paint.fontMetrics
+    val boxTop = if (text.includeFontPadding) metrics.top else metrics.ascent
+    val capTop = Rect().also { text.paint.getTextBounds("H", 0, 1, it) }.top
+    return Spaced(view, text.paddingTop + (capTop - boxTop), metrics.descent + text.paddingBottom)
+}
+
+/**
+ * Margins that put every shown element of a vertical LinearLayout exactly [gap] pixels from
+ * the next, from the glyphs of one to the glyphs of the other, whatever the empty space in
+ * their boxes. With [trimEnds], the first and last also lose that space at the column's edges,
+ * so the glyphs themselves are what is centred.
+ */
+fun spaceGlyphs(elements: List<Spaced>, gap: Int, trimEnds: Boolean = false) {
+    val shown = elements.filter { it.view.visibility != View.GONE }
+    shown.forEachIndexed { i, element ->
+        (element.view.layoutParams as ViewGroup.MarginLayoutParams).apply {
+            topMargin = when {
+                i > 0 -> (gap - element.top).roundToInt()
+                trimEnds -> -element.top.roundToInt()
+                else -> 0
+            }
+            bottomMargin = if (i < shown.lastIndex || trimEnds) -element.bottom.roundToInt() else 0
+        }
+        element.view.requestLayout()
     }
 }

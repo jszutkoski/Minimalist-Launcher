@@ -16,6 +16,7 @@ import android.view.WindowInsets
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ScrollView
+import android.widget.TextView
 import android.window.OnBackInvokedCallback
 import android.window.OnBackInvokedDispatcher
 import java.util.Date
@@ -306,9 +307,7 @@ class SettingsActivity : Activity() {
             labelSp = 13f * scale,
             gravity = Gravity.CENTER_HORIZONTAL,
             maxWidth = previewWidth,
-            date = date,
-            dateGap = dp(DATE_GAP_DP),
-            gap = dp(BATTERY_GAP_DP),
+            gap = dp(GAP_DP),
         )
         // The battery as it is now: a sticky broadcast answers at once, with no receiver kept.
         val battery = registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))?.let(BatteryState::from)
@@ -331,13 +330,16 @@ class SettingsActivity : Activity() {
             gravity = Gravity.CENTER_HORIZONTAL
             if (!home) alpha = 0.55f
             val wrap = ViewGroup.LayoutParams.WRAP_CONTENT
-            if (look.date == DatePosition.ABOVE) addView(date, LinearLayout.LayoutParams(wrap, wrap))
-            addView(face, LinearLayout.LayoutParams(wrap, wrap))
-            if (look.date == DatePosition.BELOW) addView(date, LinearLayout.LayoutParams(wrap, wrap))
-            weather?.let { addView(it, LinearLayout.LayoutParams(wrap, wrap).apply { topMargin = dp(18) }) }
-            screenTime?.let {
-                addView(it, LinearLayout.LayoutParams(wrap, wrap).apply { topMargin = dp(if (weather != null) 4 else 18) })
-            }
+            val lines = listOfNotNull(
+                date.takeIf { look.date == DatePosition.ABOVE },
+                face,
+                date.takeIf { look.date == DatePosition.BELOW },
+                weather,
+                screenTime,
+            )
+            lines.forEach { addView(it, LinearLayout.LayoutParams(wrap, wrap)) }
+            // The same single gap as on the screen itself, glyph to glyph.
+            spaceGlyphs(lines.map { if (it === face) face.spaced() else spacedText(it as TextView) }, dp(GAP_DP))
         }
     }
 

@@ -86,6 +86,9 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
 
     private var progress = 0f
     private var stale = true
+
+    /** The date's row goes above the clock, as chosen; otherwise under it. */
+    private var dateAbove = true
     private var animator: ValueAnimator? = null
     private val emphasized = PathInterpolator(0.2f, 0f, 0f, 1f)
 
@@ -246,12 +249,11 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         weatherText = text("", 17f, Palette.SECONDARY, 400).apply {
             letterSpacing = 0.02f
             visibility = View.GONE
-            setPadding(0, dp(EXTRAS_GAP_DP), 0, 0)
         }
         screenTimeText = text("", 17f, Palette.SECONDARY, 400).apply {
             letterSpacing = 0.02f
             visibility = View.GONE
-            setPadding(0, dp(EXTRAS_GAP_DP), 0, dp(8))
+            setPadding(0, 0, 0, dp(8))
             setOnClickListener { SystemActions.openDigitalWellbeing(this@MainActivity) }
         }
         player = PlayerView(this, ::openPlayer)
@@ -345,16 +347,14 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
             labelSp = 13f * scale,
             gravity = if (prefs.centerFavorites) Gravity.CENTER_HORIZONTAL else Gravity.START,
             maxWidth = resources.displayMetrics.widthPixels - 2 * dp(SIDE_MARGIN_DP),
-            date = date,
-            dateGap = dp(DATE_GAP_DP),
-            gap = dp(BATTERY_GAP_DP),
+            gap = dp(GAP_DP),
         )
         // The date's row above the clock or below it; hidden, only the next alarm stays there.
+        dateAbove = look.date == DatePosition.ABOVE
         val rowParams = dateRow.layoutParams
         home.removeView(dateRow)
-        home.addView(dateRow, home.indexOfChild(face) + if (look.date == DatePosition.ABOVE) 0 else 1, rowParams)
+        home.addView(dateRow, home.indexOfChild(face) + if (dateAbove) 0 else 1, rowParams)
         date.visibility = if (look.date == DatePosition.HIDDEN) View.GONE else View.VISIBLE
-        updateAlarm()
         alarmDot.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f * scale)
         alarmText.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f * scale)
         pause.setTextScale(scale)
@@ -363,6 +363,8 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         showDots()
         screenTimeText.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f * scale)
         weatherText.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f * scale)
+        // Spaces the column too, with every size set.
+        updateAlarm()
         player.setTextScale(scale)
         setDefault.visibility = if (SystemActions.isDefaultHome(this)) View.GONE else View.VISIBLE
 
@@ -449,6 +451,7 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
     private fun updateScreenTime() {
         if (!prefs.screenTime(ClockScreen.HOME) || !ScreenTime.hasAccess(this)) {
             screenTimeText.visibility = View.GONE
+            spaceHome()
             return
         }
         background.execute {
@@ -456,6 +459,7 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
             runOnUiThread {
                 screenTimeText.text = getString(R.string.screen_time_today, ScreenTime.format(total))
                 screenTimeText.visibility = View.VISIBLE
+                spaceHome()
             }
         }
     }
@@ -476,8 +480,22 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
     private fun showWeather(label: String?) {
         weatherText.text = label.orEmpty()
         weatherText.visibility = if (label == null) View.GONE else View.VISIBLE
-        // Under the weather, screen time follows closely; alone, it keeps the gap from the clock.
-        screenTimeText.setPadding(0, dp(if (label == null) EXTRAS_GAP_DP else 4), 0, dp(8))
+        spaceHome()
+    }
+
+    /** The date (or the alarm alone), the clock, the weather and screen time: one gap between each. */
+    private fun spaceHome() {
+        val row = spacedText(if (date.visibility == View.VISIBLE) date else alarmText, dateRow)
+        spaceGlyphs(
+            buildList {
+                if (dateAbove) add(row)
+                add(face.spaced())
+                if (!dateAbove) add(row)
+                add(spacedText(weatherText))
+                add(spacedText(screenTimeText))
+            },
+            dp(GAP_DP),
+        )
     }
 
     // Smart search -------------------------------------------------------------------
@@ -588,6 +606,8 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         // The dot only parts the alarm from a date beside it.
         alarmDot.visibility = if (date.visibility == View.VISIBLE) visible else View.GONE
         alarmText.visibility = visible
+        dateRow.visibility = if (date.visibility == View.VISIBLE || next != null) View.VISIBLE else View.GONE
+        spaceHome()
         if (next == null) return
         val untilWithinDay = next - System.currentTimeMillis() - DAY_MS
         // Drop the weekday once the alarm is less than a day away, even if home stays open.
@@ -762,8 +782,6 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
 
         private const val STANDBY_DELAY_MS = 20_000L
 
-        /** From the clock block to the weather or screen time under it. */
-        private const val EXTRAS_GAP_DP = 18
         private const val DAY_MS = 24 * 60 * 60 * 1000L
     }
 }
