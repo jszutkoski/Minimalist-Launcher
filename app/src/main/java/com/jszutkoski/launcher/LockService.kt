@@ -7,16 +7,14 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.media.AudioManager
-import android.os.Build
 import android.provider.Settings
 import android.view.accessibility.AccessibilityEvent
 
 /**
  * The only way for an ordinary app to lock the screen, and to open a screen from the
  * background: Android lets an app whose accessibility service is on do both. It never reads
- * what is on screen. It locks on request; with "Standby on every wake" it puts the bedside
- * clock on top each time the screen turns off; and it hears, from the system's interface alone,
- * that one of its windows appeared, so standby can close the notification shade pulled over it.
+ * what is on screen and hears nothing about other apps. It locks on request, and with "Standby
+ * on every wake" it puts the bedside clock on top each time the screen turns off.
  */
 class LockService : AccessibilityService() {
     private val screenOff = object : BroadcastReceiver() {
@@ -53,10 +51,8 @@ class LockService : AccessibilityService() {
         listening = false
     }
 
-    /** One of the system interface's windows came up: only the fact is used, never its text. */
-    override fun onAccessibilityEvent(event: AccessibilityEvent?) {
-        if (event?.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) StandbyActivity.systemWindowAppeared()
-    }
+    /** Subscribed to nothing that ever comes: see lock_service.xml. */
+    override fun onAccessibilityEvent(event: AccessibilityEvent?) = Unit
 
     override fun onInterrupt() = Unit
 
@@ -76,15 +72,6 @@ class LockService : AccessibilityService() {
 
         /** True when the screen was locked. */
         fun lock(): Boolean = lockAction()
-
-        /** How the notification shade is closed: Android 12's global action. Replaced only by tests. */
-        internal var closeShadeAction: () -> Boolean = {
-            Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
-                instance?.performGlobalAction(GLOBAL_ACTION_DISMISS_NOTIFICATION_SHADE) == true
-        }
-
-        /** True when the notification shade was closed (Android 12+, with the service on). */
-        fun closeShade(): Boolean = closeShadeAction()
 
         /** Ringing or on a call: the call screen must never be covered, nor the phone locked under it. */
         fun inCall(context: Context): Boolean {

@@ -1,14 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Told only when one of Android's own windows appears (the notification shade, quick
-     settings), never what they say, and nothing at all about other apps: the service locks the
-     screen, opens the bedside clock and closes the shade pulled over it while locked. -->
+<!-- Listens to nothing and reads nothing: subscribed only to announcements from this app, which
+     never makes any. The service only locks the screen and opens the bedside clock. -->
 <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools"
-    android:accessibilityEventTypes="typeWindowStateChanged"
+    android:accessibilityEventTypes="typeAnnouncement"
     android:accessibilityFeedbackType="feedbackGeneric"
     android:canRetrieveWindowContent="false"
     android:description="@string/lock_service_description"
     android:isAccessibilityTool="false"
     android:notificationTimeout="0"
-    android:packageNames="com.android.systemui"
-    tools:targetApi="31" />
+    android:packageNames="com.jszutkoski.launcher" />

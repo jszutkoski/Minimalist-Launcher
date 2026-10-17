@@ -26,21 +26,17 @@ class StandbyScreenTest {
     private val keyguard = shadowOf(app.getSystemService(KeyguardManager::class.java))
 
     private val realLock = LockService.lockAction
-    private val realCloseShade = LockService.closeShadeAction
     private var locks = 0
-    private var shadesClosed = 0
 
     @Before
     fun countLocks() {
         // The screen is on (Robolectric's default): this is someone at the phone.
         LockService.lockAction = { locks++; true }
-        LockService.closeShadeAction = { shadesClosed++; true }
     }
 
     @After
     fun tearDown() {
         LockService.lockAction = realLock
-        LockService.closeShadeAction = realCloseShade
         Notifications.update(emptySet())
         idle()
     }
@@ -140,54 +136,12 @@ class StandbyScreenTest {
     }
 
     @Test
-    fun overTheLockScreenTheShadeIsClosedAgain() {
+    fun overTheLockScreenTheShadeIsLeftToAndroid() {
+        // Locking again would only turn the screen off; the lock screen's own settings decide.
         phone(secure = true, locked = true)
         battery(charging = true)
-        shadeOver(seconds = 1)
-        assertEquals(1, shadesClosed)
-        // Locking again would only turn the screen off.
+        shadeOver(seconds = 11)
         assertEquals(0, locks)
-    }
-
-    @Test
-    fun theShadeIsClosedAgainWhileAFingerMayStillPullIt() {
-        phone(secure = true, locked = true)
-        battery(charging = true)
-        shadeOver(seconds = 1)
-        idle(2_500)
-        assertTrue("closed $shadesClosed times", shadesClosed >= 3)
-    }
-
-    @Test
-    fun theAccessibilityServiceSeeingTheShadeClosesItToo() {
-        // Some phones never move focus away from standby when the shade opens over the lock screen.
-        phone(secure = true, locked = true)
-        battery(charging = true)
-        Robolectric.buildActivity(StandbyActivity::class.java).setup()
-        StandbyActivity.systemWindowAppeared()
-        idle()
-        assertEquals(1, shadesClosed)
-    }
-
-    @Test
-    fun aSystemWindowOnAnUnlockedStandbyDoesNotTurnTheScreenOff() {
-        // A notification popping up or the volume: only the shade taking focus locks.
-        phone(secure = true, locked = false)
-        battery(charging = true)
-        Robolectric.buildActivity(StandbyActivity::class.java).setup()
-        idle(11_000)
-        StandbyActivity.systemWindowAppeared()
-        idle()
-        assertEquals(0, locks)
-    }
-
-    @Test
-    fun theShadeCanBeLeftToAndroidsLockScreenSettings() {
-        Prefs(app).closeShadeOnStandby = false
-        phone(secure = true, locked = true)
-        battery(charging = true)
-        shadeOver(seconds = 1)
-        assertEquals(0, shadesClosed)
     }
 
     @Test
@@ -196,7 +150,6 @@ class StandbyScreenTest {
         battery(charging = true)
         shadeOver(seconds = 11)
         assertEquals(0, locks)
-        assertEquals(0, shadesClosed)
     }
 
     private fun whatsAppWaiting() {

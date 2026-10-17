@@ -128,6 +128,7 @@ class SettingsActivity : Activity() {
             getString(R.string.restricted_value),
             getString(R.string.restricted_desc),
         ) { SystemActions.openAppInfo(this) }
+        row(getString(R.string.privacy), getString(R.string.privacy_value)) { SystemActions.openPrivacyPolicy(this) }
     }
 
     private fun renderHome() {
@@ -214,22 +215,13 @@ class SettingsActivity : Activity() {
             granted = LockService.isEnabled(this),
             missing = getString(R.string.grant_accessibility),
             setEnabled = { prefs.standbyOnWake = it },
-            grant = { SystemActions.openAccessibility(this) },
+            grant = { askForAccessibility { prefs.standbyOnWake = false } },
         )
         row(
             getString(R.string.lock_glyphs),
             onOff(prefs.lockScreenGlyphs),
             getString(R.string.lock_glyphs_desc),
         ) { prefs.lockScreenGlyphs = !prefs.lockScreenGlyphs }
-        permissionRow(
-            title = getString(R.string.close_shade),
-            description = getString(R.string.close_shade_desc),
-            enabled = prefs.closeShadeOnStandby,
-            granted = LockService.isEnabled(this),
-            missing = getString(R.string.grant_accessibility),
-            setEnabled = { prefs.closeShadeOnStandby = it },
-            grant = { SystemActions.openAccessibility(this) },
-        )
         row(
             getString(R.string.lock_notifications),
             getString(R.string.lock_notifications_value),
@@ -273,7 +265,7 @@ class SettingsActivity : Activity() {
             granted = LockService.isEnabled(this),
             missing = getString(R.string.grant_accessibility),
             setEnabled = { prefs.doubleTapLock = it },
-            grant = { SystemActions.openAccessibility(this) },
+            grant = { askForAccessibility { prefs.doubleTapLock = false } },
         )
         content.addView(
             text(
@@ -318,6 +310,33 @@ class SettingsActivity : Activity() {
                 else -> setEnabled(false)
             }
         }
+    }
+
+    /**
+     * The accessibility service can do far more than this app asks of it, so before Android's
+     * page opens, this says what it is used for and what it never does; only "agree" goes on.
+     * Anything else turns the feature that asked back off.
+     */
+    private fun askForAccessibility(declined: () -> Unit) {
+        val sheet = Sheet(this, getString(R.string.accessibility_title))
+        sheet.column.addView(
+            text(getString(R.string.accessibility_disclosure), 16f, Palette.SECONDARY, 400).apply {
+                isSingleLine = false
+                setLineSpacing(dp(4f), 1f)
+                setPadding(0, dp(8), 0, dp(12))
+            },
+        )
+        var agreed = false
+        sheet.option(getString(R.string.accessibility_agree)) {
+            agreed = true
+            SystemActions.openAccessibility(this)
+        }
+        sheet.option(getString(R.string.accessibility_decline), Palette.SECONDARY) {}
+        sheet.onDismiss = {
+            if (!agreed) declined()
+            render()
+        }
+        sheet.show()
     }
 
     /** Android's own prompt; once it has been refused for good, app info is the only way left. */

@@ -3,7 +3,7 @@
     <string name="app_name">Minimalist</string>
     <string name="settings">Settings</string>
     <string name="lock_service_label">Minimalist</string>
-    <string name="lock_service_description">Lets Minimalist lock the screen when you double-tap an empty part of the home screen, show its bedside clock when the screen turns on, and close the notification shade pulled over that clock while the phone is locked. For that last one it is told when Android\'s own windows (the shade, quick settings) appear, never what they say. It doesn\'t read or change anything on your screen and hears nothing about other apps.</string>
+    <string name="lock_service_description">Lets Minimalist lock the screen when you double-tap an empty part of the home screen, and show its bedside clock when the screen turns on. It doesn\'t read or change anything on your screen, sees nothing you type and hears nothing about other apps.</string>
     <string name="media_listener_label">Minimalist now playing</string>
     <string name="search_hint">Search</string>
     <string name="search_only_hint">Type an app name</string>
@@ -78,6 +78,8 @@
     <string name="restricted_title">Restricted setting?</string>
     <string name="restricted_value">Open app info</string>
     <string name="restricted_desc">If Android says \"App was denied access\" for usage access, notification access or the screen lock: try once, then open app info, tap ⋮ and choose \"Allow restricted settings\".</string>
+    <string name="privacy">Privacy</string>
+    <string name="privacy_value">What Minimalist reads, and where it goes</string>
     <string name="on">On</string>
     <string name="off">Off</string>
     <string name="text_size">Text size</string>
@@ -109,13 +111,15 @@
     <string name="standby_wake">Standby on every wake</string>
     <string name="standby_wake_desc">Each time the screen turns on, the bedside clock shows first, over the lock screen. Tap it to unlock, or unlock with your fingerprint or face; you return to the app you were in. The same switch lets home, recents or pulling down the notifications lock the phone on a still-unlocked bedside clock</string>
     <string name="grant_accessibility">Tap to turn on Minimalist in Accessibility</string>
+    <string name="accessibility_title">Before turning on Accessibility</string>
+    <string name="accessibility_disclosure">Minimalist uses Android\'s accessibility service only for two things an ordinary app isn\'t allowed to do: lock the screen (a double-tap on the home screen, or leaving the bedside clock while the phone is still unlocked) and show the bedside clock when the screen turns on.\n\nIt doesn\'t read what is on your screen, sees nothing you type, watches no other app and sends nothing off your phone. You can turn it off at any time in Android\'s accessibility settings.</string>
+    <string name="accessibility_agree">Agree and open settings</string>
+    <string name="accessibility_decline">Not now</string>
     <string name="lock_glyphs">Message icons on the lock screen</string>
     <string name="lock_glyphs_desc">The WhatsApp and email icons on the bedside clock while the phone is locked. Off, they appear only once it is unlocked</string>
-    <string name="close_shade">Close the notification shade</string>
-    <string name="close_shade_desc">While the phone is locked, pulling down the notifications over the bedside clock closes them again: unlock first to read them. Android 12 or later, with Minimalist on in Accessibility</string>
     <string name="lock_notifications">Notifications on the lock screen</string>
     <string name="lock_notifications_value">Set in Android</string>
-    <string name="lock_notifications_desc">What the lock screen itself shows of your notifications, with standby closed or the option above off: choose there whether it shows your messages, hides what they say or shows nothing</string>
+    <string name="lock_notifications_desc">What the lock screen shows of your notifications, also when they are pulled down over the bedside clock: choose there whether it shows your messages, hides what they say or shows nothing</string>
     <string name="weather">Weather</string>
     <string name="weather_desc">Temperature and sky under the date on the bedside clock, from Open-Meteo, for your approximate location</string>
     <string name="grant_location">Tap to allow approximate location</string>

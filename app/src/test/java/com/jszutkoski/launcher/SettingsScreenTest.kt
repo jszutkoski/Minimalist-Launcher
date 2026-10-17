@@ -1,15 +1,19 @@
 package com.jszutkoski.launcher
 
 import android.app.Activity
+import android.provider.Settings
 import android.view.View
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import org.robolectric.shadows.ShadowDialog
 
 @RunWith(RobolectricTestRunner::class)
 class SettingsScreenTest {
@@ -59,6 +63,36 @@ class SettingsScreenTest {
         activity.tap(R.string.page_standby)
         activity.tap(R.string.lock_glyphs)
         assertFalse(Prefs(activity).lockScreenGlyphs)
+    }
+
+    /** Taps this option of the sheet on top. */
+    private fun Activity.choose(option: Int) {
+        val sheet = ShadowDialog.getLatestDialog()
+        assertTrue(sheet.isShowing)
+        val text = getString(option)
+        sheet.window!!.decorView.textViews().first { it.text == text }.performClick()
+        idle()
+    }
+
+    @Test
+    fun accessibilityIsExplainedBeforeAndroidsPageOpens() {
+        val activity = controller.get()
+        activity.tap(R.string.page_gestures)
+        activity.tap(R.string.double_tap)
+        assertNull(shadowOf(activity).nextStartedActivity)
+        activity.choose(R.string.accessibility_agree)
+        assertEquals(Settings.ACTION_ACCESSIBILITY_SETTINGS, shadowOf(activity).nextStartedActivity.action)
+        assertTrue(Prefs(activity).doubleTapLock)
+    }
+
+    @Test
+    fun notAgreeingLeavesTheFeatureOff() {
+        val activity = controller.get()
+        activity.tap(R.string.page_standby)
+        activity.tap(R.string.standby_wake)
+        activity.choose(R.string.accessibility_decline)
+        assertNull(shadowOf(activity).nextStartedActivity)
+        assertFalse(Prefs(activity).standbyOnWake)
     }
 
     @Test

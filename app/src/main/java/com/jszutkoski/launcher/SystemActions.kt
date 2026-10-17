@@ -53,6 +53,9 @@ object SystemActions {
 
     fun openAccessibility(activity: Activity) = start(activity, Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
 
+    /** The privacy policy, published with the code. */
+    fun openPrivacyPolicy(activity: Activity) = start(activity, Intent(Intent.ACTION_VIEW, Uri.parse(PRIVACY_POLICY_URL)))
+
     /** Where Android hides "Allow restricted settings" for sideloaded apps. */
     fun openAppInfo(activity: Activity) =
         start(activity, Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${activity.packageName}")))
@@ -125,4 +128,6 @@ object SystemActions {
         warn("Not allowed to open $intent", e)
         false
     }
+
+    private const val PRIVACY_POLICY_URL = "https://github.com/jszutkoski/Minimalist-Launcher/blob/main/PRIVACY.md"
 }
