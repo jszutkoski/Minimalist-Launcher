@@ -67,6 +67,16 @@ class SettingsScreenTest {
         assertFalse(Prefs(activity).lockScreenGlyphs)
     }
 
+    @Test
+    fun theBedsideClockHasABrightnessOfItsOwn() {
+        val activity = controller.get()
+        activity.tap(R.string.page_standby)
+        assertEquals(StandbyBrightness.SYSTEM, Prefs(activity).standbyBrightness)
+        activity.tap(R.string.standby_brightness)
+        assertEquals(StandbyBrightness.TEN, Prefs(activity).standbyBrightness)
+        assertTrue(activity.content().textViews().any { it.text == "10%" })
+    }
+
     /** Taps this option of the sheet on top. */
     private fun Activity.choose(option: Int) {
         val sheet = ShadowDialog.getLatestDialog()

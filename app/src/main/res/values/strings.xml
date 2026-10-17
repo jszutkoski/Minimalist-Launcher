@@ -82,6 +82,9 @@
     <string name="standby_icons_but">All apps but %1$d</string>
     <string name="standby_icons_desc">An app with notifications waiting shows its icon under the bedside clock; apps without an icon of their own share three dots. Tap to choose which apps may</string>
     <string name="standby_icons_title">Icons on the bedside clock</string>
+    <string name="standby_brightness">Brightness</string>
+    <string name="brightness_system">As the system</string>
+    <string name="standby_brightness_desc">The screen's brightness on the bedside clock alone; the phone's own setting stays as it is. As the system, it follows the phone's brightness and auto-brightness</string>
     <string name="set_as_home">Set as home app</string>
     <string name="all_apps">All apps</string>
     <string name="screen_time_today">%1$s today</string>

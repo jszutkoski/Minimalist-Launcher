@@ -2,6 +2,7 @@ package com.jszutkoski.launcher
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.view.WindowManager
 
 enum class TextSize(val label: Int, val scale: Float) {
     SMALL(R.string.text_small, 0.95f),
@@ -17,6 +18,16 @@ enum class StatusBarMode(val label: Int) {
 
     /** Gone; Android slides it back briefly with the notification shade or a swipe from the top. */
     HIDDEN(R.string.bar_hidden),
+}
+
+/** The bedside clock's screen brightness: the system's, or one of its own. */
+enum class StandbyBrightness(val level: Float) {
+    SYSTEM(WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE),
+    TEN(0.1f),
+    QUARTER(0.25f),
+    HALF(0.5f),
+    THREE_QUARTERS(0.75f),
+    FULL(1f),
 }
 
 class Prefs(context: Context) {
@@ -141,6 +152,10 @@ class Prefs(context: Context) {
         get() = prefs.getBoolean(KEY_STANDBY, true)
         set(value) = prefs.edit().putBoolean(KEY_STANDBY, value).apply()
 
+    var standbyBrightness: StandbyBrightness
+        get() = choice(KEY_STANDBY_BRIGHTNESS, StandbyBrightness.SYSTEM)
+        set(value) = prefs.edit().putInt(KEY_STANDBY_BRIGHTNESS, value.ordinal).apply()
+
     /** Put standby on top whenever the screen turns off, so it is the first thing on wake. */
     var standbyOnWake: Boolean
         get() = prefs.getBoolean(KEY_STANDBY_ON_WAKE, false)
@@ -240,5 +255,6 @@ class Prefs(context: Context) {
         private const val KEY_DOCK_APPS = "dock_apps"
         private const val KEY_DOCK_COUNT = "dock_count"
         private const val KEY_STANDBY_MUTED = "standby_muted"
+        private const val KEY_STANDBY_BRIGHTNESS = "standby_brightness"
     }
 }

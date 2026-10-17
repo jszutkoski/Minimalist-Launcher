@@ -235,6 +235,13 @@ class StandbyScreenTest {
         .map { it.contentDescription.toString() }
 
     @Test
+    fun itKeepsToTheSystemsBrightnessUnlessToldOtherwise() {
+        assertEquals(WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE, open().window.attributes.screenBrightness)
+        Prefs(app).standbyBrightness = StandbyBrightness.HALF
+        assertEquals(0.5f, open().window.attributes.screenBrightness)
+    }
+
+    @Test
     fun messageIconsShowOverTheLockScreenByDefault() {
         phone(secure = true, locked = true)
         whatsAppWaiting()

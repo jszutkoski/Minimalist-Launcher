@@ -25,6 +25,7 @@ import android.window.OnBackInvokedDispatcher
 import java.util.Date
 import java.util.Locale
 import kotlin.concurrent.thread
+import kotlin.math.roundToInt
 
 class SettingsActivity : Activity() {
     private lateinit var prefs: Prefs
@@ -473,6 +474,11 @@ class SettingsActivity : Activity() {
             setEnabled = { prefs.standbyOnWake = it },
             grant = { askForAccessibility { prefs.standbyOnWake = false } },
         )
+        row(
+            getString(R.string.standby_brightness),
+            brightness(prefs.standbyBrightness),
+            getString(R.string.standby_brightness_desc),
+        ) { prefs.standbyBrightness = next(prefs.standbyBrightness) }
         val muted = prefs.standbyMuted.count { pkg -> repo.apps.any { it.component.packageName == pkg } }
         row(
             getString(R.string.standby_icons),
@@ -716,6 +722,9 @@ class SettingsActivity : Activity() {
         sheet.onDismiss = { render() }
         sheet.show()
     }
+
+    private fun brightness(value: StandbyBrightness) =
+        if (value == StandbyBrightness.SYSTEM) getString(R.string.brightness_system) else "${(value.level * 100).roundToInt()}%"
 
     private fun onOff(value: Boolean) = getString(if (value) R.string.on else R.string.off)
 

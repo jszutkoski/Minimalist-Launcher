@@ -88,13 +88,13 @@ open class StandbyActivity : Activity() {
         Notifications.addListener(notificationsChanged)
         showWaiting()
 
-        // No brightness override: the screen would first light up at the system level and
-        // then visibly ramp down to it. The half-strength text on black keeps it dim enough.
-        // Bars stay, with dark icons on black: nearly invisible. Hidden bars flash in for a
+        // Set before the first frame, so the screen lights up as near the chosen level as Android
+        // allows. Left to the system, nothing is overridden. Bars stay, with dark icons on black: nearly invisible. Hidden bars flash in for a
         // moment on every wake before Android applies the request again.
         val dark = WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS or
             WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS
         window.insetsController?.setSystemBarsAppearance(dark, dark)
+        applyBrightness()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             onBackInvokedDispatcher.registerOnBackInvokedCallback(OnBackInvokedDispatcher.PRIORITY_DEFAULT) { leave() }
         }
@@ -117,12 +117,20 @@ open class StandbyActivity : Activity() {
         shown += id
         // Kept behind other apps for days, so the face chosen meanwhile is applied on each return.
         view.setLook(prefs.clockLook(ClockScreen.STANDBY))
+        applyBrightness()
         view.show()
         keepScreenOn()
         showWaiting()
         showWeather()
         showScreenTime()
         scheduleLock()
+    }
+
+    /** The brightness chosen for standby, for its own window only: the phone's setting stays as it is. */
+    private fun applyBrightness() {
+        val level = prefs.standbyBrightness.level
+        if (window.attributes.screenBrightness == level) return
+        window.attributes = window.attributes.apply { screenBrightness = level }
     }
 
     /**

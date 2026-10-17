@@ -81,6 +81,9 @@
     <string name="standby_icons_but">Todos os apps, menos %1$d</string>
     <string name="standby_icons_desc">Um app com notificação mostra o ícone embaixo do relógio de cabeceira; os que não têm ícone próprio dividem três pontinhos. Toque para escolher quais podem</string>
     <string name="standby_icons_title">Ícones no relógio de cabeceira</string>
+    <string name="standby_brightness">Brilho</string>
+    <string name="brightness_system">Igual ao sistema</string>
+    <string name="standby_brightness_desc">O brilho da tela só no relógio de cabeceira; o ajuste do celular continua como está. Igual ao sistema, segue o brilho do celular e o brilho automático</string>
     <string name="set_as_home">Definir como app de início</string>
     <string name="all_apps">Todos os apps</string>
     <string name="screen_time_today">%1$s hoje</string>
