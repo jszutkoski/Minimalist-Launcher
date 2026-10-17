@@ -3,7 +3,7 @@
     <string name="app_name">Minimalist</string>
     <string name="settings">Configurações</string>
     <string name="lock_service_label">Minimalist</string>
-    <string name="lock_service_description">Permite que o Minimalist bloqueie a tela com um toque duplo num espaço vazio da tela inicial e mostre o relógio de cabeceira quando a tela acende. Ele não lê nem altera nada na sua tela.</string>
+    <string name="lock_service_description">Permite que o Minimalist bloqueie a tela com um toque duplo num espaço vazio da tela inicial mostre o relógio de cabeceira quando a tela acende e feche a cortina de notificações puxada sobre esse relógio com o celular bloqueado. Ele não lê nem altera nada na sua tela.</string>
     <string name="media_listener_label">Minimalist tocando agora</string>
     <string name="search_hint">Buscar</string>
     <string name="search_only_hint">Digite o nome de um app</string>
@@ -110,9 +110,11 @@
     <string name="grant_accessibility">Toque para ativar o Minimalist em Acessibilidade</string>
     <string name="lock_glyphs">Ícones de mensagem na tela de bloqueio</string>
     <string name="lock_glyphs_desc">Os ícones do WhatsApp e do e-mail no relógio de cabeceira com o celular bloqueado. Desligado, aparecem só depois de desbloquear</string>
+    <string name="close_shade">Fechar a cortina de notificações</string>
+    <string name="close_shade_desc">Com o celular bloqueado, puxar as notificações sobre o relógio de cabeceira as fecha de novo: desbloqueie antes para lê-las. Android 12 ou mais novo, com o Minimalist ligado em Acessibilidade</string>
     <string name="lock_notifications">Notificações na tela de bloqueio</string>
     <string name="lock_notifications_value">Definido no Android</string>
-    <string name="lock_notifications_desc">Sobre a tela de bloqueio, a cortina de notificações é do próprio Android: escolha lá se ela mostra suas mensagens, esconde o que dizem ou não mostra nada</string>
+    <string name="lock_notifications_desc">O que a própria tela de bloqueio mostra das notificações, com o descanso fechado ou a opção acima desligada: escolha lá se ela mostra suas mensagens, esconde o que dizem ou não mostra nada</string>
     <string name="weather">Clima</string>
     <string name="weather_desc">Temperatura e céu abaixo da data no relógio de cabeceira, do Open-Meteo, para a sua localização aproximada</string>
     <string name="grant_location">Toque para permitir a localização aproximada</string>

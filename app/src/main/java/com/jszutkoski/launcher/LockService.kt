@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.media.AudioManager
+import android.os.Build
 import android.provider.Settings
 import android.view.accessibility.AccessibilityEvent
 
@@ -71,6 +72,15 @@ class LockService : AccessibilityService() {
 
         /** True when the screen was locked. */
         fun lock(): Boolean = lockAction()
+
+        /** How the notification shade is closed: Android 12's global action. Replaced only by tests. */
+        internal var closeShadeAction: () -> Boolean = {
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+                instance?.performGlobalAction(GLOBAL_ACTION_DISMISS_NOTIFICATION_SHADE) == true
+        }
+
+        /** True when the notification shade was closed (Android 12+, with the service on). */
+        fun closeShade(): Boolean = closeShadeAction()
 
         /** Ringing or on a call: the call screen must never be covered, nor the phone locked under it. */
         fun inCall(context: Context): Boolean {

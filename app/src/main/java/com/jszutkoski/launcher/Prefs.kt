@@ -124,6 +124,11 @@ class Prefs(context: Context) {
         get() = prefs.getBoolean(KEY_LOCK_SCREEN_GLYPHS, true)
         set(value) = prefs.edit().putBoolean(KEY_LOCK_SCREEN_GLYPHS, value).apply()
 
+    /** Standby closes the notification shade pulled over it while the phone is locked. */
+    var closeShadeOnStandby: Boolean
+        get() = prefs.getBoolean(KEY_CLOSE_SHADE, true)
+        set(value) = prefs.edit().putBoolean(KEY_CLOSE_SHADE, value).apply()
+
     /** Small dots beside apps with notifications waiting (needs notification access). */
     var notificationDots: Boolean
         get() = prefs.getBoolean(KEY_NOTIFICATION_DOTS, false)
@@ -170,6 +175,7 @@ class Prefs(context: Context) {
         const val KEY_STANDBY_ON_WAKE = "standby_on_wake"
         const val KEY_NOTIFICATION_DOTS = "notification_dots"
         const val KEY_LOCK_SCREEN_GLYPHS = "lock_screen_glyphs"
+        const val KEY_CLOSE_SHADE = "close_shade_on_standby"
         const val KEY_PAUSE_APPS = "pause_apps"
     }
 }

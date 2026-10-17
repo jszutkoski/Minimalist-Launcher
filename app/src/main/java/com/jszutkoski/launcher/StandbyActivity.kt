@@ -132,7 +132,8 @@ open class StandbyActivity : Activity() {
      * power menu (a call or an alarm too, but those are left alone). On a phone that is still
      * unlocked, past the grace period, the shade would hand anyone the messages and their reply
      * boxes; so the phone locks there and then, as pressing home does. Over the lock screen the
-     * shade is Android's own, showing what its lock screen settings allow.
+     * shade is Android's own and shows what its settings allow; unless that is wanted, it is
+     * closed again at once, so the messages wait for whoever can unlock.
      */
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
@@ -140,8 +141,12 @@ open class StandbyActivity : Activity() {
         if (hasFocus || unlockAsked || isFinishing) return
         if (getSystemService(PowerManager::class.java)?.isInteractive != true) return
         if (LockService.inCall(this)) return
-        val locked = getSystemService(KeyguardManager::class.java)?.isKeyguardLocked == true
-        if (!locked && needsUnlock()) LockService.lock()
+        val keyguard = getSystemService(KeyguardManager::class.java)
+        val locked = keyguard?.isKeyguardLocked == true
+        when {
+            !locked -> if (needsUnlock()) LockService.lock()
+            keyguard?.isDeviceSecure == true && Prefs(this).closeShadeOnStandby -> LockService.closeShade()
+        }
     }
 
     // Android 11 and 12 only: from 13 on, back reaches the OnBackInvokedCallback instead.

@@ -221,6 +221,15 @@ class SettingsActivity : Activity() {
             onOff(prefs.lockScreenGlyphs),
             getString(R.string.lock_glyphs_desc),
         ) { prefs.lockScreenGlyphs = !prefs.lockScreenGlyphs }
+        permissionRow(
+            title = getString(R.string.close_shade),
+            description = getString(R.string.close_shade_desc),
+            enabled = prefs.closeShadeOnStandby,
+            granted = LockService.isEnabled(this),
+            missing = getString(R.string.grant_accessibility),
+            setEnabled = { prefs.closeShadeOnStandby = it },
+            grant = { SystemActions.openAccessibility(this) },
+        )
         row(
             getString(R.string.lock_notifications),
             getString(R.string.lock_notifications_value),
