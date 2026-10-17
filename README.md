@@ -59,8 +59,12 @@ Requires JDK 17 and the Android SDK (Android Studio installs both).
 # app/build/outputs/apk/release/app-release.apk
 ```
 
-CI runs the same: the unit tests (calculator, search, screen time, weather retries)
-and Android lint must pass before an APK is published. A version release is made by
+CI runs the same, on Java 21: the unit tests (calculator, search, screen time, weather
+retries), the screen tests and Android lint must pass before an APK is published. The
+screen tests use [Robolectric](https://robolectric.org) to run the app's real views on
+Android 15 without a phone: the search opening apps on its own (and not), the mindful
+pause, menus closing, settings pages and the Portuguese texts, standby kept lit only over
+the lock screen, TalkBack's buttons and the pinned names shrinking to fit. A version release is made by
 running the workflow by hand with a version number, or by pushing a `v1.1`-style tag.
 
 The project uses only the Android framework, with no AndroidX or other libraries,
