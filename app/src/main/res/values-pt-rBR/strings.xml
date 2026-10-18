@@ -129,6 +129,8 @@
     <string name="restricted_desc">Se o Android disser \"O acesso do app foi negado\" para o acesso ao uso, o acesso às notificações ou o bloqueio de tela: tente uma vez, abra as informações do app, toque em ⋮ e escolha \"Permitir configurações restritas\".</string>
     <string name="privacy">Privacidade</string>
     <string name="privacy_value">O que o Minimalist lê e para onde vai</string>
+    <string name="language">Idioma</string>
+    <string name="language_system">Igual ao celular</string>
     <string name="on">Ligado</string>
     <string name="off">Desligado</string>
     <string name="text_size">Tamanho do texto</string>

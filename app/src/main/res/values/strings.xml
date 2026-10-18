@@ -84,7 +84,7 @@
     <string name="standby_icons_title">Icons on the bedside clock</string>
     <string name="standby_brightness">Brightness</string>
     <string name="brightness_system">As the system</string>
-    <string name="standby_brightness_desc">The screen's brightness on the bedside clock alone; the phone's own setting stays as it is. As the system, it follows the phone's brightness and auto-brightness</string>
+    <string name="standby_brightness_desc">The screen\'s brightness on the bedside clock alone; the phone\'s own setting stays as it is. As the system, it follows the phone\'s brightness and auto-brightness</string>
     <string name="set_as_home">Set as home app</string>
     <string name="all_apps">All apps</string>
     <string name="screen_time_today">%1$s today</string>
@@ -130,6 +130,8 @@
     <string name="restricted_desc">If Android says \"App was denied access\" for usage access, notification access or the screen lock: try once, then open app info, tap ⋮ and choose \"Allow restricted settings\".</string>
     <string name="privacy">Privacy</string>
     <string name="privacy_value">What Minimalist reads, and where it goes</string>
+    <string name="language">Language</string>
+    <string name="language_system">As the phone</string>
     <string name="on">On</string>
     <string name="off">Off</string>
     <string name="text_size">Text size</string>

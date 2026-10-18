@@ -151,6 +151,13 @@ class SettingsActivity : Activity() {
             getString(R.string.restricted_value),
             getString(R.string.restricted_desc),
         ) { SystemActions.openAppInfo(this) }
+        // Android 13 and later keep a language for each app; before that, only the phone's.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val current = AppLanguage.current(this)
+            row(getString(R.string.language), current?.label ?: getString(R.string.language_system)) {
+                AppLanguage.set(this, AppLanguage.after(current))
+            }
+        }
         row(getString(R.string.privacy), getString(R.string.privacy_value)) { SystemActions.openPrivacyPolicy(this) }
     }
 

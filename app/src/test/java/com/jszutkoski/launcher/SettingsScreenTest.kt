@@ -77,6 +77,14 @@ class SettingsScreenTest {
         assertTrue(activity.content().textViews().any { it.text == "10%" })
     }
 
+    @Test
+    fun theAppCanSpeakPortugueseWhateverThePhoneSpeaks() {
+        val activity = controller.get()
+        assertEquals(null, AppLanguage.current(activity))
+        activity.tap(R.string.language)
+        assertEquals(AppLanguage.PORTUGUESE, AppLanguage.current(activity))
+    }
+
     /** Taps this option of the sheet on top. */
     private fun Activity.choose(option: Int) {
         val sheet = ShadowDialog.getLatestDialog()
