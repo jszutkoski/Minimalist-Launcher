@@ -11,7 +11,10 @@ import android.provider.ContactsContract
 import android.view.View
 import android.widget.Toast
 
-/** What tapping a search result does, for everything but an app: sums, timers, contacts, settings, the web. */
+/**
+ * What tapping a search result does, for everything but an app: sums, timers, contacts,
+ * settings, a search in one app, the web.
+ */
 class SearchActions(
     private val activity: Activity,
     private val repo: AppRepository,
@@ -25,8 +28,17 @@ class SearchActions(
             is SearchResult.ContactHit -> showContact(result.contact)
             is SearchResult.SettingHit -> openSetting(result.setting)
             is SearchResult.Clock -> openClock(result.command)
+            is SearchResult.InApp -> searchIn(result.search)
             is SearchResult.Web -> SystemActions.webSearch(activity, result.query)
         }
+    }
+
+    /** In the app itself when it is installed, otherwise the same link in the browser. */
+    private fun searchIn(search: InAppSearch) {
+        val link = Intent(Intent.ACTION_VIEW, Uri.parse(search.target.link(search.query)))
+        val installed = repo.apps.any { it.component.packageName == search.target.packageName }
+        if (installed && SystemActions.start(activity, Intent(link).setPackage(search.target.packageName))) return
+        SystemActions.start(activity, link)
     }
 
     fun whatsApp(contact: Contact) {

@@ -25,7 +25,6 @@ import android.window.OnBackInvokedDispatcher
 import java.util.Date
 import java.util.Locale
 import kotlin.concurrent.thread
-import kotlin.math.roundToInt
 
 class SettingsActivity : Activity() {
     private lateinit var prefs: Prefs
@@ -730,8 +729,11 @@ class SettingsActivity : Activity() {
         sheet.show()
     }
 
-    private fun brightness(value: StandbyBrightness) =
-        if (value == StandbyBrightness.SYSTEM) getString(R.string.brightness_system) else "${(value.level * 100).roundToInt()}%"
+    private fun brightness(value: StandbyBrightness) = when (value) {
+        StandbyBrightness.SYSTEM -> getString(R.string.brightness_system)
+        StandbyBrightness.BY_HOUR -> getString(R.string.brightness_by_hour)
+        else -> "${value.percent}%"
+    }
 
     private fun onOff(value: Boolean) = getString(if (value) R.string.on else R.string.off)
 

@@ -20,14 +20,38 @@ enum class StatusBarMode(val label: Int) {
     HIDDEN(R.string.bar_hidden),
 }
 
-/** The bedside clock's screen brightness: the system's, or one of its own. */
-enum class StandbyBrightness(val level: Float) {
+/**
+ * The bedside clock's screen brightness: the system's, one of its own, or one that follows the
+ * time of day. Stored by position, so new ones go last.
+ */
+enum class StandbyBrightness(private val fixed: Float) {
     SYSTEM(WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE),
     TEN(0.1f),
     QUARTER(0.25f),
     HALF(0.5f),
     THREE_QUARTERS(0.75f),
     FULL(1f),
+    BY_HOUR(Float.NaN);
+
+    /** The window brightness at [hour] (0 to 23), or the system's own for [SYSTEM]. */
+    fun level(hour: Int): Float = if (this == BY_HOUR) byHour(hour) else fixed
+
+    /** As a percentage, for those of a fixed level. */
+    val percent: Int? get() = if (this == SYSTEM || this == BY_HOUR) null else Math.round(fixed * 100)
+
+    private fun byHour(hour: Int): Float = when (hour) {
+        in DAY_START until DUSK -> 0.6f
+        in DAWN until DAY_START, in DUSK until NIGHT -> 0.3f
+        else -> 0.1f
+    }
+
+    private companion object {
+        // Bright through the day, softer at dawn and in the evening, faint in the small hours.
+        const val DAWN = 6
+        const val DAY_START = 8
+        const val DUSK = 20
+        const val NIGHT = 23
+    }
 }
 
 class Prefs(context: Context) {

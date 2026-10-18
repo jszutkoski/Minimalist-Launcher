@@ -30,6 +30,9 @@ sealed interface SearchResult {
     /** A timer or an alarm for the clock app. */
     class Clock(val command: ClockCommand) : SearchResult
 
+    /** Words for one app's own search: "yt receita de bolo". */
+    class InApp(val search: InAppSearch) : SearchResult
+
     /** Always last: hand the words to the web. */
     class Web(val query: String) : SearchResult
 }

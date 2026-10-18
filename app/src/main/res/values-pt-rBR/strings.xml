@@ -83,7 +83,8 @@
     <string name="standby_icons_title">Ícones no relógio de cabeceira</string>
     <string name="standby_brightness">Brilho</string>
     <string name="brightness_system">Igual ao sistema</string>
-    <string name="standby_brightness_desc">O brilho da tela só no relógio de cabeceira; o ajuste do celular continua como está. Igual ao sistema, segue o brilho do celular e o brilho automático</string>
+    <string name="brightness_by_hour">Pelo horário</string>
+    <string name="standby_brightness_desc">O brilho da tela só no relógio de cabeceira; o ajuste do celular continua como está. Igual ao sistema, segue o brilho do celular e o brilho automático. Pelo horário, fica forte de dia, mais suave de manhã cedo e à noite, e fraco das 23h às 6h</string>
     <string name="set_as_home">Definir como app de início</string>
     <string name="all_apps">Todos os apps</string>
     <string name="screen_time_today">%1$s hoje</string>
@@ -187,7 +188,7 @@
     <string name="double_tap">Toque duplo para bloquear</string>
     <string name="double_tap_desc">Toque duas vezes num espaço vazio da tela inicial para apagar a tela</string>
     <string name="gestures_help">Deslize para cima para os apps · para baixo para as notificações · para os lados para os apps escolhidos acima
-Digite uma conta, uma configuração, um nome, \"timer 10 min\" ou \"alarme 7:30\" na busca
+Digite uma conta, uma configuração, um nome, \"timer 10 min\", \"alarme 7:30\" ou \"yt receita de bolo\" na busca
 Toque e segure um ícone de baixo para trocar, mover ou tirar
 Pinça para o relógio de cabeceira · toque duplo para bloquear (se ligado)
 Toque e segure um espaço vazio para as configurações</string>

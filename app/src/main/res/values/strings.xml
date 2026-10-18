@@ -84,7 +84,8 @@
     <string name="standby_icons_title">Icons on the bedside clock</string>
     <string name="standby_brightness">Brightness</string>
     <string name="brightness_system">As the system</string>
-    <string name="standby_brightness_desc">The screen\'s brightness on the bedside clock alone; the phone\'s own setting stays as it is. As the system, it follows the phone\'s brightness and auto-brightness</string>
+    <string name="brightness_by_hour">By the time of day</string>
+    <string name="standby_brightness_desc">The screen\'s brightness on the bedside clock alone; the phone\'s own setting stays as it is. As the system, it follows the phone\'s brightness and auto-brightness. By the time of day, it is bright by day, softer at dawn and in the evening, and faint from 11 pm to 6 am</string>
     <string name="set_as_home">Set as home app</string>
     <string name="all_apps">All apps</string>
     <string name="screen_time_today">%1$s today</string>
@@ -188,7 +189,7 @@
     <string name="double_tap">Double-tap to lock</string>
     <string name="double_tap_desc">Double-tap an empty part of the home screen to turn the screen off</string>
     <string name="gestures_help">Swipe up for apps · down for notifications · sideways for the apps chosen above
-Type a sum, a setting, a name, \"timer 10 min\" or \"alarm 7:30\" in the search
+Type a sum, a setting, a name, \"timer 10 min\", \"alarm 7:30\" or \"yt cake recipe\" in the search
 Long-press an icon at the bottom to change, move or remove it
 Pinch for the bedside clock · double-tap to lock (if on)
 Long-press empty space for settings</string>

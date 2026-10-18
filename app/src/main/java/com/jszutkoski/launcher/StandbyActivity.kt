@@ -22,6 +22,7 @@ import android.telecom.TelecomManager
 import android.view.WindowInsetsController
 import android.view.WindowManager
 import android.window.OnBackInvokedDispatcher
+import java.util.Calendar
 import kotlin.concurrent.thread
 
 /**
@@ -74,6 +75,11 @@ open class StandbyActivity : Activity() {
         override fun onReceive(context: Context, intent: Intent) = updateBattery(intent)
     }
 
+    /** Each minute: brightness that follows the time of day moves on with it. */
+    private val minuteReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) = applyBrightness()
+    }
+
     /** Unlocked with the fingerprint or face while showing: the phone is wanted, so step aside. */
     private val unlockReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) = finish()
@@ -106,6 +112,7 @@ open class StandbyActivity : Activity() {
         registerReceiver(batteryReceiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED))?.let(::updateBattery)
         registerReceiver(unlockReceiver, IntentFilter(Intent.ACTION_USER_PRESENT))
         registerReceiver(screenOnReceiver, IntentFilter(Intent.ACTION_SCREEN_ON))
+        registerReceiver(minuteReceiver, IntentFilter(Intent.ACTION_TIME_TICK))
     }
 
     override fun onResume() {
@@ -128,7 +135,7 @@ open class StandbyActivity : Activity() {
 
     /** The brightness chosen for standby, for its own window only: the phone's setting stays as it is. */
     private fun applyBrightness() {
-        val level = prefs.standbyBrightness.level
+        val level = prefs.standbyBrightness.level(Calendar.getInstance().get(Calendar.HOUR_OF_DAY))
         if (window.attributes.screenBrightness == level) return
         window.attributes = window.attributes.apply { screenBrightness = level }
     }
@@ -171,6 +178,7 @@ open class StandbyActivity : Activity() {
         unregisterReceiver(batteryReceiver)
         unregisterReceiver(unlockReceiver)
         unregisterReceiver(screenOnReceiver)
+        unregisterReceiver(minuteReceiver)
         super.onDestroy()
     }
 

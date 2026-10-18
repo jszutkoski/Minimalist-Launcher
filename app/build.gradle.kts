@@ -16,7 +16,7 @@ android {
         // Each CI run numbers its build, so a newer APK always installs over an older one and
         // App info tells builds apart; a local build is 1.
         versionCode = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 1
-        versionName = "1.1"
+        versionName = "1.2"
     }
 
     signingConfigs {

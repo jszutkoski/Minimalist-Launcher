@@ -247,7 +247,7 @@ class AppDrawerView(context: Context, private val callbacks: Callbacks) : Linear
     }
 
     /**
-     * A sum's answer or a timer or alarm, then apps, contacts and settings, the clock app's own
+     * A search in one app, a sum's answer or a timer or alarm, then apps, contacts and settings, the clock app's own
      * pages for its word alone, and the web last.
      */
     private fun filter(fromTyping: Boolean) {
@@ -259,7 +259,9 @@ class AppDrawerView(context: Context, private val callbacks: Callbacks) : Linear
         val people = ContactSearch.filter(contacts, q).takeIf { q.length >= 2 }.orEmpty().take(MAX_CONTACTS)
         val settings = SettingSearch.filter(q).take(MAX_SETTINGS)
         val (pages, clock) = ClockSearch.parse(q).partition { it is ClockCommand.Page }
+        val inApp = SearchTarget.parse(q)
         adapter.items = buildList {
+            inApp?.let { add(SearchResult.InApp(it)) }
             Calculator.evaluate(q, DecimalFormatSymbols.getInstance(numbers).decimalSeparator)
                 ?.let { add(SearchResult.Answer(it, numbers)) }
             clock.mapTo(this, SearchResult::Clock)
@@ -274,7 +276,7 @@ class AppDrawerView(context: Context, private val callbacks: Callbacks) : Linear
         val grew = query.length > lastQueryLength
         lastQueryLength = query.length
         if (fromTyping && grew && autoLaunch &&
-            AppSearch.opensAlone(q, found.map { it.searchKey }, people.size, settings.size + clock.size + pages.size)
+            AppSearch.opensAlone(q, found.map { it.searchKey }, people.size, settings.size + clock.size + pages.size + (if (inApp != null) 1 else 0))
         ) {
             callbacks.onLaunch(found[0], search)
         }
@@ -422,6 +424,10 @@ private class ResultAdapter(private val context: Context, private val onWhatsApp
                     title = context.getString(if (command.alarms) R.string.clock_alarms else R.string.clock_timers)
                     hint = context.getString(R.string.result_open)
                 }
+            }
+            is SearchResult.InApp -> {
+                title = context.getString(R.string.result_web_title, item.search.query)
+                hint = item.search.target.label
             }
             is SearchResult.Web -> {
                 title = context.getString(R.string.result_web_title, item.query)
