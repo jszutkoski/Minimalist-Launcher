@@ -290,7 +290,7 @@ class AnalogClock(context: Context, private val pressable: Boolean) : View(conte
         drawHands(canvas, cx, cy, r, s, ink)
     }
 
-    /** Ten segments from the 1 to the 5, lit from the top down. */
+    /** Ten segments from the 1 to the 5, lit from the 5 up: full reaches the 1, empty is at the 5. */
     private fun drawBattery(canvas: Canvas, cx: Float, cy: Float, r: Float, s: Float) {
         val color = when {
             low -> Palette.LOW
@@ -302,18 +302,19 @@ class AnalogClock(context: Context, private val pressable: Boolean) : View(conte
         arcPaint.strokeWidth = r * 0.025f + s * 0.5f
         arcBounds.set(cx - arcRadius, cy - arcRadius, cx + arcRadius, cy + arcRadius)
         val segment = ARC_DEGREES / SEGMENTS
-        val lit = level * ARC_DEGREES
+        // Angles from the 1; the charge fills back from the 5, so what is left starts here.
+        val litFrom = (1f - level) * ARC_DEGREES
         for (i in 0 until SEGMENTS) {
             val from = i * segment
             val to = from + segment - SEGMENT_GAP
             // Canvas angles start at 3 o'clock; the clock's at 12.
             arcPaint.color = Palette.TRACK
             canvas.drawArc(arcBounds, ARC_START - 90f + from, to - from, false, arcPaint)
-            val end = minOf(to, lit)
-            if (end > from) {
+            val start = maxOf(from, litFrom)
+            if (to > start) {
                 arcPaint.color = color
                 arcPaint.alpha = alpha
-                canvas.drawArc(arcBounds, ARC_START - 90f + from, end - from, false, arcPaint)
+                canvas.drawArc(arcBounds, ARC_START - 90f + start, to - start, false, arcPaint)
             }
         }
     }
