@@ -38,6 +38,7 @@ class StandbyScreenTest {
 
     @Before
     fun countLocks() {
+        OverLock.forget()
         // The screen is on (Robolectric's default): this is someone at the phone.
         LockService.lockAction = { locks++; true }
     }
@@ -45,6 +46,7 @@ class StandbyScreenTest {
     @After
     fun tearDown() {
         LockService.lockAction = realLock
+        OverLock.forget()
         Notifications.update(emptySet())
         // A standby on its way back after locking lands before the next test.
         idle(1_000)
@@ -241,6 +243,32 @@ class StandbyScreenTest {
         idle(1_000)
         controller.pause().stop()
         idle(1_000)
+        assertNull(shadowOf(app).nextStartedActivity)
+    }
+
+    @Test
+    fun theHomeSwipeOverStandbyBringsItBackAsking() {
+        // Out of sight over the lock screen, and home coming to Minimalist's home screen.
+        phone(secure = true, locked = true)
+        battery(charging = false)
+        val controller = Robolectric.buildActivity(StandbyActivity::class.java).setup()
+        idle(1_000)
+        controller.pause().stop()
+        assertTrue(OverLock.home(app))
+        val back = shadowOf(app).nextStartedActivity
+        assertEquals(StandbyActivity::class.java.name, back?.component?.className)
+        assertTrue(back!!.getBooleanExtra(OverLock.EXTRA_ASK, false))
+    }
+
+    @Test
+    fun homeLongAfterStandbyWasCoveredLeavesItBehind() {
+        phone(secure = true, locked = true)
+        battery(charging = false)
+        val controller = Robolectric.buildActivity(StandbyActivity::class.java).setup()
+        idle(1_000)
+        controller.pause().stop()
+        idle(3_000)
+        assertFalse(OverLock.home(app))
         assertNull(shadowOf(app).nextStartedActivity)
     }
 

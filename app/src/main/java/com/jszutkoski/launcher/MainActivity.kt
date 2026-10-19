@@ -201,9 +201,12 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        if (getSystemService(KeyguardManager::class.java)?.isKeyguardLocked == true) StandbyLog.note(this, "home new intent, locked")
-        // Home swiped over Android's unlock on a bedside clock: the clock again, not the lock screen.
-        if (OverLock.takeBack(this)) return
+        // Home swiped over a bedside clock on the lock screen: the clock again, asking for the
+        // fingerprint or PIN, rather than Android's lock screen over this one.
+        if (getSystemService(KeyguardManager::class.java)?.isKeyguardLocked == true) {
+            StandbyLog.note(this, "home new intent, locked")
+            if (OverLock.home(this)) return
+        }
         // Home pressed while already home.
         Sheet.dismissAll(this)
         if (pause.isShowing) cancelPause()

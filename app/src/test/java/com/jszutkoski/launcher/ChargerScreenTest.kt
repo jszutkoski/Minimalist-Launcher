@@ -39,6 +39,7 @@ class ChargerScreenTest {
 
     @Before
     fun countLocks() {
+        OverLock.forget()
         LockService.lockAction = {
             locks++
             keyguard.setKeyguardLocked(true)
@@ -49,6 +50,7 @@ class ChargerScreenTest {
     @After
     fun tearDown() {
         LockService.lockAction = realLock
+        OverLock.forget()
         Notifications.update(emptySet())
         idle(4_000)
         // Gone, so the next test starts with no clock in front.

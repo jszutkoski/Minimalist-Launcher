@@ -10,9 +10,9 @@ import android.os.PowerManager
 import android.os.SystemClock
 
 /**
- * Android's own unlock asked for over a clock shown on the lock screen. Swiping home over it
- * would land on the home screen, which Android covers with its lock screen; instead the clock
- * comes straight back, asking for the fingerprint or PIN again, as if the swipe did nothing.
+ * A clock shown on the lock screen, and the home swipe over it. Android sends that swipe to the
+ * home screen, which it then covers with its own lock screen; instead the clock comes straight
+ * back, asking for the fingerprint or PIN, as the swipe up on the lock screen itself would.
  */
 object OverLock {
     /** Opened again to ask for the unlock as soon as it shows. */
@@ -25,22 +25,53 @@ object OverLock {
     private const val SETTLE_MS = 800L
 
     /** After Android's unlock goes away, how long the clock being covered still counts as the swipe. */
-    private const val AFTER_ASKING_MS = 2_000L
+    private const val AFTER_ASKING_MS = 5_000L
+
+    /** Between the clock going out of sight and home coming, either way round, for one swipe. */
+    private const val PAIR_MS = 1_500L
 
     private val handler = Handler(Looper.getMainLooper())
     private var pending: Class<out Activity>? = null
     private var takenAt = 0L
 
+    /** The clock that last went out of sight over the lock screen, and when. */
+    private var coveredScreen: Class<out Activity>? = null
+    private var coveredAt = 0L
+
+    /** When home last came to Minimalist's home screen with the phone locked. */
+    private var homeAt = 0L
+
     /**
-     * [screen] went out of sight with the screen on and the phone still locked, while Android's
-     * unlock was up ([asking]) or had only just gone ([answeredAt]): something took its place,
-     * and with nothing else of the sort going on that is the home swipe handing over to Android's
-     * lock screen. A call is left alone.
+     * [screen] went out of sight with the screen on and the phone still locked. If home comes
+     * with it, that was the home swipe, and the clock comes back; anything else (a call, an
+     * alarm, the camera) is left alone. With Android's unlock up ([asking]) or only just gone
+     * ([answeredAt]) it is the swipe anyway, whichever home app there is.
      */
     fun covered(screen: Activity, asking: Boolean, answeredAt: Long) {
-        val recent = answeredAt != 0L && SystemClock.elapsedRealtime() - answeredAt < AFTER_ASKING_MS
+        val now = SystemClock.elapsedRealtime()
+        val recent = answeredAt != 0L && now - answeredAt < AFTER_ASKING_MS
         StandbyLog.note(screen, "${screen.javaClass.simpleName} covered asking=$asking recent=$recent")
-        if (asking || recent) left(screen)
+        coveredScreen = screen.javaClass
+        coveredAt = now
+        when {
+            now - homeAt < PAIR_MS -> {
+                pending = screen.javaClass
+                takeBack(screen.applicationContext)
+            }
+            asking || recent -> left(screen)
+        }
+    }
+
+    /**
+     * Home came to Minimalist's home screen with the phone locked: a clock that has just gone
+     * out of sight comes back. True if one did.
+     */
+    fun home(context: Context): Boolean {
+        val now = SystemClock.elapsedRealtime()
+        homeAt = now
+        if (pending == null && now - coveredAt < PAIR_MS) pending = coveredScreen
+        coveredScreen = null
+        return takeBack(context)
     }
 
     /** Home or recents while [screen] had Android's unlock up. */
@@ -69,13 +100,21 @@ object OverLock {
         }, SETTLE_MS)
     }
 
-    /**
-     * The clock left by home, put back over the lock screen; true if there was one. Called by
-     * Minimalist's home screen as home comes to it, and by the fallback above.
-     */
+    /** Nothing covered, pending or just come: for tests, each starting afresh. */
+    internal fun forget() {
+        handler.removeCallbacksAndMessages(null)
+        pending = null
+        coveredScreen = null
+        coveredAt = 0L
+        homeAt = 0L
+        takenAt = 0L
+    }
+
+    /** The clock left by home, put back over the lock screen, asking; true if there was one. */
     fun takeBack(context: Context): Boolean {
         val screen = pending ?: return false
         pending = null
+        coveredScreen = null
         val keyguard = context.getSystemService(KeyguardManager::class.java)
         val power = context.getSystemService(PowerManager::class.java)
         val locked = keyguard?.isKeyguardLocked == true
