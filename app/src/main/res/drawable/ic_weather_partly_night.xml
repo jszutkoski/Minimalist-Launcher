@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A few clouds at night: the moon behind a cloud. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="32dp"
+    android:height="32dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:pathData="M6.88,3.21 A4.2,4.2 0 1,0 11.34,8.12 A3.36,3.36 0 0,1 6.88,3.21 Z"
+        android:strokeWidth="1.5"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+    <path
+        android:pathData="M10.6,19.6 L19,19.6 A3.2,3.2 0 0,0 19.32,13.2 A4.8,4.8 0 0,0 10.28,14.08 A2.8,2.8 0 0,0 10.6,19.6 Z"
+        android:strokeWidth="1.5"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+</vector>

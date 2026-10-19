@@ -8,6 +8,8 @@ import android.content.pm.ApplicationInfo
 import android.content.pm.PackageInfo
 import android.os.BatteryManager
 import android.os.Process
+import android.os.SystemClock
+import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
 import android.widget.ImageView
@@ -285,5 +287,25 @@ class StandbyScreenTest {
         app.sendBroadcast(Intent(Intent.ACTION_SCREEN_ON))
         idle()
         assertEquals(View.VISIBLE, standby.whatsApp()?.visibility)
+    }
+
+    private fun StandbyActivity.touch() {
+        val view = content().views().filterIsInstance<StandbyView>().single()
+        val now = SystemClock.uptimeMillis()
+        view.dispatchTouchEvent(MotionEvent.obtain(now, now, MotionEvent.ACTION_DOWN, 10f, 10f, 0))
+        view.dispatchTouchEvent(MotionEvent.obtain(now, now + 50, MotionEvent.ACTION_UP, 10f, 10f, 0))
+        idle()
+    }
+
+    @Test
+    fun theTouchThatWokeTheScreenDoesNotLeave() {
+        val standby = open()
+        // The last touch of a double-tap that lit the screen.
+        standby.touch()
+        assertFalse(standby.isFinishing)
+        // A moment later, a tap of its own.
+        idle(1000)
+        standby.touch()
+        assertTrue(standby.isFinishing)
     }
 }

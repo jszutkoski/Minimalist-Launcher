@@ -149,27 +149,33 @@ class SettingsScreenTest {
     }
 
     @Test
-    fun theBedsideClockIsSetUpOnItsOwn() {
+    fun theBedsideClockIsOneOfTwoScreens() {
         val activity = controller.get()
-        activity.tap(R.string.page_clock)
-        activity.tap(R.string.clock_standby)
-        activity.tap(R.string.clock_design)
-        assertEquals(ClockDesign.ANALOG, Prefs(activity).clockLook(ClockScreen.STANDBY).design)
+        assertEquals(StandbyScreen.DIGITAL, Prefs(activity).standbyScreen)
+        activity.tap(R.string.page_standby)
+        activity.tap(R.string.clock_analog)
+        assertEquals(StandbyScreen.ANALOG, Prefs(activity).standbyScreen)
+        activity.tap(R.string.clock_digital)
+        assertEquals(StandbyScreen.DIGITAL, Prefs(activity).standbyScreen)
+        // The home screen's clock is set up on its own page, and stays as it was.
         assertEquals(ClockDesign.DIGITAL, Prefs(activity).clockLook(ClockScreen.HOME).design)
     }
 
     @Test
-    fun weatherAndScreenTimeAreChosenPerScreen() {
+    fun anAnalogBedsideClockFromBeforeStaysAnalog() {
         val activity = controller.get()
-        activity.tap(R.string.page_clock)
+        Prefs(activity).setClockLook(ClockScreen.STANDBY, ClockLook(design = ClockDesign.ANALOG))
+        assertEquals(StandbyScreen.ANALOG, Prefs(activity).standbyScreen)
+    }
+
+    @Test
+    fun weatherIsChosenPerScreen() {
+        val activity = controller.get()
+        activity.tap(R.string.page_standby)
         activity.tap(R.string.weather)
-        activity.tap(R.string.clock_standby)
-        activity.tap(R.string.screen_time)
         val prefs = Prefs(activity)
-        assertTrue(prefs.weather(ClockScreen.HOME))
-        assertFalse(prefs.weather(ClockScreen.STANDBY))
-        assertTrue(prefs.screenTime(ClockScreen.STANDBY))
-        assertFalse(prefs.screenTime(ClockScreen.HOME))
+        assertTrue(prefs.weather(ClockScreen.STANDBY))
+        assertFalse(prefs.weather(ClockScreen.HOME))
     }
 
     @Test

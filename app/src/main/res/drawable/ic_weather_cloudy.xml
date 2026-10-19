@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Clouds. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="32dp"
+    android:height="32dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:pathData="M7,18.5 L17.5,18.5 A4,4 0 0,0 17.9,10.5 A6,6 0 0,0 6.6,11.6 A3.5,3.5 0 0,0 7,18.5 Z"
+        android:strokeWidth="1.5"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+</vector>

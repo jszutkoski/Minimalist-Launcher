@@ -24,8 +24,6 @@
     <string name="clock_alarms">Alarms</string>
     <string name="no_clock_app">No clock app here takes timers or alarms</string>
     <string name="clock_design">Design</string>
-    <string name="clock_home">Home screen</string>
-    <string name="clock_standby">Bedside clock</string>
     <string name="clock_digital">Digital</string>
     <string name="date_position">Date</string>
     <string name="date_above">Above the clock</string>
@@ -39,7 +37,7 @@
     <string name="weight_medium">Medium</string>
     <string name="weight_bold">Bold</string>
     <string name="clock_size">Size</string>
-    <string name="clock_help">The home screen and the bedside clock each have their own: choose which above. The clock and its battery are one block: thickness and size apply to both. Digital: the battery line under the time. Analog: the battery along the right-hand edge, from the 1 to the 5. A clock too wide for the screen shrinks until it fits.</string>
+    <string name="clock_help">The home screen\'s clock. The clock and its battery are one block: thickness and size apply to both. Digital: the battery line under the time. Analog: the battery along the right-hand edge, from the 1 to the 5. A clock too wide for the screen shrinks until it fits. The bedside clock has its own two screens, in Standby.</string>
     <string name="swipe_left">Swipe left</string>
     <string name="swipe_right">Swipe right</string>
     <string name="swipe_desc">Opens the app you choose. Start away from the screen\'s edge, which Android keeps for back</string>
@@ -117,11 +115,11 @@
     <string name="page_home">Home screen</string>
     <string name="page_home_summary">Text size, layout, status bar, dots, music</string>
     <string name="page_clock">Clock</string>
-    <string name="page_clock_summary">Home screen and bedside clock: design, thickness, size, date, weather, screen time</string>
+    <string name="page_clock_summary">The home screen\'s clock: design, thickness, size, date, weather, screen time</string>
     <string name="page_search">Search</string>
     <string name="page_search_summary">Opening apps as you type, search only, contacts</string>
     <string name="page_standby">Standby</string>
-    <string name="page_standby_summary">The bedside clock, on every wake, lock screen</string>
+    <string name="page_standby_summary">The bedside clock\'s screen, weather, on every wake, lock screen</string>
     <string name="page_apps">Apps</string>
     <string name="page_apps_summary">Mindful pause, hidden apps, home app</string>
     <string name="page_gestures">Gestures</string>

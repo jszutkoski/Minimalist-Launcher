@@ -180,6 +180,12 @@ class Prefs(context: Context) {
         get() = choice(KEY_STANDBY_BRIGHTNESS, StandbyBrightness.SYSTEM)
         set(value) = prefs.edit().putInt(KEY_STANDBY_BRIGHTNESS, value.ordinal).apply()
 
+    /** Which of the two bedside screens; at first, the design the bedside clock had before there were only two. */
+    var standbyScreen: StandbyScreen
+        get() = StandbyScreen.entries.getOrNull(prefs.getInt(KEY_STANDBY_SCREEN, -1))
+            ?: if (clockLook(ClockScreen.STANDBY).design == ClockDesign.ANALOG) StandbyScreen.ANALOG else StandbyScreen.DIGITAL
+        set(value) = prefs.edit().putInt(KEY_STANDBY_SCREEN, value.ordinal).apply()
+
     /** Put standby on top whenever the screen turns off, so it is the first thing on wake. */
     var standbyOnWake: Boolean
         get() = prefs.getBoolean(KEY_STANDBY_ON_WAKE, false)
@@ -280,5 +286,6 @@ class Prefs(context: Context) {
         private const val KEY_DOCK_COUNT = "dock_count"
         private const val KEY_STANDBY_MUTED = "standby_muted"
         private const val KEY_STANDBY_BRIGHTNESS = "standby_brightness"
+        private const val KEY_STANDBY_SCREEN = "standby_screen"
     }
 }

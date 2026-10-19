@@ -9,6 +9,7 @@ import android.media.session.MediaSessionManager
 import android.media.session.PlaybackState
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 
 /** Follows whichever app is playing music and reports its title and state. */
 class NowPlaying(private val context: Context, private val onChange: (Track?) -> Unit) {
@@ -25,6 +26,8 @@ class NowPlaying(private val context: Context, private val onChange: (Track?) ->
     private val handler = Handler(Looper.getMainLooper())
     private var controller: MediaController? = null
     private var started = false
+
+    private val expire = Runnable { report() }
 
     private val sessionsListener = MediaSessionManager.OnActiveSessionsChangedListener { pick(it) }
 
@@ -60,6 +63,7 @@ class NowPlaying(private val context: Context, private val onChange: (Track?) ->
         started = false
         controller?.unregisterCallback(callback)
         controller = null
+        handler.removeCallbacks(expire)
         onChange(null)
     }
 
@@ -82,6 +86,7 @@ class NowPlaying(private val context: Context, private val onChange: (Track?) ->
     }
 
     private fun report() {
+        handler.removeCallbacks(expire)
         val current = controller
         val metadata = current?.metadata
         val title = metadata?.getString(MediaMetadata.METADATA_KEY_TITLE)?.takeIf { it.isNotBlank() }
@@ -100,6 +105,48 @@ class NowPlaying(private val context: Context, private val onChange: (Track?) ->
             return
         }
         val playing = state == PlaybackState.STATE_PLAYING || state == PlaybackState.STATE_BUFFERING
+        Playback.seen(current.packageName, playing)
+        // Paused: only while the music is still fresh in mind. A player that keeps a paused
+        // session around for hours, or wakes with one on its own, is not "now" playing.
+        if (!playing) {
+            val left = Playback.pausedFor(current.packageName)
+            if (left <= 0) {
+                onChange(null)
+                return
+            }
+            handler.postDelayed(expire, left)
+        }
         onChange(Track(title, artist?.takeIf { it.isNotBlank() }, playing, current.packageName, current.transportControls))
+    }
+}
+
+/**
+ * When each player was last heard playing, from its notification or the home screen's player,
+ * by package. Read and written from the notification listener and the main thread.
+ */
+object Playback {
+    private val lastPlaying = HashMap<String, Long>()
+    private val playingNow = HashSet<String>()
+
+    /** How long a paused track stays on the home screen after it stopped playing. */
+    const val PAUSED_MS = 30 * 60 * 1000L
+
+    /** [packageName]'s player is [playing] now, or paused after it was. */
+    @Synchronized
+    fun seen(packageName: String, playing: Boolean, now: Long = SystemClock.elapsedRealtime()) {
+        if (playing) {
+            playingNow += packageName
+            lastPlaying[packageName] = now
+        } else if (playingNow.remove(packageName)) {
+            // It played until this moment.
+            lastPlaying[packageName] = now
+        }
+    }
+
+    /** How much longer a paused [packageName] may show: zero once it is stale, or if it never played. */
+    @Synchronized
+    fun pausedFor(packageName: String, now: Long = SystemClock.elapsedRealtime()): Long {
+        val last = lastPlaying[packageName] ?: return 0
+        return (PAUSED_MS - (now - last)).coerceAtLeast(0)
     }
 }

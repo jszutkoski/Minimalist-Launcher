@@ -24,8 +24,6 @@
     <string name="clock_alarms">Alarmes</string>
     <string name="no_clock_app">Nenhum app de relógio aceitou o timer ou o alarme</string>
     <string name="clock_design">Design</string>
-    <string name="clock_home">Tela inicial</string>
-    <string name="clock_standby">Descanso</string>
     <string name="clock_digital">Digital</string>
     <string name="date_position">Data</string>
     <string name="date_above">Acima do relógio</string>
@@ -39,7 +37,7 @@
     <string name="weight_medium">Média</string>
     <string name="weight_bold">Forte</string>
     <string name="clock_size">Tamanho</string>
-    <string name="clock_help">A tela inicial e o relógio de cabeceira têm cada um o seu: escolha qual acima. O relógio e a bateria formam um bloco só: espessura e tamanho valem para os dois. Digital: a linha de bateria embaixo da hora. Analógico: a bateria na borda direita, do 1 ao 5. Um relógio largo demais para a tela diminui até caber.</string>
+    <string name="clock_help">O relógio da tela inicial. O relógio e a bateria formam um bloco só: espessura e tamanho valem para os dois. Digital: a linha de bateria embaixo da hora. Analógico: a bateria na borda direita, do 1 ao 5. Um relógio largo demais para a tela diminui até caber. O relógio de cabeceira tem as suas duas telas, em Descanso.</string>
     <string name="swipe_left">Deslizar para a esquerda</string>
     <string name="swipe_right">Deslizar para a direita</string>
     <string name="swipe_desc">Abre o app que você escolher. Comece longe da borda da tela, que o Android usa para voltar</string>
@@ -116,11 +114,11 @@
     <string name="page_home">Tela inicial</string>
     <string name="page_home_summary">Tamanho do texto, layout, barra de status, pontos, música</string>
     <string name="page_clock">Relógio</string>
-    <string name="page_clock_summary">Tela inicial e descanso: design, espessura, tamanho, data, clima, tempo de tela</string>
+    <string name="page_clock_summary">O relógio da tela inicial: design, espessura, tamanho, data, clima, tempo de tela</string>
     <string name="page_search">Busca</string>
     <string name="page_search_summary">Abrir apps ao digitar, só busca, contatos</string>
     <string name="page_standby">Descanso</string>
-    <string name="page_standby_summary">O relógio de cabeceira, a cada despertar, tela de bloqueio</string>
+    <string name="page_standby_summary">A tela do relógio de cabeceira, clima, a cada despertar, tela de bloqueio</string>
     <string name="page_apps">Apps</string>
     <string name="page_apps_summary">Pausa consciente, apps ocultos, app de início</string>
     <string name="page_gestures">Gestos</string>

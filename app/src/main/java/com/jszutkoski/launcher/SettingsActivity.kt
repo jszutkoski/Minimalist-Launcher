@@ -7,10 +7,12 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.res.ColorStateList
 import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.os.Bundle
 import android.text.format.DateFormat
 import android.view.Gravity
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowInsets
@@ -25,6 +27,7 @@ import android.window.OnBackInvokedDispatcher
 import java.util.Date
 import java.util.Locale
 import kotlin.concurrent.thread
+import kotlin.math.roundToInt
 
 class SettingsActivity : Activity() {
     private lateinit var prefs: Prefs
@@ -60,16 +63,12 @@ class SettingsActivity : Activity() {
         repo.onChanged = ::render
         repo.start()
         // Back on the same page after the screen is rebuilt (dark mode, font size).
-        savedInstanceState?.getString(KEY_CLOCK_SCREEN)?.let { name ->
-            ClockScreen.entries.firstOrNull { it.name == name }?.let { clockScreen = it }
-        }
         savedInstanceState?.getString(KEY_PAGE)?.let { name -> Page.entries.firstOrNull { it.name == name }?.let(::open) }
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         page?.let { outState.putString(KEY_PAGE, it.name) }
-        outState.putString(KEY_CLOCK_SCREEN, clockScreen.name)
     }
 
     override fun onResume() {
@@ -281,25 +280,21 @@ class SettingsActivity : Activity() {
         sheet.show()
     }
 
-    /** Whose clock the clock page shows and changes: the home screen's or the bedside clock's. */
-    private var clockScreen = ClockScreen.HOME
-
     /**
-     * The home screen or the bedside clock to choose, a live preview of it, then each choice,
-     * going round its values on every tap. The preview keeps the height of the tallest clock
-     * there is, with the date and both extra lines, so the rows never move.
+     * The home screen's clock: a live preview, then each choice, going round its values on every
+     * tap. The preview keeps the height of the tallest clock there is, with the date and both
+     * extra lines, so the rows never move.
      */
     private fun renderClock() {
-        val screen = clockScreen
+        val screen = ClockScreen.HOME
         val look = prefs.clockLook(screen)
-        content.addView(screenPicker(), LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
 
         val tallest = ClockDesign.entries.flatMap { design ->
             listOf(DatePosition.ABOVE, DatePosition.BELOW).map { date ->
                 look.copy(design = design, weight = ClockWeight.BOLD, size = SizeStep.entries.last(), date = date)
             }
         }.maxOf { candidate ->
-            preview(screen, candidate, extras = true).run {
+            preview(candidate, extras = true).run {
                 measure(
                     View.MeasureSpec.makeMeasureSpec(previewWidth, View.MeasureSpec.AT_MOST),
                     View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
@@ -309,7 +304,7 @@ class SettingsActivity : Activity() {
         }
         val box = FrameLayout(this).apply {
             addView(
-                preview(screen, look, extras = false),
+                preview(look, extras = false),
                 FrameLayout.LayoutParams(
                     ViewGroup.LayoutParams.WRAP_CONTENT,
                     ViewGroup.LayoutParams.WRAP_CONTENT,
@@ -335,15 +330,7 @@ class SettingsActivity : Activity() {
         ) { set(look.copy(weight = next(look.weight))) }
         row(getString(R.string.clock_size), getString(look.size.label)) { set(look.copy(size = next(look.size))) }
         row(getString(R.string.date_position), getString(look.date.label)) { set(look.copy(date = next(look.date))) }
-        permissionRow(
-            title = getString(R.string.weather),
-            description = getString(R.string.weather_desc),
-            enabled = prefs.weather(screen),
-            granted = Weather.hasAccess(this),
-            missing = getString(R.string.grant_location),
-            setEnabled = { prefs.setWeather(screen, it) },
-            grant = { askPermission(Manifest.permission.ACCESS_COARSE_LOCATION) },
-        )
+        weatherRow(screen)
         permissionRow(
             title = getString(R.string.screen_time),
             description = getString(R.string.screen_time_desc),
@@ -362,43 +349,34 @@ class SettingsActivity : Activity() {
         )
     }
 
-    /** "Home screen · Bedside clock": the chosen one bright, the other dim. */
-    private fun screenPicker() = LinearLayout(this).apply {
-        orientation = LinearLayout.HORIZONTAL
-        for (screen in ClockScreen.entries) {
-            val chosen = screen == clockScreen
-            addView(
-                text(getString(screen.label), 17f, if (chosen) Palette.TEXT else Palette.TERTIARY, if (chosen) 500 else 400).apply {
-                    setPadding(0, dp(12), dp(28), dp(12))
-                    isSelected = chosen
-                    setOnClickListener {
-                        if (clockScreen == screen) return@setOnClickListener
-                        clockScreen = screen
-                        render()
-                    }
-                },
-            )
-        }
-    }
+    /** The weather under the clock on [screen], once location is allowed. */
+    private fun weatherRow(screen: ClockScreen) = permissionRow(
+        title = getString(R.string.weather),
+        description = getString(R.string.weather_desc),
+        enabled = prefs.weather(screen),
+        granted = Weather.hasAccess(this),
+        missing = getString(R.string.grant_location),
+        setEnabled = { prefs.setWeather(screen, it) },
+        grant = { askPermission(Manifest.permission.ACCESS_COARSE_LOCATION) },
+    )
 
     private val previewWidth get() = resources.displayMetrics.widthPixels - 2 * dp(SIDE_MARGIN_DP)
 
     /**
-     * The date and [look] as [screen] shows them, at today's charge, with its weather and screen
-     * time lines when they are on, or with both anyway when [extras] (to measure the most room).
-     * The bedside clock is dimmed, as it is at night.
+     * The date and [look] as the home screen shows them, at today's charge, with its weather and
+     * screen time lines when they are on, or with both anyway when [extras] (to measure the most room).
      */
-    private fun preview(screen: ClockScreen, look: ClockLook, extras: Boolean): LinearLayout {
-        val scale = if (screen == ClockScreen.HOME) prefs.textSize.scale else 1f
-        val home = screen == ClockScreen.HOME
+    private fun preview(look: ClockLook, extras: Boolean): LinearLayout {
+        val screen = ClockScreen.HOME
+        val scale = prefs.textSize.scale
         fun line(value: String) = text(value, 17f * scale, Palette.SECONDARY, 400).apply { letterSpacing = 0.02f }
         val date = line(DateFormat.format(DateFormat.getBestDateTimePattern(Locale.getDefault(), "EEEEdMMMM"), Date()).toString())
-        if (home) date.setPadding(0, dp(10), 0, dp(10))
+        date.setPadding(0, dp(10), 0, dp(10))
         val face = ClockFace(this, pressable = false)
         face.apply(
             look,
-            digitsSp = (if (home) 100f else 106f) * scale,
-            analogDp = (if (home) 220f else 240f) * scale,
+            digitsSp = 100f * scale,
+            analogDp = 220f * scale,
             labelSp = 13f * scale,
             gravity = Gravity.CENTER_HORIZONTAL,
             maxWidth = previewWidth,
@@ -406,8 +384,7 @@ class SettingsActivity : Activity() {
         )
         // The battery as it is now: a sticky broadcast answers at once, with no receiver kept.
         val battery = registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))?.let(BatteryState::from)
-        // The home screen sets the number into the line; the bedside clock leaves it out.
-        face.showBattery(battery ?: BatteryState(1f, charging = false), number = home)
+        face.showBattery(battery ?: BatteryState(1f, charging = false), number = true)
         val weather = if (extras || prefs.weather(screen)) {
             line(Weather.cached(this)?.label(this) ?: getString(R.string.weather))
         } else {
@@ -423,7 +400,6 @@ class SettingsActivity : Activity() {
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
-            if (!home) alpha = StandbyView.DIM
             val wrap = ViewGroup.LayoutParams.WRAP_CONTENT
             val lines = listOfNotNull(
                 date.takeIf { look.date == DatePosition.ABOVE },
@@ -435,6 +411,71 @@ class SettingsActivity : Activity() {
             lines.forEach { addView(it, LinearLayout.LayoutParams(wrap, wrap)) }
             // The same single gap as on the screen itself, glyph to glyph.
             spaceGlyphs(lines.map { if (it === face) face.spaced() else spacedText(it as TextView) }, dp(GAP_DP))
+        }
+    }
+
+    /**
+     * The two bedside screens side by side, each a small picture of the real thing with its name
+     * under it, the chosen one outlined; a tap on either picks it.
+     */
+    private fun standbyPicker(): LinearLayout {
+        val bounds = windowManager.currentWindowMetrics.bounds
+        val gap = dp(16)
+        val cardWidth = (previewWidth - gap) / 2
+        val scale = cardWidth.toFloat() / bounds.width()
+        val cardHeight = (bounds.height() * scale).roundToInt()
+        val weather = Weather.cached(this)?.takeIf { prefs.weather(ClockScreen.STANDBY) && Weather.hasAccess(this) }
+        val battery = registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))?.let(BatteryState::from)
+        return LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            StandbyScreen.entries.forEachIndexed { index, screen ->
+                val chosen = screen == prefs.standbyScreen
+                val standby = StandbyView(context) {}.apply {
+                    setScreen(screen)
+                    showWeather(weather)
+                    updateBattery(battery ?: BatteryState(1f, charging = false))
+                    showStill()
+                    pivotX = 0f
+                    pivotY = 0f
+                    scaleX = scale
+                    scaleY = scale
+                    importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
+                }
+                // The picture is only looked at: touches go to the card.
+                val card = object : FrameLayout(context) {
+                    override fun onInterceptTouchEvent(event: MotionEvent) = true
+                }.apply {
+                    addView(standby, FrameLayout.LayoutParams(bounds.width(), bounds.height()))
+                    background = GradientDrawable().apply {
+                        cornerRadius = dp(14f)
+                        setColor(Palette.BACKGROUND)
+                        setStroke(dp(1), if (chosen) Palette.SECONDARY else Palette.HAIRLINE)
+                    }
+                    clipToOutline = true
+                    isDuplicateParentStateEnabled = true
+                }
+                val option = LinearLayout(context).apply {
+                    orientation = LinearLayout.VERTICAL
+                    gravity = Gravity.CENTER_HORIZONTAL
+                    isClickable = true
+                    isSelected = chosen
+                    contentDescription = getString(screen.label)
+                    addView(card, LinearLayout.LayoutParams(cardWidth, cardHeight))
+                    addView(
+                        text(getString(screen.label), 17f, if (chosen) Palette.TEXT else Palette.TERTIARY, if (chosen) 500 else 400).apply {
+                            isDuplicateParentStateEnabled = true
+                            setPadding(0, dp(12), 0, dp(4))
+                        },
+                    )
+                    setOnClickListener {
+                        prefs.standbyScreen = screen
+                        render()
+                    }
+                }
+                addView(option, LinearLayout.LayoutParams(cardWidth, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                    if (index > 0) leftMargin = gap
+                })
+            }
         }
     }
 
@@ -466,6 +507,14 @@ class SettingsActivity : Activity() {
     }
 
     private fun renderStandby() {
+        content.addView(
+            standbyPicker(),
+            LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                topMargin = dp(12)
+                bottomMargin = dp(20)
+            },
+        )
+        weatherRow(ClockScreen.STANDBY)
         row(
             getString(R.string.standby_charging),
             onOff(prefs.standbyWhenCharging),
@@ -739,6 +788,5 @@ class SettingsActivity : Activity() {
 
     private companion object {
         const val KEY_PAGE = "page"
-        const val KEY_CLOCK_SCREEN = "clock_screen"
     }
 }

@@ -7,6 +7,10 @@ import android.graphics.ColorFilter
 import android.graphics.Paint
 import android.graphics.PixelFormat
 import android.graphics.drawable.Drawable
+import android.media.session.MediaController
+import android.media.session.MediaSession
+import android.media.session.PlaybackState
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.UserHandle
@@ -22,7 +26,10 @@ class MediaListener : NotificationListenerService() {
 
     override fun onListenerDisconnected() = Notifications.update(emptySet())
 
-    override fun onNotificationPosted(sbn: StatusBarNotification?) = refresh()
+    override fun onNotificationPosted(sbn: StatusBarNotification?) {
+        sbn?.let(::notePlayer)
+        refresh()
+    }
 
     override fun onNotificationRemoved(sbn: StatusBarNotification?) = refresh()
 
@@ -34,6 +41,27 @@ class MediaListener : NotificationListenerService() {
             null
         } ?: return
         Notifications.update(active.filter(::waiting).map { it.packageName to it.user }.toSet())
+    }
+
+    /**
+     * A player's notification changes as it plays and pauses: noted, so the home screen shows a
+     * paused track only if it really played a moment ago.
+     */
+    private fun notePlayer(sbn: StatusBarNotification) {
+        val extras = sbn.notification.extras
+        val token = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            extras.getParcelable(Notification.EXTRA_MEDIA_SESSION, MediaSession.Token::class.java)
+        } else {
+            @Suppress("DEPRECATION")
+            extras.getParcelable(Notification.EXTRA_MEDIA_SESSION)
+        } ?: return
+        val state = try {
+            MediaController(this, token).playbackState?.state
+        } catch (e: RuntimeException) {
+            warn("Could not read a player's state", e)
+            return
+        }
+        Playback.seen(sbn.packageName, state == PlaybackState.STATE_PLAYING || state == PlaybackState.STATE_BUFFERING)
     }
 
     /** Something to read: not a player (even paused), download or call, and not our own. */

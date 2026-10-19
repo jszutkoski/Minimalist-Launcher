@@ -22,9 +22,18 @@ import org.json.JSONObject
  * location. Kept for half an hour; the last place is remembered for when location is off.
  */
 object Weather {
-    class Now(val temperature: Int, val code: Int, val time: Long) {
+    class Now(val temperature: Int, val code: Int, val time: Long, val day: Boolean = true) {
         /** "18° Cloudy". */
-        fun label(context: Context) = describe(code)?.let { "$temperature° ${context.getString(it)}" } ?: "$temperature°"
+        fun label(context: Context) = describe(context)?.let { "$degrees $it" } ?: degrees
+
+        /** "18°". */
+        val degrees get() = "$temperature°"
+
+        /** "Cloudy", or null for a code it doesn't know. */
+        fun describe(context: Context): String? = describe(code)?.let(context::getString)
+
+        /** The sky as a line glyph, the sun or the moon as it is day or night. */
+        val icon get() = icon(code, day)
     }
 
     private val worker = Executors.newSingleThreadExecutor()
@@ -46,7 +55,7 @@ object Weather {
         val store = store(context)
         val time = readingTime(context)
         if (System.currentTimeMillis() - time > SHOWN_MS) return null
-        return Now(store.getInt("temperature", 0), store.getInt("code", -1), time)
+        return Now(store.getInt("temperature", 0), store.getInt("code", -1), time, store.getBoolean("day", true))
     }
 
     fun isFresh(context: Context) = System.currentTimeMillis() - readingTime(context) < FRESH_MS
@@ -132,7 +141,7 @@ object Weather {
         val unit = unit(context)
         val url = String.format(
             Locale.ROOT,
-            "https://api.open-meteo.com/v1/forecast?latitude=%.2f&longitude=%.2f&current=temperature_2m,weather_code&temperature_unit=%s",
+            "https://api.open-meteo.com/v1/forecast?latitude=%.2f&longitude=%.2f&current=temperature_2m,weather_code,is_day&temperature_unit=%s",
             latitude,
             longitude,
             unit,
@@ -152,11 +161,13 @@ object Weather {
                 temperature = current.getDouble("temperature_2m").roundToInt(),
                 code = current.getInt("weather_code"),
                 time = System.currentTimeMillis(),
+                day = current.optInt("is_day", 1) != 0,
             )
             store.edit()
                 .putInt("temperature", now.temperature)
                 .putInt("code", now.code)
                 .putLong("time", now.time)
+                .putBoolean("day", now.day)
                 .putString("unit", unit)
                 .apply()
             now
@@ -197,6 +208,18 @@ object Weather {
         85, 86 -> R.string.weather_snow_showers
         95, 96, 99 -> R.string.weather_thunderstorm
         else -> null
+    }
+
+    /** WMO weather codes as glyphs; a code it doesn't know gets the plain cloud. */
+    fun icon(code: Int, day: Boolean): Int = when (code) {
+        0 -> if (day) R.drawable.ic_weather_clear_day else R.drawable.ic_weather_clear_night
+        1, 2 -> if (day) R.drawable.ic_weather_partly_day else R.drawable.ic_weather_partly_night
+        45, 48 -> R.drawable.ic_weather_fog
+        51, 53, 55, 56, 57 -> R.drawable.ic_weather_drizzle
+        61, 63, 65, 66, 67, 80, 81, 82 -> R.drawable.ic_weather_rain
+        71, 73, 75, 77, 85, 86 -> R.drawable.ic_weather_snow
+        95, 96, 99 -> R.drawable.ic_weather_thunder
+        else -> R.drawable.ic_weather_cloudy
     }
 
     // Its own file: the launcher's settings file marks home for a rebuild on every change.

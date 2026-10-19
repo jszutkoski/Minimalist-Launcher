@@ -23,12 +23,11 @@ import android.view.WindowInsetsController
 import android.view.WindowManager
 import android.window.OnBackInvokedDispatcher
 import java.util.Calendar
-import kotlin.concurrent.thread
 
 /**
  * The bedside clock as its own screen, allowed to show over the lock screen. When the phone
  * locks while it is open, pressing power brings it back instead of the lock screen. It shows
- * the time, battery, date, weather and which messages are waiting, nothing that can be opened:
+ * the time, the weather and which messages are waiting, nothing that can be opened:
  * tapping asks for the PIN or fingerprint first, and unlocking by any means closes it.
  */
 open class StandbyActivity : Activity() {
@@ -51,6 +50,7 @@ open class StandbyActivity : Activity() {
     private val screenOnReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             awakeSince = SystemClock.elapsedRealtime()
+            view.ignoreTaps(WAKE_TAP_MS)
             // Android may have locked while the screen was off: now standby may stay lit.
             keepScreenOn()
             scheduleLock()
@@ -122,14 +122,14 @@ open class StandbyActivity : Activity() {
             setTurnScreenOn(false)
         }
         shown += id
-        // Kept behind other apps for days, so the face chosen meanwhile is applied on each return.
-        view.setLook(prefs.clockLook(ClockScreen.STANDBY))
+        // Kept behind other apps for days, so the screen chosen meanwhile is applied on each return.
+        view.setScreen(prefs.standbyScreen)
+        view.ignoreTaps(WAKE_TAP_MS)
         applyBrightness()
         view.show()
         keepScreenOn()
         showWaiting()
         showWeather()
-        showScreenTime()
         scheduleLock()
     }
 
@@ -336,22 +336,10 @@ open class StandbyActivity : Activity() {
             view.showWeather(null)
             return
         }
-        view.showWeather(Weather.cached(this)?.label(this))
+        view.showWeather(Weather.cached(this))
         if (Weather.isFresh(this)) return
         Weather.refresh(this) { now ->
-            if (now != null) runOnUiThread { if (!isDestroyed) view.showWeather(now.label(this)) }
-        }
-    }
-
-    /** Today's time in apps, read off the main thread. */
-    private fun showScreenTime() {
-        if (!prefs.screenTime(ClockScreen.STANDBY) || !ScreenTime.hasAccess(this)) {
-            view.showScreenTime(null)
-            return
-        }
-        thread(name = "screen-time") {
-            val label = getString(R.string.screen_time_today, ScreenTime.format(ScreenTime.today(this)))
-            runOnUiThread { if (!isDestroyed) view.showScreenTime(label) }
+            if (now != null) runOnUiThread { if (!isDestroyed) view.showWeather(now) }
         }
     }
 
@@ -380,6 +368,9 @@ open class StandbyActivity : Activity() {
     companion object {
         /** How long after the screen comes on a still-unlocked phone opens without the fingerprint. */
         private const val GRACE_MS = 10_000L
+
+        /** After the screen comes on, how long a touch is taken for the end of the wake gesture. */
+        private const val WAKE_TAP_MS = 700L
 
         /** After locking on the charger, the moment for the lock screen to settle before lighting up again. */
         private const val RELIGHT_DELAY_MS = 600L

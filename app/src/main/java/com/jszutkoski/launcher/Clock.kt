@@ -56,10 +56,10 @@ enum class DatePosition(val label: Int) {
     HIDDEN(R.string.date_hidden),
 }
 
-/** The two screens with a clock, each set up on its own. */
-enum class ClockScreen(val label: Int, val prefix: String) {
-    HOME(R.string.clock_home, ""),
-    STANDBY(R.string.clock_standby, "standby_"),
+/** The two screens with a clock, each with settings of its own. */
+enum class ClockScreen(val prefix: String) {
+    HOME(""),
+    STANDBY("standby_"),
 }
 
 /** The clock as chosen in settings for one screen. */
@@ -132,12 +132,22 @@ class ClockFace(context: Context, pressable: Boolean) : LinearLayout(context) {
     /**
      * Shows [look] with the digits at [digitsSp] (the analog face [analogDp] across) and the
      * battery's number at [labelSp], lined up by [gravity], never wider than [maxWidth] pixels,
-     * the battery line's centre [gap] pixels under the digits' baseline.
+     * the battery line's centre [gap] pixels under the digits' baseline, or no line at all
+     * without [batteryLine].
      */
-    fun apply(look: ClockLook, digitsSp: Float, analogDp: Float, labelSp: Float, gravity: Int, maxWidth: Int, gap: Int) {
+    fun apply(
+        look: ClockLook,
+        digitsSp: Float,
+        analogDp: Float,
+        labelSp: Float,
+        gravity: Int,
+        maxWidth: Int,
+        gap: Int,
+        batteryLine: Boolean = true,
+    ) {
         val digits = look.design == ClockDesign.DIGITAL
         digital.visibility = if (digits) VISIBLE else GONE
-        battery.visibility = if (digits) VISIBLE else GONE
+        battery.visibility = if (digits && batteryLine) VISIBLE else GONE
         analog.visibility = if (digits) GONE else VISIBLE
         for (view in listOf(digital, battery, analog)) {
             (view.layoutParams as LayoutParams).apply {
@@ -146,7 +156,9 @@ class ClockFace(context: Context, pressable: Boolean) : LinearLayout(context) {
                 bottomMargin = 0
             }
         }
-        if (digits) {
+        if (digits && !batteryLine) {
+            showDigits(look, digitsSp, maxWidth)
+        } else if (digits) {
             showDigits(look, digitsSp, maxWidth)
             battery.thickness = context.dp(look.weight.lineDp)
             battery.setLabelSize(labelSp * look.size.scale)
@@ -165,12 +177,14 @@ class ClockFace(context: Context, pressable: Boolean) : LinearLayout(context) {
 
     /**
      * The block as an element of its column: from the top of the digits (or the face) to the
-     * battery line's centre (or the face's bottom), for the same gap to what is around it.
+     * battery line's centre (the digits' baseline with no line, or the face's bottom), for the
+     * same gap to what is around it.
      */
-    fun spaced(): Spaced = if (digital.visibility == VISIBLE) {
-        Spaced(this, glyphInset(digital), battery.preferredHeight / 2f)
-    } else {
-        Spaced(this, 0f, 0f)
+    fun spaced(): Spaced = when {
+        digital.visibility != VISIBLE -> Spaced(this, 0f, 0f)
+        battery.visibility == VISIBLE -> Spaced(this, glyphInset(digital), battery.preferredHeight / 2f)
+        // The digits alone: down to their baseline.
+        else -> Spaced(this, glyphInset(digital), digital.paint.fontMetrics.descent + digital.paddingBottom)
     }
 
     /** The digits in the chosen weight and size, or smaller when they would not fit in [maxWidth]. */
@@ -224,6 +238,17 @@ class AnalogClock(context: Context, private val pressable: Boolean) : View(conte
             invalidate()
         }
 
+    /**
+     * Drawn as an outline instead of a dark disc: black inside a thin ring, the battery's
+     * segments set into the ring, the marks and numbers a little further out.
+     */
+    var outlined = false
+        set(value) {
+            if (field == value) return
+            field = value
+            invalidate()
+        }
+
     private val dialPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Palette.SURFACE }
     private val markPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { strokeCap = Paint.Cap.ROUND }
     private val handPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { strokeCap = Paint.Cap.ROUND }
@@ -268,38 +293,49 @@ class AnalogClock(context: Context, private val pressable: Boolean) : View(conte
         val r = minOf(cx, cy)
         val s = stroke
         val ink = if (pressable && isPressed) Palette.SECONDARY else Palette.TEXT
-        canvas.drawCircle(cx, cy, r, dialPaint)
+        // Outlined, the ring (and the battery on it) runs along the edge, everything else in from it.
+        val ring = if (outlined) r - arcWidth(r, s) / 2f else r * 0.94f
+        if (outlined) {
+            arcPaint.color = RING
+            arcPaint.strokeWidth = maxOf(context.dp(1f), ring * 0.006f)
+            canvas.drawCircle(cx, cy, ring, arcPaint)
+        } else {
+            canvas.drawCircle(cx, cy, r, dialPaint)
+        }
+        val marks = if (outlined) ring * 0.915f else r * 0.87f
+        val hourMark = if (outlined) ring * 0.77f else r * 0.72f
+        val minuteMark = if (outlined) ring * 0.865f else r * 0.83f
 
         // Every minute a short faint mark, every hour a long one.
         for (minute in 0 until 60) {
             val hour = minute % 5 == 0
             markPaint.color = if (hour) ink else Palette.TERTIARY
             markPaint.strokeWidth = if (hour) s * 0.7f else s * 0.4f
-            radial(canvas, cx, cy, minute * 6.0, r * if (hour) 0.72f else 0.83f, r * 0.87f, markPaint)
+            radial(canvas, cx, cy, minute * 6.0, if (hour) hourMark else minuteMark, marks, markPaint)
         }
-        numberPaint.textSize = r * 0.2f
+        numberPaint.textSize = if (outlined) ring * 0.13f else r * 0.2f
         numberPaint.color = ink
+        val numbers = if (outlined) ring * 0.635f else r * 0.58f
         for ((hour, label) in listOf(0 to "12", 3 to "3", 6 to "6", 9 to "9")) {
             val angle = Math.toRadians(hour * 30.0)
             numberPaint.getTextBounds(label, 0, label.length, digitBounds)
-            val x = cx + r * 0.58f * sin(angle).toFloat()
-            val y = cy - r * 0.58f * cos(angle).toFloat() - digitBounds.exactCenterY()
+            val x = cx + numbers * sin(angle).toFloat()
+            val y = cy - numbers * cos(angle).toFloat() - digitBounds.exactCenterY()
             canvas.drawText(label, x, y, numberPaint)
         }
-        drawBattery(canvas, cx, cy, r, s)
+        drawBattery(canvas, cx, cy, ring, r, s)
         drawHands(canvas, cx, cy, r, s, ink)
     }
 
     /** Ten segments from the 1 to the 5, lit from the 5 up: full reaches the 1, empty is at the 5. */
-    private fun drawBattery(canvas: Canvas, cx: Float, cy: Float, r: Float, s: Float) {
+    private fun drawBattery(canvas: Canvas, cx: Float, cy: Float, arcRadius: Float, r: Float, s: Float) {
         val color = when {
             low -> Palette.LOW
             full -> Palette.FULL
             else -> Palette.TEXT
         }
         val alpha = if (charging) breathAlpha(breathStart, full) else 255
-        val arcRadius = r * 0.94f
-        arcPaint.strokeWidth = r * 0.025f + s * 0.5f
+        arcPaint.strokeWidth = arcWidth(r, s)
         arcBounds.set(cx - arcRadius, cy - arcRadius, cx + arcRadius, cy + arcRadius)
         val segment = ARC_DEGREES / SEGMENTS
         // Angles from the 1; the charge fills back from the 5, so what is left starts here.
@@ -308,7 +344,7 @@ class AnalogClock(context: Context, private val pressable: Boolean) : View(conte
             val from = i * segment
             val to = from + segment - SEGMENT_GAP
             // Canvas angles start at 3 o'clock; the clock's at 12.
-            arcPaint.color = Palette.TRACK
+            arcPaint.color = if (outlined) EMPTY_SEGMENT else Palette.TRACK
             canvas.drawArc(arcBounds, ARC_START - 90f + from, to - from, false, arcPaint)
             val start = maxOf(from, litFrom)
             if (to > start) {
@@ -318,6 +354,9 @@ class AnalogClock(context: Context, private val pressable: Boolean) : View(conte
             }
         }
     }
+
+    /** The battery arc's thickness, for the face's radius [r] and the marks' stroke [s]. */
+    private fun arcWidth(r: Float, s: Float) = r * 0.025f + s * 0.5f
 
     private fun drawHands(canvas: Canvas, cx: Float, cy: Float, r: Float, s: Float, ink: Int) {
         val now = Calendar.getInstance()
@@ -390,5 +429,9 @@ class AnalogClock(context: Context, private val pressable: Boolean) : View(conte
         const val ARC_DEGREES = 120f
         const val SEGMENTS = 10
         const val SEGMENT_GAP = 1.6f
+
+        /** The outlined face's ring, and the battery's empty segments set into it. */
+        const val RING = 0xFF4D4D4D.toInt()
+        const val EMPTY_SEGMENT = 0xFF5C5C5C.toInt()
     }
 }
