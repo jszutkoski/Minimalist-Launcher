@@ -59,6 +59,17 @@ class StandbyLayoutTest {
         assertTrue(row.views().any { it is ImageView && it.visibility == View.VISIBLE })
     }
 
+    @Test
+    fun theLastLineKeepsItsTail() {
+        val standby = StandbyView(context) {}.apply { setScreen(StandbyScreen.DIGITAL) }
+        standby.showWeather(Weather.Now(11, 3, System.currentTimeMillis()))
+        standby.layOut()
+        // No notifications: the weather is the last line, and nothing of it is cut off.
+        val row = standby.views().filterIsInstance<WeatherRow>().single()
+        val group = row.parent as View
+        assertTrue("${row.bottom} > ${group.height}", row.bottom <= group.height)
+    }
+
     private companion object {
         const val WIDTH = 1080
         const val HEIGHT = 2400

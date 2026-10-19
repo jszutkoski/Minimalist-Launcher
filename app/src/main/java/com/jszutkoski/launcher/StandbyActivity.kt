@@ -51,6 +51,7 @@ open class StandbyActivity : Activity() {
         override fun onReceive(context: Context, intent: Intent) {
             awakeSince = SystemClock.elapsedRealtime()
             view.ignoreTaps(WAKE_TAP_MS)
+            view.refreshClock()
             // Android may have locked while the screen was off: now standby may stay lit.
             keepScreenOn()
             scheduleLock()
@@ -75,9 +76,12 @@ open class StandbyActivity : Activity() {
         override fun onReceive(context: Context, intent: Intent) = updateBattery(intent)
     }
 
-    /** Each minute: brightness that follows the time of day moves on with it. */
+    /** Each minute: the time caught up if its own timer runs late, and brightness that follows the time of day. */
     private val minuteReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context, intent: Intent) = applyBrightness()
+        override fun onReceive(context: Context, intent: Intent) {
+            view.refreshClock()
+            applyBrightness()
+        }
     }
 
     /** Unlocked with the fingerprint or face while showing: the phone is wanted, so step aside. */
@@ -124,6 +128,7 @@ open class StandbyActivity : Activity() {
         shown += id
         // Kept behind other apps for days, so the screen chosen meanwhile is applied on each return.
         view.setScreen(prefs.standbyScreen)
+        view.refreshClock()
         view.ignoreTaps(WAKE_TAP_MS)
         applyBrightness()
         view.show()

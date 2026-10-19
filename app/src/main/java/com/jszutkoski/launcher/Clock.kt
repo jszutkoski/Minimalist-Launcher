@@ -115,6 +115,16 @@ class ClockFace(context: Context, pressable: Boolean) : LinearLayout(context) {
         addView(analog, LayoutParams(wrap, wrap))
     }
 
+    /**
+     * The time read again now. Each clock keeps its own timer, on a clock that stops while the
+     * phone sleeps, so after a sleep with the screen still counted as showing it can run late
+     * until its next tick; the screen coming on and the minute's broadcast catch it up.
+     */
+    fun refresh() {
+        digital.refreshTime()
+        analog.refresh()
+    }
+
     fun setOnTimeClick(action: () -> Unit) {
         digital.setOnClickListener { action() }
         analog.setOnClickListener { action() }
@@ -394,6 +404,12 @@ class AnalogClock(context: Context, private val pressable: Boolean) : View(conte
      * Redrawn once a second for the second hand, or at the breath's steps while charging, and
      * only while in sight. What TalkBack reads changes once a minute, or with the charge.
      */
+    /** Redrawn now, and the next second's redraw counted from now. */
+    fun refresh() {
+        lastMinute = -1
+        onFrame()
+    }
+
     private fun onFrame() {
         invalidate()
         removeCallbacks(frame)

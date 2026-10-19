@@ -121,21 +121,27 @@ class StandbyView(context: Context, private val onExit: () -> Unit) : FrameLayou
 
     /** The gaps of the chosen screen, glyph to glyph, with the clock's glyphs at the top of the group. */
     private fun space() {
+        val weatherShown = weather.visibility != GONE
+        val iconsShown = waiting.visibility != GONE
         val clock = face.spaced()
         (face.layoutParams as LinearLayout.LayoutParams).apply {
             topMargin = -clock.top.roundToInt()
-            bottomMargin = -clock.bottom.roundToInt()
+            // Trimmed to the glyphs only where something follows: the last line keeps its
+            // descent (the tail of a y, the bottom of the sky's glyph), or the group cuts it off.
+            bottomMargin = if (weatherShown || iconsShown) -clock.bottom.roundToInt() else 0
         }
-        val weatherShown = weather.visibility != GONE
         val sky = weather.spaced()
         (weather.layoutParams as LinearLayout.LayoutParams).apply {
             topMargin = (dp(screen.weatherGapDp) - sky.top).roundToInt()
-            bottomMargin = -sky.bottom.roundToInt()
+            bottomMargin = if (iconsShown) -sky.bottom.roundToInt() else 0
         }
         (waiting.layoutParams as LinearLayout.LayoutParams).topMargin =
             dp(if (weatherShown) screen.iconsGapDp else screen.weatherGapDp) - glyphInset()
         content.requestLayout()
     }
+
+    /** The time read again now, rather than at the clock's own next tick. */
+    fun refreshClock() = face.refresh()
 
     /** Where the glyphs of the clock itself sit, from the top of [face]: their middle. */
     private fun clockMiddle(): Float {

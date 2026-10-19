@@ -127,17 +127,37 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
     }
     private val alarmRefresh = Runnable { updateAlarm() }
 
+    /** The screen coming on, and every minute: the clock catches up if its own timer ran late. */
+    private val timeReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) = refreshClock()
+    }
+
+    private fun refreshClock() {
+        face.refresh()
+        date.refreshTime()
+    }
+
     override fun onStart() {
         super.onStart()
         // A sticky broadcast: registering returns the current state right away.
         registerReceiver(batteryReceiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED))?.let(::updateBattery)
         registerReceiver(alarmReceiver, IntentFilter(AlarmManager.ACTION_NEXT_ALARM_CLOCK_CHANGED))
+        registerReceiver(
+            timeReceiver,
+            IntentFilter().apply {
+                addAction(Intent.ACTION_TIME_TICK)
+                addAction(Intent.ACTION_SCREEN_ON)
+                addAction(Intent.ACTION_USER_PRESENT)
+            },
+        )
+        refreshClock()
         updateAlarm()
     }
 
     override fun onResume() {
         super.onResume()
         inFront = true
+        refreshClock()
         // Only rebuilt when a setting, name or pinned app changed since the last time, so
         // coming back from an app costs next to nothing before home can draw.
         if (stale) render()
@@ -166,6 +186,7 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         inFront = getSystemService(PowerManager::class.java)?.isInteractive == false
         unregisterReceiver(batteryReceiver)
         unregisterReceiver(alarmReceiver)
+        unregisterReceiver(timeReceiver)
         root.removeCallbacks(alarmRefresh)
         // Pressing home or the screen going off closes any menu left open.
         Sheet.dismissAll(this)
