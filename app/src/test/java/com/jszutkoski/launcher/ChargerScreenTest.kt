@@ -8,6 +8,8 @@ import android.content.pm.ApplicationInfo
 import android.content.pm.PackageInfo
 import android.os.BatteryManager
 import android.os.Process
+import android.os.SystemClock
+import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
 import android.widget.ImageView
@@ -234,5 +236,26 @@ class ChargerScreenTest {
         // Standby itself opens at screen off and must wait for the wake.
         val standby = app.packageManager.getActivityInfo(ComponentName(app, StandbyOverAppsActivity::class.java), 0)
         assertFalse(standby.flags and TURN_SCREEN_ON != 0)
+    }
+
+    @Test
+    fun anUnansweredUnlockGoesWithTheScreenAndTheClockComesBack() {
+        Prefs(app).standbyWhenCharging = true
+        phone(secure = true, locked = true)
+        charging()
+        val controller = Robolectric.buildActivity(ChargerActivity::class.java).setup()
+        opened += controller
+        idle(1_000)
+        // A tap: Android's unlock comes up, and nothing more happens.
+        val view = controller.get().content().views().filterIsInstance<StandbyView>().single()
+        val now = SystemClock.uptimeMillis()
+        view.dispatchTouchEvent(MotionEvent.obtain(now, now, MotionEvent.ACTION_DOWN, 10f, 10f, 0))
+        view.dispatchTouchEvent(MotionEvent.obtain(now, now + 50, MotionEvent.ACTION_UP, 10f, 10f, 0))
+        idle(9_000)
+        assertEquals(0, locks)
+        // Dark after ten seconds, which closes it, and lit again with the clock.
+        idle(1_500)
+        assertEquals(1, locks)
+        assertTrue(startedClock() != null)
     }
 }

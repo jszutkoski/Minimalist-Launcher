@@ -37,12 +37,18 @@ class ChargerActivity : Activity() {
 
     private val notificationsChanged: () -> Unit = { showWaiting() }
 
+    private val handler = Handler(Looper.getMainLooper())
+    private val unlockUnanswered = Runnable { closeUnlock() }
+
     /** A step for the log, with the phone's state at that moment. */
     private fun note(step: String) =
         StandbyLog.note(this, "ChargerActivity $step screenOn=$screenOn locked=$locked asking=$unlockAsked")
 
     private val screenOnReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
+            // Android's unlock went with the screen: the next tap asks again.
+            unlockAsked = false
+            handler.removeCallbacks(unlockUnanswered)
             view.ignoreTaps(WAKE_TAP_MS)
             view.refreshClock()
             showWaiting()
@@ -132,6 +138,7 @@ class ChargerActivity : Activity() {
 
     override fun onDestroy() {
         note("destroyed")
+        handler.removeCallbacksAndMessages(null)
         Notifications.removeListener(notificationsChanged)
         showing = false
         unregisterReceiver(batteryReceiver)
@@ -156,26 +163,42 @@ class ChargerActivity : Activity() {
         if (unlockAsked) return
         unlockAsked = true
         note("unlock asked")
+        handler.postDelayed(unlockUnanswered, UNLOCK_WAIT_MS)
         keyguard.requestDismissKeyguard(
             this,
             object : KeyguardManager.KeyguardDismissCallback() {
                 override fun onDismissSucceeded() {
+                    handler.removeCallbacks(unlockUnanswered)
                     note("unlocked")
                     finish()
                 }
 
                 // Back out of the PIN pad: the clock stays, and the next tap asks again.
                 override fun onDismissCancelled() {
+                    handler.removeCallbacks(unlockUnanswered)
                     unlockAsked = false
                     note("unlock cancelled")
                 }
 
                 override fun onDismissError() {
+                    handler.removeCallbacks(unlockUnanswered)
                     unlockAsked = false
                     note("unlock error")
                 }
             },
         )
+    }
+
+    /**
+     * Android's unlock left unanswered: no app can close it, but Android does as the screen goes
+     * off. So the screen goes dark (locking again, through Minimalist's accessibility service)
+     * and the clock lights it again a moment later, as after any lock on the charger.
+     */
+    private fun closeUnlock() {
+        if (!unlockAsked || isFinishing || !screenOn || !locked || LockService.inCall(this)) return
+        note("unlock unanswered")
+        unlockAsked = false
+        if (LockService.lock()) startWhenLocked(this, again = true)
     }
 
     /** Three dots when anything is waiting, whatever it is and from whichever app. */
@@ -219,6 +242,9 @@ class ChargerActivity : Activity() {
         /** After the screen comes on, how long a touch is taken for the end of the wake gesture. */
         private const val WAKE_TAP_MS = 700L
 
+        /** How long Android's unlock stays up over the clock unanswered. */
+        private const val UNLOCK_WAIT_MS = 10_000L
+
         /** In front, or was when the screen went off. */
         @Volatile
         var showing = false
@@ -246,17 +272,18 @@ class ChargerActivity : Activity() {
          * At screen off on the charger (Minimalist's accessibility service hears it): the phone
          * is locked at once if Android would wait a few seconds first, so the screen that comes
          * back on a few seconds later is over the lock screen, with this clock. Nothing to do if it is
-         * already there: pressing power over it just turns the screen off.
+         * already there: pressing power over it just turns the screen off; unless it is the clock
+         * itself that turned the screen off ([again]), and lights it again.
          */
-        fun startWhenLocked(context: Context) {
-            if (showing || pending) return
+        fun startWhenLocked(context: Context, again: Boolean = false) {
+            if ((showing && !again) || pending) return
             val keyguard = context.getSystemService(KeyguardManager::class.java)
             if (keyguard != null && keyguard.isDeviceSecure && !keyguard.isKeyguardLocked && !LockService.lock()) return
             pending = true
             val app = context.applicationContext
             Handler(Looper.getMainLooper()).postDelayed({
                 pending = false
-                if (showing || LockService.inCall(app) || !wanted(app) || !canShow(app)) return@postDelayed
+                if ((showing && !again) || LockService.inCall(app) || !wanted(app) || !canShow(app)) return@postDelayed
                 try {
                     app.startActivity(
                         Intent(app, ChargerActivity::class.java)
