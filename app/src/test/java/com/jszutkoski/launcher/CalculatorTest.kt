@@ -59,4 +59,18 @@ class CalculatorTest {
         assertNull(br("2026-10-17"))
         assertNull(br("whatsapp"))
     }
+
+    @Test
+    fun numbersAndDatesThatOnlyLookLikeSums() {
+        assertNull(en("555-123-4567"))
+        assertNull(br("2026/10/17"))
+        assertNull(br("2026-10-17"))
+    }
+
+    @Test
+    fun aHugePasteIsNoSum() {
+        // Deep enough to overflow the stack if it were ever worked out.
+        assertNull(br("1+" + "-".repeat(100_000) + "1"))
+        assertNull(br("(".repeat(50_000) + "1"))
+    }
 }

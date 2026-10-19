@@ -78,4 +78,16 @@ class ClockSearchTest {
         assertEquals("1 min 30 s", ClockSearch.describe(90))
         assertEquals("2 h", ClockSearch.describe(7200))
     }
+
+    @Test
+    fun twelveAtNightIsMidnight() {
+        assertEquals(listOf(Alarm(0, 0)), parse("alarme 12 da noite"))
+        assertEquals(listOf(Alarm(12, 0)), parse("alarme 12 da tarde"))
+    }
+
+    @Test
+    fun aHugeTimerIsNoTimer() {
+        // 2^32 + 60 seconds: as an Int it would wrap round to a one-minute timer.
+        assertEquals(emptyList<ClockCommand>(), parse("timer 4294967356 s"))
+    }
 }

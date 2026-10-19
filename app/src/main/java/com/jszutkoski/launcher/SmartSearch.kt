@@ -45,7 +45,12 @@ object Calculator {
     /** Two numbers with only a space between: "11 98765-4321" is a phone number, not a sum. */
     private val spacedNumbers = Regex("[0-9.,]\\s+[0-9(]")
     private val phone = Regex("\\+?[\\d\\s()]*\\d{5}-\\d{4}")
-    private val date = Regex("\\d{1,2}/\\d{1,2}/\\d{2,4}|\\d{4}-\\d{1,2}-\\d{1,2}")
+    private val date = Regex("\\d{1,2}/\\d{1,2}/\\d{2,4}|\\d{4}[-/]\\d{1,2}[-/]\\d{1,2}")
+    /** "555-123-4567": a number written the US way. */
+    private val usPhone = Regex("\\+?1?[\\s(]*\\d{3}\\)?[\\s-]\\d{3}-\\d{4}")
+
+    /** Longer than any sum anyone types: past it, nothing is worked out (nor can it run too deep). */
+    private const val MAX_LENGTH = 120
 
     /**
      * The value of a typed sum such as "12*7", "2,5 + 1", "1.500 + 300" or "200 x 15%", or null
@@ -53,10 +58,10 @@ object Calculator {
      */
     fun evaluate(input: String, decimal: Char = DecimalFormatSymbols.getInstance().decimalSeparator): Double? {
         val text = input.trim()
-        if (text.length < 3 || !allowed.matches(text) || text.none(Char::isDigit)) return null
+        if (text.length !in 3..MAX_LENGTH || !allowed.matches(text) || text.none(Char::isDigit)) return null
         // A leading minus alone ("-5") is a number, not a sum.
         if (!operator.containsMatchIn(text.drop(1))) return null
-        if (spacedNumbers.containsMatchIn(text) || phone.matches(text) || date.matches(text)) return null
+        if (spacedNumbers.containsMatchIn(text) || phone.matches(text) || usPhone.matches(text) || date.matches(text)) return null
         val plain = text.replace(" ", "")
             .replace('×', '*').replace('x', '*').replace('X', '*').replace('÷', '/')
         return try {

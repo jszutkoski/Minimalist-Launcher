@@ -20,6 +20,10 @@ import android.view.accessibility.AccessibilityEvent
 class LockService : AccessibilityService() {
     private val screenOff = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
+            if (intent.action == Intent.ACTION_USER_PRESENT) {
+                MainActivity.onUnlocked()
+                return
+            }
             if (!wanted(context) || inCall(context) || StandbyActivity.inFront) return
             // Home was on screen: standby joins the home task, so unlocking fades back to home
             // instead of the system's sideways task animation.
@@ -35,13 +39,19 @@ class LockService : AccessibilityService() {
         if (!prefs.standbyWhenCharging) return false
         // Sticky: answers at once with the charge as it is now.
         val battery = context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))?.let(BatteryState::from)
-        return battery?.charging == true
+        return battery?.plugged == true
     }
 
     override fun onServiceConnected() {
         instance = this
         // A system broadcast; only a receiver registered at runtime gets it.
-        registerReceiver(screenOff, IntentFilter(Intent.ACTION_SCREEN_OFF))
+        registerReceiver(
+            screenOff,
+            IntentFilter().apply {
+                addAction(Intent.ACTION_SCREEN_OFF)
+                addAction(Intent.ACTION_USER_PRESENT)
+            },
+        )
         listening = true
     }
 

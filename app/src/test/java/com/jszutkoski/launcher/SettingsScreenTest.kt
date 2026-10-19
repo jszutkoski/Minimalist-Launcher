@@ -8,6 +8,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Assert.fail
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Robolectric
@@ -207,11 +208,13 @@ class SettingsScreenTest {
     /** Waits for the app list, read off the main thread: changes to the bottom icons wait for it too. */
     private fun SettingsActivity.appsLoaded() {
         val repo = SettingsActivity::class.java.getDeclaredField("repo").apply { isAccessible = true }.get(this) as AppRepository
-        repeat(200) {
+        // The list is read on a real background thread: a real wait, up to five seconds.
+        repeat(500) {
             if (repo.loaded) return
             Thread.sleep(10)
             idle()
         }
+        fail("The app list never loaded")
     }
 
     /** Taps the sheet option reading [text]. */

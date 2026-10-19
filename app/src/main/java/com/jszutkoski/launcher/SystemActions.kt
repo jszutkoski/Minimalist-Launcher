@@ -122,10 +122,11 @@ object SystemActions {
         activity.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), options)
         true
     } catch (e: ActivityNotFoundException) {
-        warn("Nothing opens $intent", e)
+        // The action alone: the data can be a contact or a search.
+        warn("Nothing opens ${intent.action}", e)
         false
     } catch (e: SecurityException) {
-        warn("Not allowed to open $intent", e)
+        warn("Not allowed to open ${intent.action}", e)
         false
     }
 

@@ -22,17 +22,31 @@ import android.service.notification.StatusBarNotification
  * notifications waiting (dots). It never reads, changes or dismisses the notifications.
  */
 class MediaListener : NotificationListenerService() {
+    /** The waiting notifications by key, kept up to date one change at a time. */
+    private val waitingByKey = HashMap<String, Pair<String, UserHandle>>()
+
     override fun onListenerConnected() = refresh()
 
-    override fun onListenerDisconnected() = Notifications.update(emptySet())
-
-    override fun onNotificationPosted(sbn: StatusBarNotification?) {
-        sbn?.let(::notePlayer)
-        refresh()
+    override fun onListenerDisconnected() {
+        waitingByKey.clear()
+        Notifications.update(emptySet())
     }
 
-    override fun onNotificationRemoved(sbn: StatusBarNotification?) = refresh()
+    // Each change touches only its own notification: no fetching every notification again for
+    // a download's progress ticking along.
+    override fun onNotificationPosted(sbn: StatusBarNotification?) {
+        sbn ?: return
+        notePlayer(sbn)
+        if (waiting(sbn)) waitingByKey[sbn.key] = sbn.packageName to sbn.user else waitingByKey.remove(sbn.key)
+        publish()
+    }
 
+    override fun onNotificationRemoved(sbn: StatusBarNotification?) {
+        sbn ?: return
+        if (waitingByKey.remove(sbn.key) != null) publish()
+    }
+
+    /** All of them, once, when the listener connects. */
     private fun refresh() {
         val active = try {
             activeNotifications
@@ -40,8 +54,12 @@ class MediaListener : NotificationListenerService() {
             warn("Could not read the waiting notifications", e)
             null
         } ?: return
-        Notifications.update(active.filter(::waiting).map { it.packageName to it.user }.toSet())
+        waitingByKey.clear()
+        active.filter(::waiting).forEach { waitingByKey[it.key] = it.packageName to it.user }
+        publish()
     }
+
+    private fun publish() = Notifications.update(waitingByKey.values.toSet())
 
     /**
      * A player's notification changes as it plays and pauses: noted, so the home screen shows a

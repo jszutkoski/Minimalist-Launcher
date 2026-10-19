@@ -1,10 +1,10 @@
 package com.jszutkoski.launcher
 
-import android.animation.Animator
-import android.animation.AnimatorListenerAdapter
 import android.animation.ValueAnimator
 import android.annotation.SuppressLint
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.MotionEvent
@@ -30,6 +30,17 @@ class PauseView(context: Context, private val onCancel: () -> Unit) :
     private var pending: (() -> Unit)? = null
     private var timer: ValueAnimator? = null
 
+    // The pause itself runs on the clock, not on the animation: with animations off in Android's
+    // settings an animator ends at once, and "Open" would be there straight away.
+    private val clock = Handler(Looper.getMainLooper())
+    private val breatheOut = Runnable { title.text = context.getString(R.string.breathe_out) }
+    private val ready = Runnable {
+        title.text = context.getString(R.string.pause_still)
+        open.alpha = 0f
+        open.visibility = VISIBLE
+        open.animate().alpha(1f).setDuration(250).start()
+    }
+
     val isShowing get() = visibility == VISIBLE
 
     init {
@@ -52,6 +63,8 @@ class PauseView(context: Context, private val onCancel: () -> Unit) :
         notNow.setPadding(dp(16), dp(12), dp(16), dp(12))
         open.setOnClickListener { pending?.invoke() }
         notNow.setOnClickListener { onCancel() }
+        // "Breathe in", "Breathe out" and the way in are read out as they come.
+        title.accessibilityLiveRegion = ACCESSIBILITY_LIVE_REGION_POLITE
         addView(column, LayoutParams(wrap, wrap, Gravity.CENTER))
     }
 
@@ -69,30 +82,29 @@ class PauseView(context: Context, private val onCancel: () -> Unit) :
         alpha = 0f
         animate().alpha(1f).setDuration(250).start()
 
+        hideBehind(true)
+        clock.removeCallbacks(breatheOut)
+        clock.removeCallbacks(ready)
+        clock.postDelayed(breatheOut, PAUSE_MS / 2)
+        clock.postDelayed(ready, PAUSE_MS)
+        // The line only shows how far along it is.
         timer?.cancel()
         timer = ValueAnimator.ofFloat(0f, 1f).apply {
             duration = PAUSE_MS
             interpolator = LinearInterpolator()
-            addUpdateListener {
-                val t = it.animatedFraction
-                progress.update(t, charging = false, low = false)
-                title.text = context.getString(if (t < 0.5f) R.string.breathe_in else R.string.breathe_out)
-            }
-            addListener(object : AnimatorListenerAdapter() {
-                private var cancelled = false
-                override fun onAnimationCancel(animation: Animator) {
-                    cancelled = true
-                }
-
-                override fun onAnimationEnd(animation: Animator) {
-                    if (cancelled) return
-                    title.text = context.getString(R.string.pause_still)
-                    open.alpha = 0f
-                    open.visibility = VISIBLE
-                    open.animate().alpha(1f).setDuration(250).start()
-                }
-            })
+            addUpdateListener { progress.update(it.animatedFraction, charging = false, low = false) }
             start()
+        }
+    }
+
+    /** While the pause shows, TalkBack can't wander to the home screen or the list behind it. */
+    private fun hideBehind(hidden: Boolean) {
+        val parent = parent as? ViewGroup ?: return
+        for (i in 0 until parent.childCount) {
+            val view = parent.getChildAt(i)
+            if (view === this) continue
+            view.importantForAccessibility =
+                if (hidden) IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS else IMPORTANT_FOR_ACCESSIBILITY_AUTO
         }
     }
 
@@ -105,11 +117,16 @@ class PauseView(context: Context, private val onCancel: () -> Unit) :
         title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 40f * scale)
         subtitle.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f * scale)
         open.setTextSize(TypedValue.COMPLEX_UNIT_SP, 20f * scale)
+        usage.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f * scale)
+        notNow.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f * scale)
     }
 
     fun hide(animate: Boolean) {
         pending = null
         timer?.cancel()
+        clock.removeCallbacks(breatheOut)
+        clock.removeCallbacks(ready)
+        hideBehind(false)
         animate().cancel()
         if (!animate) {
             alpha = 0f

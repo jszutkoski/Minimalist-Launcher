@@ -80,6 +80,7 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
     private lateinit var panel: HomePanel
     private lateinit var nowPlaying: NowPlaying
     private val background = Executors.newSingleThreadExecutor()
+    /** On the charger, charging or holding at a limit. */
     private var charging = false
     // Focus is checked when the countdown ends: a menu or the shade may have opened since.
     private val idleStandby = Runnable { if (canAutoStandby() && hasWindowFocus()) enterStandby() }
@@ -111,8 +112,8 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         repo.onChanged = ::render
         prefs.onChange { stale = true }
         dock = Dock(this, prefs, repo, ::launch, ::openShortcut)
-        appMenu = AppMenu(this, prefs, repo, dock.apps, ::render, ::openShortcut)
-        searchActions = SearchActions(this, repo, ::launch) { closeDrawer(animate = true) }
+        appMenu = AppMenu(this, prefs, repo, dock.apps, ::render, ::openShortcut) { launchNow(it, root) }
+        searchActions = SearchActions(this, repo, ::launch, ::throughPauseFor) { closeDrawer(animate = true) }
         addDock()
         repo.start()
         nowPlaying = NowPlaying(this, ::showTrack)
@@ -160,6 +161,7 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
     override fun onResume() {
         super.onResume()
         inFront = true
+        resumed = true
         refreshClock()
         // Only rebuilt when a setting, name or pinned app changed since the last time, so
         // coming back from an app costs next to nothing before home can draw. Back from
@@ -191,6 +193,7 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
 
     override fun onStop() {
         super.onStop()
+        resumed = false
         // Stopped because the screen went off: home is still what the user was looking at.
         inFront = getSystemService(PowerManager::class.java)?.isInteractive == false
         unregisterReceiver(batteryReceiver)
@@ -426,8 +429,8 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         val battery = BatteryState.from(intent) ?: return
         face.showBattery(battery, number = true)
         panel.showBattery(battery)
-        if (battery.charging != charging) {
-            charging = battery.charging
+        if (battery.plugged != charging) {
+            charging = battery.plugged
             scheduleStandby()
         }
     }
@@ -442,10 +445,15 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
 
     /** Charging, on the bare home screen, with the app list closed. */
     private fun canAutoStandby() =
-        prefs.standbyWhenCharging && charging && progress == 0f
+        prefs.standbyWhenCharging && charging && progress == 0f && !pause.isShowing && StandbyActivity.canShow(this)
 
     private fun enterStandby() {
         root.removeCallbacks(idleStandby)
+        // On an unlocked phone, standby needs the accessibility service to stay guarded.
+        if (!StandbyActivity.canShow(this)) {
+            Toast.makeText(this, R.string.standby_needs_service, Toast.LENGTH_LONG).show()
+            return
+        }
         StandbyActivity.start(this)
     }
 
@@ -684,6 +692,8 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
 
     private fun showPause(app: App, open: () -> Unit) {
         root.gesturesEnabled = false
+        // Typing must not go on underneath: the hidden search could open something else.
+        drawer.hideKeyboard()
         pause.show(app, null, open)
         if (!prefs.screenTime(ClockScreen.HOME) || !ScreenTime.hasAccess(this)) return
         background.execute {
@@ -826,6 +836,17 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         if (app.key in prefs.pauseApps) showPause(app, open) else open()
     }
 
+    /**
+     * The same for a way into an app known only by its package (a search in YouTube, a WhatsApp
+     * chat, the browser): paused if any of that package's entries is.
+     */
+    private fun throughPauseFor(packageName: String?, open: () -> Unit) {
+        val paused = packageName?.let { pkg ->
+            repo.apps.firstOrNull { it.component.packageName == pkg && it.key in prefs.pauseApps }
+        }
+        if (paused != null) showPause(paused, open) else open()
+    }
+
     private fun launchNow(app: App, source: View) {
         val bounds = Rect().also { source.getGlobalVisibleRect(it) }
         try {
@@ -842,6 +863,18 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         /** Home was on screen, or was when the screen went off. */
         var inFront = false
             private set
+
+        /** Home is in front right now, not just when the screen went off. */
+        private var resumed = false
+
+        /**
+         * The phone was unlocked. Home counts as in front only if it is what shows: from the
+         * lock screen, a notification or the camera may have taken the user straight into an
+         * app, and the next standby must then cover that app, not bring home back over it.
+         */
+        fun onUnlocked() {
+            if (!resumed) inFront = false
+        }
 
         private const val STANDBY_DELAY_MS = 20_000L
 

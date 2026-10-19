@@ -42,7 +42,7 @@ class BatteryBar(context: Context) : View(context) {
     private var breathStart = 0L
     private var shown = false
 
-    /** A breath drawn at [BREATH_FRAME_MS] steps. Stops whenever the line can't be seen. */
+    /** A breath drawn at [breathFrame] steps. Stops whenever the line can't be seen. */
     private val breath = object : Runnable {
         override fun run() {
             val alpha = breathAlpha(breathStart, full)
@@ -50,7 +50,7 @@ class BatteryBar(context: Context) : View(context) {
             labelPaint.alpha = alpha
             boltPaint.alpha = alpha
             invalidate()
-            postDelayed(this, BREATH_FRAME_MS)
+            postDelayed(this, breathFrame(full))
         }
     }
 

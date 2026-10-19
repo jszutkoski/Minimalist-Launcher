@@ -111,6 +111,16 @@ class AppDrawerScreenTest {
     }
 
     @Test
+    fun anAppsShortNameWaitsForWhatToSearchInIt() {
+        // "sp" is Spotify's short name: "sp lofi" must stay typeable.
+        type("sp")
+        assertTrue(launched.isEmpty())
+        type("sp lofi")
+        assertTrue(launched.isEmpty())
+        assertTrue(items.first() is SearchResult.InApp)
+    }
+
+    @Test
     fun goWithAnEmptySearchOpensNothing() {
         search.onEditorAction(EditorInfo.IME_ACTION_GO)
         assertTrue(launched.isEmpty())

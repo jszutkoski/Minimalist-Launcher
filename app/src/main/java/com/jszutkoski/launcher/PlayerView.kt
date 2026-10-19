@@ -118,7 +118,9 @@ class PlayerView(context: Context, private val onOpen: (packageName: String) -> 
     }
 
     private companion object {
-        const val BUTTON_PADDING_DP = 10
-        const val BUTTON_GAP_DP = 20
+        // A 22dp glyph in 13dp of padding all round: a 48dp target, as Android asks.
+        const val BUTTON_PADDING_DP = 13
+        // Less between them, so the glyphs keep their spacing with the larger targets.
+        const val BUTTON_GAP_DP = 14
     }
 }

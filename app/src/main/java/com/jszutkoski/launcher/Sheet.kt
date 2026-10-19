@@ -74,8 +74,9 @@ class Sheet(activity: Activity, title: String?) {
     }
 
     /**
-     * A tall scrolling list of [apps]. With [chosen], the apps it picks out are bright and the
-     * rest dim, and the list redraws after each tap, for choosing several.
+     * A tall scrolling list of [apps]. With [chosen], the apps it picks out are bright with a
+     * dot beside them (said by TalkBack too) and the rest dimmer, and the list redraws after
+     * each tap, for choosing several.
      */
     fun appList(apps: List<App>, chosen: ((App) -> Boolean)? = null, onPick: (App) -> Unit) {
         val adapter = object : ArrayAdapter<App>(context, 0, apps) {
@@ -83,7 +84,15 @@ class Sheet(activity: Activity, title: String?) {
                 val row = convertView as? TextView ?: context.text("", 19f).apply { setPadding(0, dp(12), 0, dp(12)) }
                 val app = apps[position]
                 row.text = app.label
-                if (chosen != null) row.setTextColor(pressable(if (chosen(app)) Palette.TEXT else Palette.TERTIARY))
+                if (chosen != null) {
+                    val picked = chosen(app)
+                    row.setTextColor(pressable(if (picked) Palette.TEXT else Palette.SECONDARY))
+                    // Not by colour alone: a dot after the name, and the state read out.
+                    val dot = if (picked) Dot(context).apply { setBounds(0, 0, intrinsicWidth, intrinsicHeight) } else null
+                    row.setCompoundDrawablesRelative(null, null, dot, null)
+                    row.compoundDrawablePadding = context.dp(10)
+                    row.stateDescription = context.getString(if (picked) R.string.on else R.string.off)
+                }
                 return row
             }
         }

@@ -51,6 +51,12 @@ enum class SearchTarget(val label: String, private val words: List<String>, val 
             return InAppSearch(target, rest)
         }
 
+        /** [query] is one of the short names ("yt", "sp", "wiki"): a search in that app may follow. */
+        fun isKeyword(query: String): Boolean {
+            val word = AppSearch.normalize(query.trim())
+            return entries.any { word in it.words }
+        }
+
         private fun encode(text: String) = URLEncoder.encode(text, "UTF-8").replace("+", "%20")
     }
 }

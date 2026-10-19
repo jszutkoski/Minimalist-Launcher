@@ -39,7 +39,8 @@ object Shortcuts {
         try {
             context.getSystemService(LauncherApps::class.java)?.startShortcut(shortcut, bounds, null)
         } catch (e: RuntimeException) {
-            warn("Shortcut ${shortcut.id} failed", e)
+            // Not the id: it can name the person a chat is with.
+            warn("A shortcut of ${shortcut.`package`} failed", e)
             Toast.makeText(context, context.getString(R.string.cant_open, shortcut.shortLabel), Toast.LENGTH_SHORT).show()
         }
     }

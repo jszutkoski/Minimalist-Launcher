@@ -4,12 +4,12 @@ on:
   push:
     branches: [main]
     # A version tag (v1.0, v1.1…) also publishes a permanent release of that version.
-    tags: ['v*']
+    tags: ['v[0-9]*']
   pull_request:
   workflow_dispatch:
     inputs:
       version:
-        description: "Publish this build as a version release (for example 1.1); empty for none"
+        description: "Publish this build of main as a version release (for example 1.3, no v); empty for none"
         required: false
         default: ""
 
@@ -17,22 +17,31 @@ on:
 permissions:
   contents: read
 
-# One build per branch or tag at a time, so two publishes never race on the same release.
+# One build per branch or tag at a time, so two publishes never race on the same release. A
+# version release has a group of its own: GitHub keeps one waiting run per group, and a push
+# arriving meanwhile would otherwise cancel it.
 concurrency:
-  group: build-${{ github.ref }}
+  group: build-${{ github.ref }}-${{ inputs.version || 'push' }}
   cancel-in-progress: false
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # The signing key and its password (repository secrets, never in the code) are given only
+    # to the two steps that need them, never to the job: the checkout, the caches and the
+    # tests, with every plugin and library they load, never see them.
     env:
-      # The signing key, base64, and its password: repository secrets, never in the code.
-      # Absent on pull requests from forks, which then build an unsigned check only.
-      MINIMALIST_KEYSTORE: ${{ secrets.MINIMALIST_KEYSTORE }}
-      MINIMALIST_KEYSTORE_PASSWORD: ${{ secrets.MINIMALIST_KEYSTORE_PASSWORD }}
+      # Published: a push to main or a version tag, or a manual version release of main.
+      PUBLISHING: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.version != '') }}
+      # The version the APK calls itself: the release's, or empty for "base version (run)".
+      MINIMALIST_VERSION: ${{ inputs.version || (startsWith(github.ref, 'refs/tags/v') && github.ref_name) || '' }}
     steps:
       # Actions pinned to a commit, not a movable tag: a tag can be pointed at other code.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The token is not left in .git/config for the build to find.
+          persist-credentials: false
 
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
@@ -47,27 +56,50 @@ jobs:
           # job holds the signing key.
           cache-provider: basic
 
-      - name: Require the signing key for published builds
-        if: (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.version != '')) && env.MINIMALIST_KEYSTORE == ''
+      - name: Check a manual version release
+        if: github.event_name == 'workflow_dispatch' && inputs.version != ''
+        env:
+          VERSION: ${{ inputs.version }}
         run: |
-          echo "::error::The MINIMALIST_KEYSTORE secret is missing; refusing to publish an unsigned APK."
-          exit 1
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "::error::Version releases are made from main only."
+            exit 1
+          fi
+          if ! printf '%s' "$VERSION" | grep -Eq '^[0-9]+(\.[0-9]+)*$'; then
+            echo "::error::\"$VERSION\" is not a version number such as 1.3 (no v)."
+            exit 1
+          fi
 
+      # Unit tests and lint first, without the key: a failure stops everything before signing.
+      - name: Test and lint
+        run: ./gradlew testReleaseUnitTest lintRelease --stacktrace
+
+      # Never for pull requests: unmerged code is not signed with the release key.
       - name: Decode the signing key
-        if: env.MINIMALIST_KEYSTORE != ''
+        if: github.event_name != 'pull_request'
+        env:
+          MINIMALIST_KEYSTORE: ${{ secrets.MINIMALIST_KEYSTORE }}
         run: |
+          if [ -z "$MINIMALIST_KEYSTORE" ]; then
+            if [ "$PUBLISHING" = "true" ]; then
+              echo "::error::The MINIMALIST_KEYSTORE secret is missing; refusing to publish an unsigned APK."
+              exit 1
+            fi
+            exit 0
+          fi
           echo "$MINIMALIST_KEYSTORE" | base64 -d > "$RUNNER_TEMP/release.p12"
           echo "MINIMALIST_KEYSTORE_FILE=$RUNNER_TEMP/release.p12" >> "$GITHUB_ENV"
 
-      # Unit tests and lint first: a failure stops the build before anything is published.
-      - name: Test, lint and build the release APK
-        run: ./gradlew testReleaseUnitTest lintRelease assembleRelease --stacktrace
+      - name: Build the release APK
+        env:
+          MINIMALIST_KEYSTORE_PASSWORD: ${{ github.event_name != 'pull_request' && secrets.MINIMALIST_KEYSTORE_PASSWORD || '' }}
+        run: ./gradlew assembleRelease --stacktrace
 
       - name: Show the lint findings
         run: cat app/build/reports/lint-results-release.txt
 
       - name: Name the APK and its checksum
-        # "-unsigned" in the name when built without the key (pull requests from forks).
+        # "-unsigned" in the name when built without the key (pull requests).
         run: |
           cp app/build/outputs/apk/release/app-release*.apk minimalist-launcher.apk
           sha256sum minimalist-launcher.apk > minimalist-launcher.apk.sha256
@@ -102,8 +134,9 @@ jobs:
     needs: build
     if: >-
       (github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))) ||
-      (github.event_name == 'workflow_dispatch' && inputs.version != '')
+      (github.event_name == 'workflow_dispatch' && inputs.version != '' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: write
     env:

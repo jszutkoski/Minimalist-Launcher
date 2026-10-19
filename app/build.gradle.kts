@@ -5,6 +5,9 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
+/** The last version released; builds in between are named after it. */
+val BASE_VERSION = "1.2"
+
 android {
     namespace = "com.jszutkoski.launcher"
     compileSdk = 36
@@ -13,10 +16,13 @@ android {
         applicationId = "com.jszutkoski.launcher"
         minSdk = 30
         targetSdk = 36
-        // Each CI run numbers its build, so a newer APK always installs over an older one and
-        // App info tells builds apart; a local build is 1.
-        versionCode = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 1
-        versionName = "1.2"
+        // Each CI run numbers its build, so a newer APK always installs over an older one; a
+        // local build is 1. App info shows the name: a release's own version ("1.3"), or for
+        // every other build the version it grows from and its run ("1.2 (152)").
+        val run = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull()
+        versionCode = run ?: 1
+        versionName = System.getenv("MINIMALIST_VERSION")?.removePrefix("v")?.takeIf { it.isNotEmpty() }
+            ?: if (run != null) "$BASE_VERSION ($run)" else BASE_VERSION
     }
 
     signingConfigs {

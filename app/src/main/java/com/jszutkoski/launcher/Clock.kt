@@ -421,7 +421,7 @@ class AnalogClock(context: Context, private val pressable: Boolean) : View(conte
             contentDescription = DateFormat.getTimeFormat(context).format(Calendar.getInstance().time) + ", " +
                 NumberFormat.getPercentInstance().format(level.toDouble())
         }
-        val delay = if (charging) BREATH_FRAME_MS else SECOND_MS - System.currentTimeMillis() % SECOND_MS + 5
+        val delay = if (charging) breathFrame(full) else SECOND_MS - System.currentTimeMillis() % SECOND_MS + 5
         postDelayed(frame, delay)
     }
 

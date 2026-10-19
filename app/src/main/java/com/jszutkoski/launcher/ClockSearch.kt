@@ -116,6 +116,8 @@ object ClockSearch {
             position = m.range.last + 1
         }
         if (bare && !anyUnit) return null
+        // Checked before it becomes an Int: a huge number would wrap round to a small one.
+        if (total > MAX_TIMER_SECONDS) return null
         return timer(Math.round(total).toInt(), true)
     }
 
@@ -134,10 +136,13 @@ object ClockSearch {
         var rest = text
         var later = false
         var earlier = false
+        // "12 da noite" is midnight; "12 da tarde" is noon.
+        var night = false
         for (suffix in listOf("noite", "tarde", "night", "evening", "afternoon")) {
             if (rest.endsWith(" $suffix")) {
                 rest = rest.removeSuffix(" $suffix")
                 later = true
+                night = suffix == "noite" || suffix == "night"
             }
         }
         for (suffix in listOf("manha", "morning")) {
@@ -158,7 +163,7 @@ object ClockSearch {
                 if (hour !in 1..12) return null
                 val afternoon = meridiem == "pm" || later
                 hour = when {
-                    hour == 12 -> if (afternoon) 12 else 0
+                    hour == 12 -> if (afternoon && !night) 12 else 0
                     afternoon -> hour + 12
                     else -> hour
                 }

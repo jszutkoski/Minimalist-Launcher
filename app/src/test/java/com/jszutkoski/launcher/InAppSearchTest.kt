@@ -31,4 +31,11 @@ class InAppSearchTest {
         assertEquals("https://pt.wikipedia.org/w/index.php?search=Curitiba", SearchTarget.WIKIPEDIA.link("Curitiba", "pt"))
         assertEquals("https://en.wikipedia.org/w/index.php?search=Curitiba", SearchTarget.WIKIPEDIA.link("Curitiba", "de"))
     }
+
+    @Test
+    fun aShortNameAloneIsOnlyTheStartOfASearch() {
+        assertEquals(true, SearchTarget.isKeyword("sp"))
+        assertEquals(true, SearchTarget.isKeyword("YT "))
+        assertEquals(false, SearchTarget.isKeyword("spo"))
+    }
 }

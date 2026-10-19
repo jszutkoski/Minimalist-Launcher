@@ -9,8 +9,12 @@ import kotlin.math.cos
 /** Below this charge, and not charging, the battery shows in red. */
 const val LOW_BATTERY = 0.15f
 
-/** The charge as the battery broadcast reports it, shared by home and standby. */
-class BatteryState(val fraction: Float, val charging: Boolean) {
+/**
+ * The charge as the battery broadcast reports it, shared by home and standby. [plugged] is on
+ * the charger whether or not it charges: a phone holding at 80% to spare the battery reports
+ * "not charging" while it is plugged in all night.
+ */
+class BatteryState(val fraction: Float, val charging: Boolean, val plugged: Boolean = charging) {
     val low get() = !charging && fraction <= LOW_BATTERY
 
     companion object {
@@ -21,7 +25,8 @@ class BatteryState(val fraction: Float, val charging: Boolean) {
             if (level < 0 || scale <= 0) return null
             val status = intent.getIntExtra(BatteryManager.EXTRA_STATUS, BatteryManager.BATTERY_STATUS_UNKNOWN)
             val charging = status == BatteryManager.BATTERY_STATUS_CHARGING || status == BatteryManager.BATTERY_STATUS_FULL
-            return BatteryState(level / scale.toFloat(), charging)
+            val plugged = charging || intent.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) != 0
+            return BatteryState(level / scale.toFloat(), charging, plugged)
         }
     }
 }
@@ -36,6 +41,11 @@ private const val SLOW_MS = 2400
  * steps a second: smooth enough for a slow fade.
  */
 const val BREATH_FRAME_MS = 60L
+
+/** Full on the charger the pulse is slower, and needs fewer steps still: all night long. */
+const val FULL_FRAME_MS = 150L
+
+fun breathFrame(full: Boolean) = if (full) FULL_FRAME_MS else BREATH_FRAME_MS
 
 /** The charging battery's alpha now, fading in and out since [start] (uptime). */
 fun breathAlpha(start: Long, full: Boolean): Int {

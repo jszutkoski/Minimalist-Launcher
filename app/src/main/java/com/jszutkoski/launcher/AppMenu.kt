@@ -25,15 +25,19 @@ class AppMenu(
     private val dock: DockApps,
     private val render: () -> Unit,
     private val openShortcut: (App, ShortcutInfo) -> Unit,
+    /** Opens the app straight away, past its pause. */
+    private val openNow: (App) -> Unit,
 ) {
     fun show(app: App) {
-        val favoriteKeys = prefs.favorites
+        // Only the pinned apps that show: a locked private space or an app being updated keeps
+        // its place in storage, but is not counted or moved past.
+        val favoriteKeys = shownFavorites()
         val index = favoriteKeys.indexOf(app.key)
         val paused = app.key in prefs.pauseApps
         Sheet(activity, app.label).apply {
             addShortcuts(activity, app) { openShortcut(app, it) }
             if (index >= 0) {
-                option(activity.getString(R.string.menu_remove_home)) { prefs.favorites = favoriteKeys - app.key; render() }
+                option(activity.getString(R.string.menu_remove_home)) { prefs.favorites = prefs.favorites - app.key; render() }
                 if (index > 0) option(activity.getString(R.string.menu_move_up)) { moveFavorite(app.key, -1) }
                 if (index < favoriteKeys.lastIndex) option(activity.getString(R.string.menu_move_down)) { moveFavorite(app.key, 1) }
             } else {
@@ -46,8 +50,12 @@ class AppMenu(
                 option(activity.getString(R.string.menu_add_dock)) { dock.offer(activity, app, render) }
             }
             option(activity.getString(R.string.menu_rename)) { showRename(app) }
-            option(activity.getString(if (paused) R.string.menu_open_without_pause else R.string.menu_pause_before)) {
-                prefs.pauseApps = if (paused) prefs.pauseApps - app.key else prefs.pauseApps + app.key
+            if (paused) {
+                // Just this once; the pause stays for next time.
+                option(activity.getString(R.string.menu_open_without_pause)) { openNow(app) }
+                option(activity.getString(R.string.menu_remove_pause)) { prefs.pauseApps = prefs.pauseApps - app.key }
+            } else {
+                option(activity.getString(R.string.menu_pause_before)) { prefs.pauseApps = prefs.pauseApps + app.key }
             }
             if (index < 0) option(activity.getString(R.string.menu_hide)) { hide(app) }
             option(activity.getString(R.string.menu_app_info)) { SystemActions.openAppDetails(activity, app) }
@@ -56,22 +64,27 @@ class AppMenu(
         }
     }
 
+    private fun shownFavorites() = prefs.favorites.filter { repo.find(it) != null }
+
     private fun addFavorite(app: App) {
-        val current = prefs.favorites.filter { repo.find(it) != null }
-        if (current.size >= MAX_FAVORITES) {
+        if (shownFavorites().size >= MAX_FAVORITES) {
             Toast.makeText(activity, activity.getString(R.string.home_full, MAX_FAVORITES), Toast.LENGTH_SHORT).show()
             return
         }
-        prefs.favorites = current + app.key
+        // Everything stored stays stored: the private space's apps come back when it unlocks.
+        prefs.favorites = prefs.favorites + app.key
         render()
     }
 
+    /** Swaps [key] with the shown app next to it, whatever is stored, unseen, in between. */
     private fun moveFavorite(key: String, by: Int) {
+        val shown = shownFavorites()
+        val neighbour = shown.getOrNull(shown.indexOf(key) + by) ?: return
         val list = prefs.favorites.toMutableList()
-        val from = list.indexOf(key)
-        val to = from + by
-        if (from < 0 || to !in list.indices) return
-        list.add(to, list.removeAt(from))
+        val a = list.indexOf(key)
+        val b = list.indexOf(neighbour)
+        list[a] = neighbour
+        list[b] = key
         prefs.favorites = list
         render()
     }
@@ -84,7 +97,11 @@ class AppMenu(
     }
 
     private fun uninstall(app: App) {
-        SystemActions.start(activity, Intent(Intent.ACTION_DELETE, Uri.parse("package:${app.component.packageName}")))
+        // The copy in this app's profile: the work profile's or private space's, not the personal one.
+        SystemActions.start(
+            activity,
+            Intent(Intent.ACTION_DELETE, Uri.parse("package:${app.component.packageName}")).putExtra(Intent.EXTRA_USER, app.user),
+        )
     }
 
     private fun showRename(app: App) {

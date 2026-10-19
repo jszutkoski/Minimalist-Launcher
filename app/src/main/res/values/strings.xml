@@ -3,7 +3,7 @@
     <string name="app_name">Minimalist</string>
     <string name="settings">Settings</string>
     <string name="lock_service_label">Minimalist</string>
-    <string name="lock_service_description">Lets Minimalist lock the screen when you double-tap an empty part of the home screen, and show its bedside clock when the screen turns on. It doesn\'t read or change anything on your screen, sees nothing you type and hears nothing about other apps.</string>
+    <string name="lock_service_description">Lets Minimalist lock the screen when you double-tap an empty part of the home screen, show its bedside clock when the screen turns on, and lock the phone when the bedside clock is left on an unlocked phone (after 10 untouched seconds on the charger, or by home, recents or the notifications). It doesn\'t read or change anything on your screen, sees nothing you type and hears nothing about other apps.</string>
     <string name="media_listener_label">Minimalist now playing</string>
     <string name="search_hint">Search</string>
     <string name="search_only_hint">Type an app name</string>
@@ -23,7 +23,7 @@
     <string name="clock_timers">Timers</string>
     <string name="clock_alarms">Alarms</string>
     <string name="no_clock_app">No clock app here takes timers or alarms</string>
-    <string name="home_layout">Layout</string>
+    <string name="home_layout">Clock layout</string>
     <string name="home_layout_desc">Classic: the clock as set up below, the weather and screen time on lines under it. Panel: the date, the digits, and one quiet row with the weather, screen time and battery.</string>
     <string name="layout_classic">Classic</string>
     <string name="layout_panel">Panel</string>
@@ -51,6 +51,7 @@
     <string name="menu_add_home">Add to home</string>
     <string name="menu_rename">Rename</string>
     <string name="menu_open_without_pause">Open without pause</string>
+    <string name="menu_remove_pause">Remove pause</string>
     <string name="menu_pause_before">Pause before opening</string>
     <string name="menu_hide">Hide</string>
     <string name="menu_app_info">App info</string>
@@ -82,7 +83,7 @@
     <string name="standby_icons">Notification icons</string>
     <string name="standby_icons_all">All apps</string>
     <string name="standby_icons_but">All apps but %1$d</string>
-    <string name="standby_icons_desc">An app with notifications waiting shows its icon under the bedside clock; apps without an icon of their own share three dots. Tap to choose which apps may</string>
+    <string name="standby_icons_desc">An app with notifications waiting shows its icon under the bedside clock; apps without an icon of their own share three dots. Tap to choose which apps may show one</string>
     <string name="standby_icons_title">Icons on the bedside clock</string>
     <string name="standby_brightness">Brightness</string>
     <string name="brightness_system">As the system</string>
@@ -162,7 +163,8 @@
     <string name="contacts_desc">Type a name to call, text or open a WhatsApp chat. Search also answers sums (12*7), finds settings (wifi, brilho) and the flashlight</string>
     <string name="grant_contacts">Tap to allow contacts</string>
     <string name="standby_charging">Standby while charging</string>
-    <string name="standby_charging_desc">A dim bedside clock after 20 seconds on the home screen while charging. Pinch the home screen with two fingers to open it any time; tap to leave. It stays lit all night only over the lock screen, so nobody can reach your notifications: with Minimalist on in Accessibility, it locks the phone itself after 10 untouched seconds and lights straight up again, and it is back on top every time the screen turns off on the charger. Without it, a still-unlocked phone times out like any screen</string>
+    <string name="standby_charging_desc">A dim bedside clock after 20 seconds on the home screen while charging. Pinch the home screen with two fingers to open it any time; tap to leave. It stays lit all night only over the lock screen, so nobody can reach your notifications. On a phone with a screen lock it needs Minimalist on in Accessibility, which is what keeps it guarded: it locks the phone itself after 10 untouched seconds and lights straight up again, it is back on top every time the screen turns off on the charger, and leaving it by home, recents or the notifications locks the phone</string>
+    <string name="standby_needs_service">Turn on Minimalist in Accessibility (Settings → Standby) to use the bedside clock on an unlocked phone</string>
     <string name="standby_wake">Standby on every wake</string>
     <string name="standby_wake_desc">Each time the screen turns on, the bedside clock shows first, over the lock screen. Tap it to unlock, or unlock with your fingerprint or face; you return to the app you were in. The same switch lets home, recents or pulling down the notifications lock the phone on a still-unlocked bedside clock</string>
     <string name="grant_accessibility">Tap to turn on Minimalist in Accessibility</string>

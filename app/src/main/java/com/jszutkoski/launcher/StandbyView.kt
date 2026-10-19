@@ -204,7 +204,12 @@ class StandbyView(context: Context, private val onExit: () -> Unit) : FrameLayou
     }
 
     fun show() {
-        if (visibility == VISIBLE) return
+        if (visibility == VISIBLE) {
+            // Back in front after a while behind: drifting again from here.
+            removeCallbacks(drift)
+            postDelayed(drift, DRIFT_MS)
+            return
+        }
         animate().cancel()
         visibility = VISIBLE
         moveContent()
@@ -230,8 +235,11 @@ class StandbyView(context: Context, private val onExit: () -> Unit) : FrameLayou
             .setDuration(if (content.translationX == 0f && content.translationY == 0f) 0 else 1200)
             .start()
         removeCallbacks(drift)
-        postDelayed(drift, 60_000)
+        postDelayed(drift, DRIFT_MS)
     }
+
+    /** No drifting while nobody can see it. */
+    fun hold() = removeCallbacks(drift)
 
     /** Touches that began before this moment, on the uptime clock, are not taps. */
     private var ignoreBefore = 0L
@@ -273,6 +281,7 @@ class StandbyView(context: Context, private val onExit: () -> Unit) : FrameLayou
 
     private companion object {
         const val DRIFT_DP = 6
+        const val DRIFT_MS = 60_000L
 
         /** Between two notification glyphs, line to line. */
         const val ICON_GAP_DP = 48

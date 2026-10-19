@@ -85,6 +85,7 @@ class StandbyScreenTest {
 
     @Test
     fun unlockedOnTheChargerItTimesOutLikeAnyScreen() {
+        serviceOn()
         phone(secure = true, locked = false)
         battery(charging = true)
         assertFalse(open().lit())
@@ -99,6 +100,7 @@ class StandbyScreenTest {
 
     @Test
     fun onceAndroidLocksTheNextWakeStaysLit() {
+        serviceOn()
         phone(secure = true, locked = false)
         battery(charging = true)
         val standby = open()
@@ -130,16 +132,19 @@ class StandbyScreenTest {
 
     @Test
     fun theShadeOverAnUnlockedStandbyLocksThePhone() {
+        serviceOn()
         phone(secure = true, locked = false)
-        battery(charging = true)
+        // Off the charger, so only the shade locks.
+        battery(charging = false)
         shadeOver(seconds = 11)
         assertEquals(1, locks)
     }
 
     @Test
     fun inTheFirstSecondsTheShadeIsAsOpenAsATap() {
+        serviceOn()
         phone(secure = true, locked = false)
-        battery(charging = true)
+        battery(charging = false)
         shadeOver(seconds = 3)
         assertEquals(0, locks)
     }
@@ -307,5 +312,45 @@ class StandbyScreenTest {
         idle(1000)
         standby.touch()
         assertTrue(standby.isFinishing)
+    }
+
+    @Test
+    fun withoutTheServiceItShowsOnlyOverTheLockScreen() {
+        // Unlocked, nothing could lock the phone when someone leaves it: it doesn't stay.
+        phone(secure = true, locked = false)
+        assertTrue(open().isFinishing)
+        phone(secure = true, locked = true)
+        assertFalse(open().isFinishing)
+    }
+
+    @Test
+    fun aCopyLeftBehindAnotherAppNeverLocksIt() {
+        serviceOn()
+        phone(secure = true, locked = false)
+        battery(charging = true)
+        val controller = Robolectric.buildActivity(StandbyOverAppsActivity::class.java).setup()
+        // Home pressed within the first seconds: the copy over apps waits behind, alive.
+        idle(3_000)
+        controller.userLeaving().pause().stop()
+        idle(15_000)
+        battery(charging = true)
+        idle(15_000)
+        assertEquals(0, locks)
+    }
+
+    @Test
+    fun pluggedInButHoldingTheChargeCountsAsOnTheCharger() {
+        // A phone that stops at 80% to spare its battery says "not charging" all night.
+        phone(secure = true, locked = true)
+        @Suppress("DEPRECATION")
+        app.sendStickyBroadcast(
+            Intent(Intent.ACTION_BATTERY_CHANGED)
+                .putExtra(BatteryManager.EXTRA_LEVEL, 80)
+                .putExtra(BatteryManager.EXTRA_SCALE, 100)
+                .putExtra(BatteryManager.EXTRA_STATUS, BatteryManager.BATTERY_STATUS_NOT_CHARGING)
+                .putExtra(BatteryManager.EXTRA_PLUGGED, BatteryManager.BATTERY_PLUGGED_AC),
+        )
+        idle()
+        assertTrue(open().lit())
     }
 }

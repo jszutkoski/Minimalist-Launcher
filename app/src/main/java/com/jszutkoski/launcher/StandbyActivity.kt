@@ -41,6 +41,8 @@ open class StandbyActivity : Activity() {
     private lateinit var view: StandbyView
     private var charging = false
     private var unlockAsked = false
+    /** Our own fingerprint prompt while it is up, to take it down if standby closes first. */
+    private var prompt: CancellationSignal? = null
     /** The fingerprint or PIN was given here, so leaving needs no lock behind it. */
     private var confirmed = false
     /** When the screen last came on with standby up, or standby opened on a lit screen. */
@@ -121,6 +123,12 @@ open class StandbyActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
+        // Unlocked, only Minimalist's accessibility service can keep the way in guarded (by
+        // locking at home or the shade): without it, standby shows over the lock screen alone.
+        if (!canShow(this)) {
+            finish()
+            return
+        }
         if (relighting) {
             relighting = false
             setTurnScreenOn(false)
@@ -154,14 +162,15 @@ open class StandbyActivity : Activity() {
      */
     private fun scheduleLock() {
         handler.removeCallbacks(lockOnCharger)
-        if (charging && screenOn && !locked && secure && LockService.isEnabled(this)) {
+        // Only while in front: a copy left behind another app must never lock it mid-use.
+        if (inFrontNow && charging && screenOn && !locked && secure && LockService.isEnabled(this)) {
             val left = GRACE_MS - (SystemClock.elapsedRealtime() - awakeSince)
             handler.postDelayed(lockOnCharger, left.coerceAtLeast(0))
         }
     }
 
     private fun lockAndRelight() {
-        if (!charging || !screenOn || locked || unlockAsked || isFinishing || LockService.inCall(this)) return
+        if (!inFrontNow || !charging || !screenOn || locked || unlockAsked || isFinishing || LockService.inCall(this)) return
         if (!LockService.lock()) return
         relighting = true
         setTurnScreenOn(true)
@@ -174,10 +183,13 @@ open class StandbyActivity : Activity() {
         // notification): no longer in front, so the next screen off must bring it back on top.
         // Stopped by the screen going off, it is still what the wake will show.
         if (screenOn) leaveFront()
+        // Nobody sees it drift; it starts again on the way back.
+        view.hold()
     }
 
     override fun onDestroy() {
         handler.removeCallbacksAndMessages(null)
+        prompt?.cancel()
         Notifications.removeListener(notificationsChanged)
         leaveFront()
         unregisterReceiver(batteryReceiver)
@@ -222,7 +234,10 @@ open class StandbyActivity : Activity() {
 
     private fun leaveFront() {
         shown -= id
+        handler.removeCallbacks(lockOnCharger)
     }
+
+    private val inFrontNow get() = id in shown
 
     // Android 11 and 12 only: from 13 on, back reaches the OnBackInvokedCallback instead.
     @SuppressLint("GestureBackNavigation")
@@ -280,6 +295,7 @@ open class StandbyActivity : Activity() {
     private fun confirmIdentity() {
         if (unlockAsked) return
         unlockAsked = true
+        val signal = CancellationSignal().also { prompt = it }
         BiometricPrompt.Builder(this)
             .setTitle(getString(R.string.unlock))
             .setAllowedAuthenticators(
@@ -287,11 +303,12 @@ open class StandbyActivity : Activity() {
             )
             .build()
             .authenticate(
-                CancellationSignal(),
+                signal,
                 mainExecutor,
                 object : BiometricPrompt.AuthenticationCallback() {
                     override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
                         unlockAsked = false
+                        prompt = null
                         confirmed = true
                         finish()
                     }
@@ -299,6 +316,7 @@ open class StandbyActivity : Activity() {
                     // Cancelled or too many tries: standby stays, and the next tap asks again.
                     override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
                         unlockAsked = false
+                        prompt = null
                     }
                 },
             )
@@ -350,7 +368,8 @@ open class StandbyActivity : Activity() {
 
     private fun updateBattery(intent: Intent) {
         val battery = BatteryState.from(intent) ?: return
-        charging = battery.charging
+        // On the charger, charging or holding: standby may stay lit either way.
+        charging = battery.plugged
         view.updateBattery(battery)
         keepScreenOn()
         scheduleLock()
@@ -387,6 +406,16 @@ open class StandbyActivity : Activity() {
         val inFront get() = shown.isNotEmpty()
 
         /**
+         * Standby may show: over the lock screen, on a phone with no screen lock, or with
+         * Minimalist's accessibility service on, which is what locks the phone when someone
+         * leaves standby on an unlocked phone without the fingerprint or PIN.
+         */
+        fun canShow(context: Context): Boolean {
+            val keyguard = context.getSystemService(KeyguardManager::class.java) ?: return true
+            return keyguard.isKeyguardLocked || !keyguard.isDeviceSecure || LockService.isEnabled(context)
+        }
+
+        /**
          * From the screen-off receiver: in a task of its own above whatever app was open, so
          * that app returns after unlocking. Nothing to do if standby is already up.
          */
@@ -396,7 +425,8 @@ open class StandbyActivity : Activity() {
                     Intent(context, StandbyOverAppsActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
                 )
             } catch (e: RuntimeException) {
-                // No longer allowed to open screens from the background.
+                // A launch Android refuses from the background is dropped without a word; this
+                // is only for the screen itself failing to start.
                 warn("Standby could not open over the app", e)
             }
         }
@@ -408,7 +438,7 @@ open class StandbyActivity : Activity() {
                     Intent(context, StandbyActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
                 )
             } catch (e: RuntimeException) {
-                // No longer allowed to open screens from the background.
+                // As above: only a screen that fails to start lands here.
                 warn("Standby could not open over home", e)
             }
         }

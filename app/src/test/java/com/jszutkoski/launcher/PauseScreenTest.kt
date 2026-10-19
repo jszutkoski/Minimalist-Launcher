@@ -1,5 +1,6 @@
 package com.jszutkoski.launcher
 
+import android.animation.ValueAnimator
 import android.view.View
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -31,6 +32,29 @@ class PauseScreenTest {
         assertTrue(pause.textViews().any { it.text == context.getString(R.string.pause_still) })
         open.performClick()
         assertTrue(opened)
+    }
+
+    /** Android's "Remove animations": every animator ends the moment it starts. */
+    private fun animatorScale(scale: Float) {
+        ValueAnimator::class.java.getDeclaredMethod("setDurationScale", Float::class.javaPrimitiveType)
+            .apply { isAccessible = true }
+            .invoke(null, scale)
+    }
+
+    @Test
+    fun withAnimationsOffThePauseStillLasts() {
+        animatorScale(0f)
+        try {
+            show()
+            idle(100)
+            assertEquals(View.INVISIBLE, open.visibility)
+            idle(4_000)
+            assertEquals(View.INVISIBLE, open.visibility)
+            idle(1_000)
+            assertEquals(View.VISIBLE, open.visibility)
+        } finally {
+            animatorScale(1f)
+        }
     }
 
     @Test

@@ -3,6 +3,7 @@ package com.jszutkoski.launcher
 import android.Manifest
 import android.annotation.SuppressLint
 import android.app.Activity
+import android.app.KeyguardManager
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.res.ColorStateList
@@ -16,6 +17,8 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowInsets
+import android.view.accessibility.AccessibilityManager
+import android.view.accessibility.AccessibilityNodeInfo
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -368,7 +371,11 @@ class SettingsActivity : Activity() {
         enabled = prefs.weather(screen),
         granted = Weather.hasAccess(this),
         missing = getString(R.string.grant_location),
-        setEnabled = { prefs.setWeather(screen, it) },
+        setEnabled = { on ->
+            prefs.setWeather(screen, on)
+            // Off on both screens: the last place kept for it goes as well.
+            if (!on && ClockScreen.entries.none(prefs::weather)) Weather.forget(this)
+        },
         grant = { askPermission(Manifest.permission.ACCESS_COARSE_LOCATION) },
     )
 
@@ -552,11 +559,17 @@ class SettingsActivity : Activity() {
             },
         )
         weatherRow(ClockScreen.STANDBY)
-        row(
-            getString(R.string.standby_charging),
-            onOff(prefs.standbyWhenCharging),
-            getString(R.string.standby_charging_desc),
-        ) { prefs.standbyWhenCharging = !prefs.standbyWhenCharging }
+        // With a screen lock, standby on an unlocked phone is guarded only through the service.
+        val secure = getSystemService(KeyguardManager::class.java)?.isDeviceSecure == true
+        permissionRow(
+            title = getString(R.string.standby_charging),
+            description = getString(R.string.standby_charging_desc),
+            enabled = prefs.standbyWhenCharging,
+            granted = !secure || LockService.isEnabled(this),
+            missing = getString(R.string.grant_accessibility),
+            setEnabled = { prefs.standbyWhenCharging = it },
+            grant = { askForAccessibility { prefs.standbyWhenCharging = false } },
+        )
         permissionRow(
             title = getString(R.string.standby_wake),
             description = getString(R.string.standby_wake_desc),
@@ -728,9 +741,14 @@ class SettingsActivity : Activity() {
             orientation = LinearLayout.VERTICAL
             setPadding(0, dp(14), 0, dp(14))
             isClickable = true
+            // Read out with the row, and again when it changes.
+            stateDescription = value
             setOnClickListener {
                 onClick()
                 render()
+                // The page is built anew: TalkBack's focus goes back to this row, which reads
+                // its new value, instead of falling to the top of the page.
+                refocus(title)
             }
         }
         row.addView(text(title, 20f).apply { isDuplicateParentStateEnabled = true })
@@ -752,6 +770,15 @@ class SettingsActivity : Activity() {
             )
         }
         content.addView(row, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+    }
+
+    /** Puts TalkBack's focus on the row titled [title], when TalkBack is on. */
+    private fun refocus(title: String) {
+        if (getSystemService(AccessibilityManager::class.java)?.isTouchExplorationEnabled != true) return
+        val row = (0 until content.childCount).map { content.getChildAt(it) }.firstOrNull { view ->
+            (view as? LinearLayout)?.getChildAt(0).let { it is TextView && it.text == title }
+        } ?: return
+        row.post { row.performAccessibilityAction(AccessibilityNodeInfo.ACTION_ACCESSIBILITY_FOCUS, null) }
     }
 
     private fun showHidden() {

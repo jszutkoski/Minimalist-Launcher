@@ -275,7 +275,8 @@ class AppDrawerView(context: Context, private val callbacks: Callbacks) : Linear
         // Only when the query grew: deleting letters should never launch anything.
         val grew = query.length > lastQueryLength
         lastQueryLength = query.length
-        if (fromTyping && grew && autoLaunch &&
+        // "sp" may be the start of "sp lofi": an app's short name never opens anything by itself.
+        if (fromTyping && grew && autoLaunch && !SearchTarget.isKeyword(q) &&
             AppSearch.opensAlone(q, found.map { it.searchKey }, people.size, settings.size + clock.size + pages.size + (if (inApp != null) 1 else 0))
         ) {
             callbacks.onLaunch(found[0], search)
@@ -461,11 +462,12 @@ private class ResultAdapter(private val context: Context, private val onWhatsApp
                     setImageResource(R.drawable.ic_chat)
                     imageTintList = pressable(Palette.TEXT)
                     contentDescription = "WhatsApp"
-                    val inset = context.dp(10)
+                    val inset = context.dp(11)
                     setPadding(inset, inset, 0, inset)
                     setOnClickListener { onWhatsApp(contact) }
                 },
-                LinearLayout.LayoutParams(context.dp(46), context.dp(46)).apply { leftMargin = context.dp(6) },
+                // 48dp, a finger's width.
+                LinearLayout.LayoutParams(context.dp(48), context.dp(48)).apply { leftMargin = context.dp(4) },
             )
         }
         return row

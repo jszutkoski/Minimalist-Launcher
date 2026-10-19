@@ -84,15 +84,20 @@ object Weather {
             onResult(result)
         }
         val app = context.applicationContext
+        // Asking for the place, as well as the weather, happens off the main thread.
+        worker.execute { locate(app, done) }
+    }
+
+    private fun locate(app: Context, done: (Now?) -> Unit) {
         val locations = app.getSystemService(LocationManager::class.java)
         val last = locations?.let(::lastKnown)
         if (locations == null || (last != null && System.currentTimeMillis() - last.time < LOCATION_MAX_AGE_MS)) {
-            worker.execute { done(fetch(app, last)) }
+            done(fetch(app, last))
             return
         }
         val provider = provider(locations)
         if (provider == null) {
-            worker.execute { done(fetch(app, last)) }
+            done(fetch(app, last))
             return
         }
         try {
@@ -128,8 +133,9 @@ object Weather {
         val latitude: Double
         val longitude: Double
         if (location != null) {
-            latitude = location.latitude
-            longitude = location.longitude
+            // Kept only as precise as what is sent: about a kilometre.
+            latitude = rounded(location.latitude)
+            longitude = rounded(location.longitude)
             store.edit().putFloat("latitude", latitude.toFloat()).putFloat("longitude", longitude.toFloat()).apply()
         } else if (store.contains("latitude")) {
             latitude = store.getFloat("latitude", 0f).toDouble()
@@ -150,6 +156,8 @@ object Weather {
             val connection = URI(url).toURL().openConnection() as HttpURLConnection
             connection.connectTimeout = 8000
             connection.readTimeout = 8000
+            // Android's own would add the phone's model and build to the request.
+            connection.setRequestProperty("User-Agent", "Minimalist")
             val body = try {
                 if (connection.responseCode != 200) return null
                 connection.inputStream.bufferedReader().use { it.readText() }
@@ -221,6 +229,11 @@ object Weather {
         95, 96, 99 -> R.drawable.ic_weather_thunder
         else -> R.drawable.ic_weather_cloudy
     }
+
+    private fun rounded(degrees: Double) = Math.round(degrees * 100) / 100.0
+
+    /** Weather turned off everywhere: the last place and reading go too. */
+    fun forget(context: Context) = store(context).edit().clear().apply()
 
     // Its own file: the launcher's settings file marks home for a rebuild on every change.
     private fun store(context: Context) = context.getSharedPreferences("weather", Context.MODE_PRIVATE)
