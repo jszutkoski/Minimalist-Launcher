@@ -46,7 +46,8 @@ class StandbyScreenTest {
     fun tearDown() {
         LockService.lockAction = realLock
         Notifications.update(emptySet())
-        idle()
+        // A standby on its way back after locking lands before the next test.
+        idle(1_000)
     }
 
     @Suppress("DEPRECATION")
@@ -138,6 +139,48 @@ class StandbyScreenTest {
         battery(charging = false)
         shadeOver(seconds = 11)
         assertEquals(1, locks)
+    }
+
+    /** The standby started again after it locked the phone, or null. */
+    private fun cameBack(): Intent? {
+        idle(1_000)
+        return shadowOf(app).nextStartedActivity?.takeIf { it.getBooleanExtra("relight", false) }
+    }
+
+    @Test
+    fun afterTheShadeLocksThePhoneTheClockComesBackLit() {
+        serviceOn()
+        phone(secure = true, locked = false)
+        battery(charging = false)
+        shadeOver(seconds = 11)
+        assertEquals(StandbyActivity::class.java.name, cameBack()?.component?.className)
+    }
+
+    @Test
+    fun homeOnAnUnlockedStandbyLocksAndTheClockComesBack() {
+        // Past the first seconds, off the charger: nothing has locked the phone yet.
+        serviceOn()
+        phone(secure = true, locked = false)
+        battery(charging = false)
+        val controller = Robolectric.buildActivity(StandbyActivity::class.java).setup()
+        idle(11_000)
+        controller.userLeaving()
+        assertEquals(1, locks)
+        // Over the lock screen again, rather than Android's lock screen alone.
+        assertEquals(StandbyActivity::class.java.name, cameBack()?.component?.className)
+    }
+
+    @Test
+    fun homeInTheFirstSecondsJustLeaves() {
+        serviceOn()
+        phone(secure = true, locked = false)
+        battery(charging = false)
+        val controller = Robolectric.buildActivity(StandbyActivity::class.java).setup()
+        idle(3_000)
+        controller.userLeaving()
+        assertEquals(0, locks)
+        assertTrue(controller.get().isFinishing)
+        assertNull(cameBack())
     }
 
     @Test

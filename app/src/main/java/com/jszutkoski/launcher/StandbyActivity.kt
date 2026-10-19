@@ -45,6 +45,9 @@ open class StandbyActivity : Activity() {
     private var prompt: CancellationSignal? = null
     /** The fingerprint or PIN was given here, so leaving needs no lock behind it. */
     private var confirmed = false
+    /** Home or recents came while our own prompt was up: handled once the prompt is gone. */
+    private var leftWhileAsking = false
+    private var stopped = false
     /** When the screen last came on with standby up, or standby opened on a lit screen. */
     private var awakeSince = SystemClock.elapsedRealtime()
     private val id = System.identityHashCode(this)
@@ -97,6 +100,7 @@ open class StandbyActivity : Activity() {
         edgeToEdge()
         view = StandbyView(this, ::leave)
         setContentView(view)
+        if (intent.getBooleanExtra(EXTRA_RELIGHT, false)) relightOnResume()
         Notifications.addListener(notificationsChanged)
         showWaiting()
 
@@ -121,8 +125,15 @@ open class StandbyActivity : Activity() {
         registerReceiver(minuteReceiver, IntentFilter(Intent.ACTION_TIME_TICK))
     }
 
+    override fun onStart() {
+        super.onStart()
+        stopped = false
+    }
+
     override fun onResume() {
         super.onResume()
+        // Back in front: whatever came over it (our own PIN pad) was not someone leaving.
+        leftWhileAsking = false
         // Unlocked, only Minimalist's accessibility service can keep the way in guarded (by
         // locking at home or the shade): without it, standby shows over the lock screen alone.
         if (!canShow(this)) {
@@ -172,9 +183,14 @@ open class StandbyActivity : Activity() {
     private fun lockAndRelight() {
         if (!inFrontNow || !charging || !screenOn || locked || unlockAsked || isFinishing || LockService.inCall(this)) return
         if (!LockService.lock()) return
+        relightOnResume()
+        handler.postDelayed(relight, RELIGHT_DELAY_MS)
+    }
+
+    /** The next return to the front turns the screen on, over the lock screen. */
+    private fun relightOnResume() {
         relighting = true
         setTurnScreenOn(true)
-        handler.postDelayed(relight, RELIGHT_DELAY_MS)
     }
 
     override fun onStop() {
@@ -183,12 +199,18 @@ open class StandbyActivity : Activity() {
         // notification): no longer in front, so the next screen off must bring it back on top.
         // Stopped by the screen going off, it is still what the wake will show.
         if (screenOn) leaveFront()
+        stopped = true
+        // Home or recents while our prompt was up, and the prompt already gone without the
+        // fingerprint or PIN: left like any other way.
+        if (leftWhileAsking && !unlockAsked && screenOn) left()
         // Nobody sees it drift; it starts again on the way back.
         view.hold()
     }
 
     override fun onDestroy() {
         handler.removeCallbacksAndMessages(null)
+        // Closed under its own prompt (home clears the home task): left like any other way.
+        if (leftWhileAsking) left()
         prompt?.cancel()
         Notifications.removeListener(notificationsChanged)
         leaveFront()
@@ -208,12 +230,26 @@ open class StandbyActivity : Activity() {
         super.onUserLeaveHint()
         // With the screen off this is just the launch at screen off, not the user leaving.
         if (!screenOn) return
-        // The PIN pad of our own prompt opening over standby.
-        if (unlockAsked) return
+        // Our own prompt is up, and the PIN pad opening over standby lands here too. Only if
+        // the prompt then goes without the fingerprint or PIN, with standby out of sight, was
+        // this home or recents.
+        if (unlockAsked) {
+            leftWhileAsking = true
+            return
+        }
+        left()
+    }
+
+    /**
+     * Home or recents. On a phone that was never locked (the charger keeps the screen on, so it
+     * never locks by itself), past the grace period, the phone locks now, or that swipe would
+     * get straight in; and standby comes straight back over the lock screen, so the swipe lands
+     * on the clock again rather than on Android's lock screen.
+     */
+    private fun left() {
+        leftWhileAsking = false
         leaveFront()
-        // Home or recents on a phone that was never locked (the charger keeps the screen on,
-        // so it never locks by itself): lock it now, or that swipe would get straight in.
-        if (!locked && needsUnlock()) LockService.lock()
+        if (!locked && needsUnlock()) lockAndReturn(this)
         if (this !is StandbyOverAppsActivity) finish()
     }
 
@@ -221,7 +257,8 @@ open class StandbyActivity : Activity() {
      * Something of the system's came over standby: the notification shade, quick settings or the
      * power menu (a call or an alarm too, but those are left alone). On a phone that is still
      * unlocked, past the grace period, the shade would hand anyone the messages and their reply
-     * boxes; so the phone locks there and then, as pressing home does. Over the lock screen the
+     * boxes; so the phone locks there and then, as pressing home does, and standby lights up again
+     * over the lock screen. Over the lock screen the
      * shade is Android's own, as it is without standby, and shows what Android's lock-screen
      * settings allow.
      */
@@ -229,7 +266,7 @@ open class StandbyActivity : Activity() {
         super.onWindowFocusChanged(hasFocus)
         // Our own fingerprint prompt or PIN pad, standby closing, or the screen going off.
         if (hasFocus || unlockAsked || isFinishing || !screenOn || LockService.inCall(this)) return
-        if (!locked && needsUnlock()) LockService.lock()
+        if (!locked && needsUnlock()) lockAndReturn(this)
     }
 
     private fun leaveFront() {
@@ -248,6 +285,7 @@ open class StandbyActivity : Activity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         awakeSince = SystemClock.elapsedRealtime()
+        if (intent.getBooleanExtra(EXTRA_RELIGHT, false)) relightOnResume()
     }
 
     /**
@@ -317,6 +355,8 @@ open class StandbyActivity : Activity() {
                     override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
                         unlockAsked = false
                         prompt = null
+                        // Taken away by home or recents, with standby out of sight now.
+                        if (leftWhileAsking && stopped) left()
                     }
                 },
             )
@@ -399,11 +439,46 @@ open class StandbyActivity : Activity() {
         /** After locking on the charger, the moment for the lock screen to settle before lighting up again. */
         private const val RELIGHT_DELAY_MS = 600L
 
+        /** Brought back to the front with the screen lit, after standby locked the phone. */
+        private const val EXTRA_RELIGHT = "relight"
+
         /** The standby screens in front (or in front when the screen went off), by instance. */
         private val shown = mutableSetOf<Int>()
 
         /** A standby screen is showing, or was when the screen went off. */
         val inFront get() = shown.isNotEmpty()
+
+        /** Standby locked the phone and is on its way back: the screen off is its own. */
+        var returning = false
+            private set
+
+        /**
+         * Someone left an unlocked standby without the fingerprint or PIN (home, recents, the
+         * shade): the phone locks, and the same standby comes straight back, lit, over the lock
+         * screen. Started from here rather than from the screen itself, which home may have
+         * closed by then.
+         */
+        private fun lockAndReturn(standby: StandbyActivity) {
+            if (returning || !LockService.lock()) return
+            returning = true
+            val context = standby.applicationContext
+            val screen = standby.javaClass
+            Handler(Looper.getMainLooper()).postDelayed({
+                returning = false
+                if (LockService.inCall(context)) return@postDelayed
+                try {
+                    // Into its own task again: the home task for the one over home, where the
+                    // screen still showing is brought forward rather than opened twice.
+                    context.startActivity(
+                        Intent(context, screen)
+                            .putExtra(EXTRA_RELIGHT, true)
+                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP),
+                    )
+                } catch (e: RuntimeException) {
+                    warn("Standby could not come back over the lock screen", e)
+                }
+            }, RELIGHT_DELAY_MS)
+        }
 
         /**
          * Standby may show: over the lock screen, on a phone with no screen lock, or with
