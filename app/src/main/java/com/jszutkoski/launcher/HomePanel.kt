@@ -22,23 +22,12 @@ enum class HomeLayout(val label: Int) {
     /** The clock as set up in Settings → Clock, the weather and screen time on lines under it. */
     CLASSIC(R.string.layout_classic),
 
-    /** The date in spaced capitals, the digits, and one quiet row: weather, screen time, battery. */
+    /** The date, the digits, and one quiet row: weather, screen time, battery. */
     PANEL(R.string.layout_panel),
 }
 
 /** Between the panel layout's date, digits and row, glyph to glyph: a little more air than the classic's. */
 const val PANEL_GAP_DP = 28
-
-/**
- * The date as [panel] or the classic layout shows it: in spaced capitals, smaller and a little
- * brighter, or as a plain line in the grey under the clock.
- */
-fun styleDate(date: TextView, panel: Boolean, scale: Float) {
-    date.isAllCaps = panel
-    date.letterSpacing = if (panel) 0.3f else 0.02f
-    date.setTextSize(TypedValue.COMPLEX_UNIT_SP, (if (panel) 13f else 17f) * scale)
-    date.setTextColor(pressable(if (panel) Palette.DATE else Palette.SECONDARY))
-}
 
 /**
  * The panel under the clock: the sky, today's screen time and the battery, each a glyph and its

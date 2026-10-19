@@ -386,7 +386,6 @@ class SettingsActivity : Activity() {
         val shown = if (panelLayout) look.copy(design = ClockDesign.DIGITAL, date = DatePosition.ABOVE) else look
         fun line(value: String) = text(value, 17f * scale, Palette.SECONDARY, 400).apply { letterSpacing = 0.02f }
         val date = line(DateFormat.format(DateFormat.getBestDateTimePattern(Locale.getDefault(), "EEEEdMMMM"), Date()).toString())
-        styleDate(date, panelLayout, scale)
         date.setPadding(0, dp(10), 0, dp(10))
         val face = ClockFace(this, pressable = false)
         face.apply(

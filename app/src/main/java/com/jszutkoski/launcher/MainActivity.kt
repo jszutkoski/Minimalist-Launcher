@@ -91,6 +91,9 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
     /** The date's row goes above the clock, as chosen; otherwise under it. */
     private var dateAbove = true
     private var panelLayout = false
+
+    /** Today's screen time as last read, to show at once while it is read again. */
+    private var lastScreenTime: Long? = null
     private var animator: ValueAnimator? = null
     private val emphasized = PathInterpolator(0.2f, 0f, 0f, 1f)
 
@@ -159,8 +162,14 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         inFront = true
         refreshClock()
         // Only rebuilt when a setting, name or pinned app changed since the last time, so
-        // coming back from an app costs next to nothing before home can draw.
-        if (stale) render()
+        // coming back from an app costs next to nothing before home can draw. Back from
+        // settings, the weather and screen time (as last read) are in place for that first
+        // frame too, so the new layout shows whole at once rather than filling in after.
+        if (stale) {
+            render()
+            updateWeather()
+            showScreenTime(lastScreenTime)
+        }
         setDefault.visibility = if (SystemActions.isDefaultHome(this)) View.GONE else View.VISIBLE
         showAccessibleRow()
         applyStatusBar()
@@ -369,7 +378,7 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         stale = false
         val scale = prefs.textSize.scale
         panelLayout = prefs.homeLayout == HomeLayout.PANEL
-        styleDate(date, panelLayout, scale)
+        date.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f * scale)
         // The panel keeps the digits' weight and size, always digital and with the date above.
         val look = prefs.clockLook(ClockScreen.HOME).let {
             if (panelLayout) it.copy(design = ClockDesign.DIGITAL, date = DatePosition.ABOVE) else it
@@ -489,21 +498,26 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
 
     private fun updateScreenTime() {
         if (!prefs.screenTime(ClockScreen.HOME) || !ScreenTime.hasAccess(this)) {
-            screenTimeText.visibility = View.GONE
-            panel.showScreenTime(null)
-            spaceHome()
+            showScreenTime(null)
             return
         }
         background.execute {
             val total = ScreenTime.today(this)
             runOnUiThread {
-                screenTimeText.text = getString(R.string.screen_time_today, ScreenTime.format(total))
-                // In the panel, the time alone: its glyph says what it is.
-                screenTimeText.visibility = if (panelLayout) View.GONE else View.VISIBLE
-                panel.showScreenTime(ScreenTime.format(total))
-                spaceHome()
+                lastScreenTime = total
+                showScreenTime(total)
             }
         }
+    }
+
+    /** Today's [total] under the clock or in the panel, or nothing when it is off or not read yet. */
+    private fun showScreenTime(total: Long?) {
+        val time = total?.takeIf { prefs.screenTime(ClockScreen.HOME) && ScreenTime.hasAccess(this) }?.let(ScreenTime::format)
+        if (time != null) screenTimeText.text = getString(R.string.screen_time_today, time)
+        // In the panel, the time alone: its glyph says what it is.
+        screenTimeText.visibility = if (time != null && !panelLayout) View.VISIBLE else View.GONE
+        panel.showScreenTime(time)
+        spaceHome()
     }
 
     /** The last reading, fetched again when it is over half an hour old. */
