@@ -36,6 +36,11 @@ class ChargerActivity : Activity() {
     private var askOnResume = false
     /** When Android's unlock last went away without the phone opening. */
     private var answeredAt = 0L
+    /**
+     * Closed by itself (unlocked, unplugged): not the same as Android closing it because home
+     * came, which clears whatever is over the home screen.
+     */
+    private var closing = false
     private val locked get() = keyguard?.isKeyguardLocked == true
 
     /** A step for the log, with the phone's state at that moment. */
@@ -123,11 +128,11 @@ class ChargerActivity : Activity() {
         note("new intent ask=$askOnResume")
     }
 
-    /** Swiped home over Android's unlock: as if nothing happened, the clock comes back asking. */
+    /** Swiped home over the lock screen, the unlock up or not: the clock comes back asking. */
     override fun onUserLeaveHint() {
         super.onUserLeaveHint()
         note("user leaving")
-        if (screenOn && unlockAsked) OverLock.left(this)
+        if (screenOn && (unlockAsked || locked)) OverLock.left(this)
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
@@ -142,14 +147,19 @@ class ChargerActivity : Activity() {
 
     override fun onStop() {
         super.onStop()
-        note("stopped")
+        note("stopped finishing=$isFinishing closing=$closing")
         // Gone from sight over the lock screen with the unlock up: the home swipe put Android's
         // lock screen in its place, so it comes back, asking again.
-        if (screenOn && locked && !isFinishing && !LockService.inCall(this)) OverLock.covered(this, unlockAsked, answeredAt)
+        if (screenOn && locked && !closing && !LockService.inCall(this)) OverLock.covered(this, unlockAsked, answeredAt)
         // Covered with the screen on (a call, an alarm): the next screen off brings it back.
         // Stopped by the screen going off, it is still what the wake will show.
         if (screenOn) showing = false
         view.hold()
+    }
+
+    override fun finish() {
+        closing = true
+        super.finish()
     }
 
     override fun onDestroy() {

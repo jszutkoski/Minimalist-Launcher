@@ -46,6 +46,11 @@ open class StandbyActivity : Activity() {
     private var askOnResume = false
     /** When Android's unlock last went away without the phone opening. */
     private var answeredAt = 0L
+    /**
+     * Closed by itself (unlocked, unplugged): not the same as Android closing it because home
+     * came, which clears whatever is over the home screen.
+     */
+    private var closing = false
     private var plugged = false
     /** Our own fingerprint prompt while it is up, to take it down if standby closes first. */
     private var prompt: CancellationSignal? = null
@@ -188,10 +193,10 @@ open class StandbyActivity : Activity() {
 
     override fun onStop() {
         super.onStop()
-        note("stopped")
+        note("stopped finishing=$isFinishing closing=$closing")
         // Gone from sight over the lock screen with the unlock up: the home swipe put Android's
         // lock screen in its place, so it comes back, asking again.
-        if (screenOn && locked && !isFinishing && !LockService.inCall(this)) OverLock.covered(this, dismissing, answeredAt)
+        if (screenOn && locked && !closing && !LockService.inCall(this)) OverLock.covered(this, dismissing, answeredAt)
         // Covered by something else with the screen on (a call, an alarm, an app opened from a
         // notification): no longer in front, so the next screen off must bring it back on top.
         // Stopped by the screen going off, it is still what the wake will show.
@@ -203,6 +208,11 @@ open class StandbyActivity : Activity() {
         if (leftWhileAsking && !unlockAsked && screenOn) left()
         // Nobody sees it drift; it starts again on the way back.
         view.hold()
+    }
+
+    override fun finish() {
+        closing = true
+        super.finish()
     }
 
     override fun onDestroy() {
@@ -230,8 +240,9 @@ open class StandbyActivity : Activity() {
         note("user leaving")
         // With the screen off this is just the launch at screen off, not the user leaving.
         if (!screenOn) return
-        // Swiped home over Android's unlock: as if nothing happened, standby comes back asking.
-        if (dismissing) {
+        // Swiped home over the lock screen, the unlock up or not: standby comes back asking, as
+        // the lock screen's own swipe up would.
+        if (dismissing || locked) {
             OverLock.left(this)
             return
         }

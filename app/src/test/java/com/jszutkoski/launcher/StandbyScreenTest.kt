@@ -261,6 +261,31 @@ class StandbyScreenTest {
     }
 
     @Test
+    fun homeArrivingFirstStillBringsItBack() {
+        // Home reaches Minimalist's home screen a moment before standby is out of sight.
+        phone(secure = true, locked = true)
+        battery(charging = false)
+        val controller = Robolectric.buildActivity(StandbyActivity::class.java).setup()
+        idle(1_000)
+        assertFalse(OverLock.home(app))
+        controller.pause().stop()
+        assertEquals(StandbyActivity::class.java.name, shadowOf(app).nextStartedActivity?.component?.className)
+    }
+
+    @Test
+    fun closedByItselfItDoesNotComeBack() {
+        // Closed as the phone unlocks, say, with home right after.
+        phone(secure = true, locked = true)
+        battery(charging = false)
+        val controller = Robolectric.buildActivity(StandbyActivity::class.java).setup()
+        idle(1_000)
+        controller.get().finish()
+        controller.pause().stop()
+        assertFalse(OverLock.home(app))
+        assertNull(shadowOf(app).nextStartedActivity)
+    }
+
+    @Test
     fun homeLongAfterStandbyWasCoveredLeavesItBehind() {
         phone(secure = true, locked = true)
         battery(charging = false)
