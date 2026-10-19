@@ -51,12 +51,12 @@ class StandbyLayoutTest {
     }
 
     @Test
-    fun theAnalogWeatherIsWordsAlone() {
+    fun theAnalogWeatherHasTheSkysGlyphToo() {
         val standby = StandbyView(context) {}.apply { setScreen(StandbyScreen.ANALOG) }
         standby.showWeather(Weather.Now(11, 3, System.currentTimeMillis()))
         standby.layOut()
         val row = standby.views().filterIsInstance<WeatherRow>().single()
-        assertTrue(row.views().none { it is ImageView && it.visibility == View.VISIBLE })
+        assertTrue(row.views().any { it is ImageView && it.visibility == View.VISIBLE })
     }
 
     private companion object {

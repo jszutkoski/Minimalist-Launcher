@@ -58,7 +58,7 @@ enum class StandbyScreen(
         weatherGapDp = 80,
         iconsGapDp = 70,
         weatherSp = 15f,
-        skyIconDp = 0,
+        skyIconDp = 30,
         glyphDp = 26,
     ),
 }
@@ -274,7 +274,7 @@ class StandbyView(context: Context, private val onExit: () -> Unit) : FrameLayou
 }
 
 /**
- * "☁ 11° Mostly clear": the sky's glyph (on the digital screen), the temperature bright and the
+ * "☁ 11° Mostly clear": the sky's glyph, the temperature bright and the
  * sky in words dimmer, on one line; gone when there is no reading.
  */
 class WeatherRow(context: Context) : LinearLayout(context) {
