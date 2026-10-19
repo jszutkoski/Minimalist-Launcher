@@ -24,12 +24,28 @@ object OverLock {
     /** After the unlock is backed out of, the moment for the clock to have its window again. */
     private const val SETTLE_MS = 800L
 
+    /** After Android's unlock goes away, how long the clock being covered still counts as the swipe. */
+    private const val AFTER_ASKING_MS = 2_000L
+
     private val handler = Handler(Looper.getMainLooper())
     private var pending: Class<out Activity>? = null
     private var takenAt = 0L
 
+    /**
+     * [screen] went out of sight with the screen on and the phone still locked, while Android's
+     * unlock was up ([asking]) or had only just gone ([answeredAt]): something took its place,
+     * and with nothing else of the sort going on that is the home swipe handing over to Android's
+     * lock screen. A call is left alone.
+     */
+    fun covered(screen: Activity, asking: Boolean, answeredAt: Long) {
+        val recent = answeredAt != 0L && SystemClock.elapsedRealtime() - answeredAt < AFTER_ASKING_MS
+        StandbyLog.note(screen, "${screen.javaClass.simpleName} covered asking=$asking recent=$recent")
+        if (asking || recent) left(screen)
+    }
+
     /** Home or recents while [screen] had Android's unlock up. */
     fun left(screen: Activity) {
+        StandbyLog.note(screen, "${screen.javaClass.simpleName} left over the unlock")
         pending = screen.javaClass
         val app = screen.applicationContext
         handler.postDelayed({ takeBack(app) }, BACK_MS)
@@ -44,6 +60,7 @@ object OverLock {
         val app = screen.applicationContext
         val kind = screen.javaClass
         handler.postDelayed({
+            StandbyLog.note(app, "${kind.simpleName} unlock cancelled focus=${screen.hasWindowFocus()} finishing=${screen.isFinishing}")
             if (screen.isFinishing || screen.isDestroyed || screen.hasWindowFocus()) return@postDelayed
             // Already brought back by home or recents.
             if (SystemClock.elapsedRealtime() - takenAt < SETTLE_MS * 2) return@postDelayed
@@ -61,8 +78,11 @@ object OverLock {
         pending = null
         val keyguard = context.getSystemService(KeyguardManager::class.java)
         val power = context.getSystemService(PowerManager::class.java)
+        val locked = keyguard?.isKeyguardLocked == true
+        val on = power?.isInteractive == true
+        StandbyLog.note(context, "take back ${screen.simpleName} locked=$locked screenOn=$on")
         // Unlocked meanwhile, the screen gone off, or a call: nothing to come back to.
-        if (keyguard?.isKeyguardLocked != true || power?.isInteractive != true || LockService.inCall(context)) return false
+        if (!locked || !on || LockService.inCall(context)) return false
         takenAt = SystemClock.elapsedRealtime()
         return try {
             context.startActivity(

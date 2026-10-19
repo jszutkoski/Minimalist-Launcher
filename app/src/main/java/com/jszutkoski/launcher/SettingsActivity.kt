@@ -3,6 +3,8 @@ package com.jszutkoski.launcher
 import android.Manifest
 import android.annotation.SuppressLint
 import android.app.Activity
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.res.ColorStateList
@@ -24,6 +26,7 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.Space
 import android.widget.TextView
+import android.widget.Toast
 import android.window.OnBackInvokedCallback
 import android.window.OnBackInvokedDispatcher
 import java.util.Date
@@ -604,6 +607,18 @@ class SettingsActivity : Activity() {
             getString(R.string.lock_notifications_value),
             getString(R.string.lock_notifications_desc),
         ) { SystemActions.openLockScreenNotifications(this) }
+        row(
+            getString(R.string.standby_log),
+            getString(R.string.standby_log_value),
+            getString(R.string.standby_log_desc),
+        ) {
+            getSystemService(ClipboardManager::class.java)
+                ?.setPrimaryClip(ClipData.newPlainText(getString(R.string.standby_log), StandbyLog.read(this)))
+            // Android 13 and later show their own note when something is copied.
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+                Toast.makeText(this, R.string.standby_log_copied, Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 
     private fun renderApps() {

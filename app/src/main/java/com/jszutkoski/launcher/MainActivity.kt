@@ -7,6 +7,7 @@ import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.ActivityOptions
 import android.app.AlarmManager
+import android.app.KeyguardManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -200,6 +201,7 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        if (getSystemService(KeyguardManager::class.java)?.isKeyguardLocked == true) StandbyLog.note(this, "home new intent, locked")
         // Home swiped over Android's unlock on a bedside clock: the clock again, not the lock screen.
         if (OverLock.takeBack(this)) return
         // Home pressed while already home.

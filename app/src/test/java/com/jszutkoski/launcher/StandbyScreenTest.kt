@@ -218,6 +218,33 @@ class StandbyScreenTest {
     }
 
     @Test
+    fun coveredByTheLockScreenWhileAskingItComesBackAsking() {
+        // No word of home from Android: standby just goes out of sight under its unlock.
+        phone(secure = true, locked = true)
+        battery(charging = false)
+        val controller = Robolectric.buildActivity(StandbyActivity::class.java).setup()
+        idle(1_000)
+        controller.get().touch()
+        controller.pause().stop()
+        idle(1_000)
+        val back = shadowOf(app).nextStartedActivity
+        assertEquals(StandbyActivity::class.java.name, back?.component?.className)
+        assertTrue(back!!.getBooleanExtra(OverLock.EXTRA_ASK, false))
+    }
+
+    @Test
+    fun coveredWithoutAskingItWaitsBehind() {
+        // A call or an alarm over it, say: nothing to bring back.
+        phone(secure = true, locked = true)
+        battery(charging = false)
+        val controller = Robolectric.buildActivity(StandbyActivity::class.java).setup()
+        idle(1_000)
+        controller.pause().stop()
+        idle(1_000)
+        assertNull(shadowOf(app).nextStartedActivity)
+    }
+
+    @Test
     fun offTheChargerItNeverLocksOnItsOwn() {
         serviceOn()
         phone(secure = true, locked = false)

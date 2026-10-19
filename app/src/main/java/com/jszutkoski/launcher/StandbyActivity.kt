@@ -44,6 +44,8 @@ open class StandbyActivity : Activity() {
     private var dismissing = false
     /** Brought back after home swiped Android's unlock away: asks again once it shows. */
     private var askOnResume = false
+    /** When Android's unlock last went away without the phone opening. */
+    private var answeredAt = 0L
     private var plugged = false
     /** Our own fingerprint prompt while it is up, to take it down if standby closes first. */
     private var prompt: CancellationSignal? = null
@@ -125,8 +127,13 @@ open class StandbyActivity : Activity() {
         stopped = false
     }
 
+    /** A step for the log, with the phone's state at that moment. */
+    private fun note(step: String) =
+        StandbyLog.note(this, "${javaClass.simpleName} $step screenOn=$screenOn locked=$locked asking=$dismissing")
+
     override fun onResume() {
         super.onResume()
+        note("resumed ask=$askOnResume")
         // Back in front: whatever came over it (our own PIN pad) was not someone leaving.
         leftWhileAsking = false
         // Unlocked, only Minimalist's accessibility service can keep the way in guarded (by
@@ -174,8 +181,17 @@ open class StandbyActivity : Activity() {
         window.attributes = window.attributes.apply { screenBrightness = level }
     }
 
+    override fun onPause() {
+        super.onPause()
+        note("paused")
+    }
+
     override fun onStop() {
         super.onStop()
+        note("stopped")
+        // Gone from sight over the lock screen with the unlock up: the home swipe put Android's
+        // lock screen in its place, so it comes back, asking again.
+        if (screenOn && locked && !isFinishing && !LockService.inCall(this)) OverLock.covered(this, dismissing, answeredAt)
         // Covered by something else with the screen on (a call, an alarm, an app opened from a
         // notification): no longer in front, so the next screen off must bring it back on top.
         // Stopped by the screen going off, it is still what the wake will show.
@@ -190,6 +206,7 @@ open class StandbyActivity : Activity() {
     }
 
     override fun onDestroy() {
+        note("destroyed")
         handler.removeCallbacksAndMessages(null)
         // Closed under its own prompt (home clears the home task): left like any other way.
         if (leftWhileAsking) left()
@@ -210,6 +227,7 @@ open class StandbyActivity : Activity() {
      */
     override fun onUserLeaveHint() {
         super.onUserLeaveHint()
+        note("user leaving")
         // With the screen off this is just the launch at screen off, not the user leaving.
         if (!screenOn) return
         // Swiped home over Android's unlock: as if nothing happened, standby comes back asking.
@@ -251,6 +269,7 @@ open class StandbyActivity : Activity() {
      */
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
+        note("focus=$hasFocus")
         // Our own fingerprint prompt or PIN pad, standby closing, or the screen going off.
         if (hasFocus || unlockAsked || isFinishing || !screenOn || LockService.inCall(this)) return
         if (!locked && needsUnlock()) lockAndReturn(this)
@@ -270,6 +289,7 @@ open class StandbyActivity : Activity() {
         super.onNewIntent(intent)
         awakeSince = SystemClock.elapsedRealtime()
         if (intent.getBooleanExtra(OverLock.EXTRA_ASK, false)) askOnResume = true
+        note("new intent ask=$askOnResume")
     }
 
     /**
@@ -298,16 +318,22 @@ open class StandbyActivity : Activity() {
         if (unlockAsked) return
         unlockAsked = true
         dismissing = true
+        note("unlock asked")
         handler.removeCallbacks(sleep)
         keyguard.requestDismissKeyguard(
             this,
             object : KeyguardManager.KeyguardDismissCallback() {
-                override fun onDismissSucceeded() = finish()
+                override fun onDismissSucceeded() {
+                    note("unlocked")
+                    finish()
+                }
 
                 // Back out of the PIN pad: standby stays, and the next tap asks again.
                 override fun onDismissCancelled() {
                     unlockAsked = false
                     dismissing = false
+                    answeredAt = SystemClock.elapsedRealtime()
+                    note("unlock cancelled")
                     OverLock.cancelled(this@StandbyActivity)
                     scheduleSleep()
                 }
@@ -315,6 +341,8 @@ open class StandbyActivity : Activity() {
                 override fun onDismissError() {
                     unlockAsked = false
                     dismissing = false
+                    answeredAt = SystemClock.elapsedRealtime()
+                    note("unlock error")
                     scheduleSleep()
                 }
             },

@@ -161,6 +161,10 @@
     <string name="contacts">Contatos na busca</string>
     <string name="contacts_desc">Digite um nome para ligar, mandar mensagem ou abrir uma conversa no WhatsApp. A busca também faz contas (12*7), acha configurações (wifi, brilho) e a lanterna</string>
     <string name="grant_contacts">Toque para permitir os contatos</string>
+    <string name="standby_log">Registro do descanso</string>
+    <string name="standby_log_value">Toque para copiar</string>
+    <string name="standby_log_desc">Os últimos passos do relógio de cabeceira (apareceu, foi coberto, pediu o desbloqueio, voltou) e se a tela estava acesa e o celular bloqueado, para descobrir o que o Android do seu celular faz com ele. Nada do que está na tela é guardado, e fica no celular até você copiar</string>
+    <string name="standby_log_copied">Registro copiado</string>
     <string name="charger_waiting">Notificações esperando</string>
     <string name="standby_charging">Relógio no carregador</string>
     <string name="standby_charging_desc">Toda vez que o celular bloqueia no carregador, a tela acende com o relógio de cabeceira, o clima e, se houver notificação, três pontinhos que não dizem de qual app. Brilho baixo, aceso enquanto estiver conectado, e muda de lugar a cada minuto para não marcar a tela. Toque para desbloquear; o botão de energia apaga a tela. Precisa do Minimalist ligado em Acessibilidade, que é o que percebe o bloqueio</string>

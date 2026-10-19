@@ -20,6 +20,7 @@ import android.view.accessibility.AccessibilityEvent
 class LockService : AccessibilityService() {
     private val screenOff = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
+            StandbyLog.note(context, "service ${intent.action?.substringAfterLast('.')}")
             when (intent.action) {
                 Intent.ACTION_USER_PRESENT -> {
                     MainActivity.onUnlocked()
