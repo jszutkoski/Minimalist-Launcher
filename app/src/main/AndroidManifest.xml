@@ -100,6 +100,17 @@
             android:showWhenLocked="true"
             android:taskAffinity="${applicationId}.standby" />
 
+        <!-- The clock for the night, lit over the lock screen once the phone locks on the
+             charger; in its own task, so that unlocking returns to whatever was open. -->
+        <activity
+            android:name=".ChargerActivity"
+            android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenSize|screenLayout|smallestScreenSize|uiMode"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:showWhenLocked="true"
+            android:taskAffinity="${applicationId}.charger" />
+
         <!-- Double-tap to lock. -->
         <service
             android:name=".LockService"

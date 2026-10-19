@@ -13,34 +13,36 @@ import android.view.accessibility.AccessibilityEvent
 /**
  * The only way for an ordinary app to lock the screen, and to open a screen from the
  * background: Android lets an app whose accessibility service is on do both. It never reads
- * what is on screen and hears nothing about other apps. It locks on request, and with "Standby
- * on every wake" it puts the bedside clock on top each time the screen turns off (with "Standby
- * while charging", each time it does on the charger).
+ * what is on screen and hears nothing about other apps. It locks on request; on the charger it
+ * brings up the night's clock each time the phone locks ([ChargerActivity]), and elsewhere, with
+ * "Standby on every wake", it puts the bedside clock on top each time the screen turns off.
  */
 class LockService : AccessibilityService() {
     private val screenOff = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
-            if (intent.action == Intent.ACTION_USER_PRESENT) {
-                MainActivity.onUnlocked()
+            when (intent.action) {
+                Intent.ACTION_USER_PRESENT -> {
+                    MainActivity.onUnlocked()
+                    return
+                }
+                Intent.ACTION_POWER_CONNECTED -> {
+                    ChargerActivity.onPlugged(context)
+                    return
+                }
+            }
+            if (inCall(context)) return
+            // On the charger, the night's clock comes over the lock screen instead.
+            if (ChargerActivity.wanted(context)) {
+                ChargerActivity.startWhenLocked(context)
                 return
             }
-            if (!wanted(context) || inCall(context) || StandbyActivity.inFront || StandbyActivity.returning) return
+            if (!Prefs(context).standbyOnWake || StandbyActivity.inFront || StandbyActivity.returning) return
             // Home was on screen: standby joins the home task, so unlocking fades back to home
             // instead of the system's sideways task animation.
             if (MainActivity.inFront) StandbyActivity.startOverHome(context) else StandbyActivity.startOnTop(context)
         }
     }
     private var listening = false
-
-    /** On every screen off, or, with "Standby while charging", on every one while charging. */
-    private fun wanted(context: Context): Boolean {
-        val prefs = Prefs(context)
-        if (prefs.standbyOnWake) return true
-        if (!prefs.standbyWhenCharging) return false
-        // Sticky: answers at once with the charge as it is now.
-        val battery = context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))?.let(BatteryState::from)
-        return battery?.plugged == true
-    }
 
     override fun onServiceConnected() {
         instance = this
@@ -50,6 +52,7 @@ class LockService : AccessibilityService() {
             IntentFilter().apply {
                 addAction(Intent.ACTION_SCREEN_OFF)
                 addAction(Intent.ACTION_USER_PRESENT)
+                addAction(Intent.ACTION_POWER_CONNECTED)
             },
         )
         listening = true

@@ -27,7 +27,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 
-/** The bedside clock: when it may keep the screen lit, and what it shows over the lock screen. */
+/** The bedside clock: when it locks the phone, and what it shows over the lock screen. */
 @RunWith(RobolectricTestRunner::class)
 class StandbyScreenTest {
     private val app = RuntimeEnvironment.getApplication()
@@ -90,45 +90,6 @@ class StandbyScreenTest {
         phone(secure = true, locked = false)
         battery(charging = true)
         assertFalse(open().lit())
-    }
-
-    @Test
-    fun overTheLockScreenOnTheChargerItStaysLit() {
-        phone(secure = true, locked = true)
-        battery(charging = true)
-        assertTrue(open().lit())
-    }
-
-    @Test
-    fun onceAndroidLocksTheNextWakeStaysLit() {
-        serviceOn()
-        phone(secure = true, locked = false)
-        battery(charging = true)
-        val standby = open()
-        assertFalse(standby.lit())
-        keyguard.setKeyguardLocked(true)
-        app.sendBroadcast(Intent(Intent.ACTION_SCREEN_ON))
-        idle()
-        assertTrue(standby.lit())
-    }
-
-    @Test
-    fun withNoScreenLockThereIsNothingToGuard() {
-        phone(secure = false, locked = false)
-        battery(charging = true)
-        assertTrue(open().lit())
-    }
-
-    @Test
-    fun offTheChargerItTimesOut() {
-        phone(secure = true, locked = true)
-        battery(charging = false)
-        val standby = open()
-        assertFalse(standby.lit())
-        battery(charging = true)
-        assertTrue(standby.lit())
-        battery(charging = false)
-        assertFalse(standby.lit())
     }
 
     @Test
@@ -207,15 +168,14 @@ class StandbyScreenTest {
     }
 
     @Test
-    fun unlockedOnTheChargerItLocksToStayLit() {
+    fun onTheChargerItLeavesLockingToAndroid() {
+        // The charger's own clock comes once the phone locks; standby doesn't lock it to stay lit.
         serviceOn()
         phone(secure = true, locked = false)
         battery(charging = true)
         open()
-        idle(9_000)
+        idle(15_000)
         assertEquals(0, locks)
-        idle(2_000)
-        assertEquals(1, locks)
     }
 
     @Test
@@ -379,21 +339,5 @@ class StandbyScreenTest {
         battery(charging = true)
         idle(15_000)
         assertEquals(0, locks)
-    }
-
-    @Test
-    fun pluggedInButHoldingTheChargeCountsAsOnTheCharger() {
-        // A phone that stops at 80% to spare its battery says "not charging" all night.
-        phone(secure = true, locked = true)
-        @Suppress("DEPRECATION")
-        app.sendStickyBroadcast(
-            Intent(Intent.ACTION_BATTERY_CHANGED)
-                .putExtra(BatteryManager.EXTRA_LEVEL, 80)
-                .putExtra(BatteryManager.EXTRA_SCALE, 100)
-                .putExtra(BatteryManager.EXTRA_STATUS, BatteryManager.BATTERY_STATUS_NOT_CHARGING)
-                .putExtra(BatteryManager.EXTRA_PLUGGED, BatteryManager.BATTERY_PLUGGED_AC),
-        )
-        idle()
-        assertTrue(open().lit())
     }
 }

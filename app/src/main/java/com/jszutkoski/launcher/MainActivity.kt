@@ -80,10 +80,6 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
     private lateinit var panel: HomePanel
     private lateinit var nowPlaying: NowPlaying
     private val background = Executors.newSingleThreadExecutor()
-    /** On the charger, charging or holding at a limit. */
-    private var charging = false
-    // Focus is checked when the countdown ends: a menu or the shade may have opened since.
-    private val idleStandby = Runnable { if (canAutoStandby() && hasWindowFocus()) enterStandby() }
     private lateinit var drawer: AppDrawerView
 
     private var progress = 0f
@@ -183,12 +179,6 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
             loadContacts()
             if (prefs.nowPlaying) nowPlaying.start() else nowPlaying.stop()
         }
-        scheduleStandby()
-    }
-
-    override fun onUserInteraction() {
-        super.onUserInteraction()
-        scheduleStandby()
     }
 
     override fun onStop() {
@@ -206,7 +196,6 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         pause.hide(animate = false)
         // Coming back home should always land on the clock, never a stale search.
         closeDrawer(animate = false)
-        root.removeCallbacks(idleStandby)
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -429,26 +418,11 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         val battery = BatteryState.from(intent) ?: return
         face.showBattery(battery, number = true)
         panel.showBattery(battery)
-        if (battery.plugged != charging) {
-            charging = battery.plugged
-            scheduleStandby()
-        }
     }
 
     // Standby ------------------------------------------------------------------
 
-    /** Restarts the countdown to standby; called on every touch. */
-    private fun scheduleStandby() {
-        root.removeCallbacks(idleStandby)
-        if (canAutoStandby()) root.postDelayed(idleStandby, STANDBY_DELAY_MS)
-    }
-
-    /** Charging, on the bare home screen, with the app list closed. */
-    private fun canAutoStandby() =
-        prefs.standbyWhenCharging && charging && progress == 0f && !pause.isShowing && StandbyActivity.canShow(this)
-
     private fun enterStandby() {
-        root.removeCallbacks(idleStandby)
         // On an unlocked phone, standby needs the accessibility service to stay guarded.
         if (!StandbyActivity.canShow(this)) {
             Toast.makeText(this, R.string.standby_needs_service, Toast.LENGTH_LONG).show()
@@ -462,7 +436,6 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         // The notification shade only takes focus away; it never pauses this activity, so
         // onResume doesn't run when it closes.
         if (hasFocus) applyStatusBar()
-        if (hasFocus) scheduleStandby()
         // A keyboard asked for while the window had no focus yet is shown now.
         if (hasFocus && progress > 0f) drawer.onWindowFocus()
     }
@@ -875,8 +848,6 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         fun onUnlocked() {
             if (!resumed) inFront = false
         }
-
-        private const val STANDBY_DELAY_MS = 20_000L
 
         private const val DAY_MS = 24 * 60 * 60 * 1000L
     }

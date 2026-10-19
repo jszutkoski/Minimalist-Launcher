@@ -66,7 +66,8 @@ enum class StandbyScreen(
 /**
  * A bedside clock on black: the clock, the weather when it is on, and a glyph for each app with
  * notifications waiting, as [StandbyScreen] lays them out. The group drifts a few pixels every
- * minute so no pixel stays lit in the same place. A tap calls [onExit].
+ * minute (or, [wanders], moves anywhere on the screen) so no pixel stays lit in the same place.
+ * A tap calls [onExit].
  */
 class StandbyView(context: Context, private val onExit: () -> Unit) : FrameLayout(context) {
     private val weather = WeatherRow(context)
@@ -80,6 +81,12 @@ class StandbyView(context: Context, private val onExit: () -> Unit) : FrameLayou
     private var screen = StandbyScreen.DIGITAL
     private var icons: List<AppGlyphs.Waiting> = emptyList()
     private var describe: (AppGlyphs.Waiting) -> String = { "" }
+
+    /**
+     * Lit all night: instead of drifting a few pixels, the group goes somewhere else on the
+     * screen once a minute, fading out and in again.
+     */
+    var wanders = false
 
     init {
         setBackgroundColor(Palette.BACKGROUND)
@@ -204,6 +211,11 @@ class StandbyView(context: Context, private val onExit: () -> Unit) : FrameLayou
     }
 
     fun show() {
+        if (wanders) {
+            // Never left half faded by a move cut short behind something else.
+            content.animate().cancel()
+            content.alpha = 1f
+        }
         if (visibility == VISIBLE) {
             // Back in front after a while behind: drifting again from here.
             removeCallbacks(drift)
@@ -212,7 +224,8 @@ class StandbyView(context: Context, private val onExit: () -> Unit) : FrameLayou
         }
         animate().cancel()
         visibility = VISIBLE
-        moveContent()
+        // Wandering starts from the screen's own place, a minute from now.
+        if (wanders) postDelayed(drift, DRIFT_MS) else moveContent()
         animate().alpha(1f).setDuration(600).start()
     }
 
@@ -227,6 +240,10 @@ class StandbyView(context: Context, private val onExit: () -> Unit) : FrameLayou
      * all night, too little to ever look moved.
      */
     private fun moveContent() {
+        if (wanders) {
+            jump()
+            return
+        }
         val rangeX = dp(DRIFT_DP).toFloat()
         val rangeY = dp(DRIFT_DP).toFloat()
         content.animate()
@@ -236,6 +253,27 @@ class StandbyView(context: Context, private val onExit: () -> Unit) : FrameLayou
             .start()
         removeCallbacks(drift)
         postDelayed(drift, DRIFT_MS)
+    }
+
+    /** Out, over to a new place anywhere on the screen, and in again. */
+    private fun jump() {
+        content.animate().alpha(0f).setDuration(FADE_MS).withEndAction {
+            content.translationX = somewhere(content.left, content.width, width, dp(SIDE_MARGIN_DP))
+            content.translationY = somewhere(content.top, content.height, height, dp(WANDER_EDGE_DP))
+            content.animate().alpha(1f).setDuration(FADE_MS).start()
+        }.start()
+        removeCallbacks(drift)
+        postDelayed(drift, DRIFT_MS)
+    }
+
+    /**
+     * A shift for a group laid out at [start], [size] long, that keeps it [edge] clear of both
+     * ends of [room]; none when it doesn't fit.
+     */
+    private fun somewhere(start: Int, size: Int, room: Int, edge: Int): Float {
+        val least = edge - start
+        val most = room - edge - size - start
+        return if (most <= least) 0f else (least + Random.nextFloat() * (most - least))
     }
 
     /** No drifting while nobody can see it. */
@@ -282,6 +320,12 @@ class StandbyView(context: Context, private val onExit: () -> Unit) : FrameLayou
     private companion object {
         const val DRIFT_DP = 6
         const val DRIFT_MS = 60_000L
+
+        /** Each way of a move when wandering. */
+        const val FADE_MS = 800L
+
+        /** Clear of the top and bottom of the screen when wandering, past the status and navigation bars. */
+        const val WANDER_EDGE_DP = 56
 
         /** Between two notification glyphs, line to line. */
         const val ICON_GAP_DP = 48

@@ -3,7 +3,6 @@ package com.jszutkoski.launcher
 import android.Manifest
 import android.annotation.SuppressLint
 import android.app.Activity
-import android.app.KeyguardManager
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.res.ColorStateList
@@ -559,13 +558,12 @@ class SettingsActivity : Activity() {
             },
         )
         weatherRow(ClockScreen.STANDBY)
-        // With a screen lock, standby on an unlocked phone is guarded only through the service.
-        val secure = getSystemService(KeyguardManager::class.java)?.isDeviceSecure == true
+        // The service is what hears the phone lock on the charger, and lights the clock.
         permissionRow(
             title = getString(R.string.standby_charging),
             description = getString(R.string.standby_charging_desc),
             enabled = prefs.standbyWhenCharging,
-            granted = !secure || LockService.isEnabled(this),
+            granted = LockService.isEnabled(this),
             missing = getString(R.string.grant_accessibility),
             setEnabled = { prefs.standbyWhenCharging = it },
             grant = { askForAccessibility { prefs.standbyWhenCharging = false } },

@@ -3,7 +3,7 @@
     <string name="app_name">Minimalist</string>
     <string name="settings">Configurações</string>
     <string name="lock_service_label">Minimalist</string>
-    <string name="lock_service_description">Permite que o Minimalist bloqueie a tela com um toque duplo num espaço vazio da tela inicial, mostre o relógio de cabeceira quando a tela acende e bloqueie o celular quando o relógio de cabeceira fica num celular desbloqueado (depois de 10 segundos sem toque no carregador, ou ao sair pelo início, pelos recentes ou pelas notificações). Ele não lê nem altera nada na sua tela, não vê o que você digita e não sabe nada dos outros apps.</string>
+    <string name="lock_service_description">Permite que o Minimalist bloqueie a tela com um toque duplo num espaço vazio da tela inicial, mostre o relógio de cabeceira quando a tela acende e o relógio no carregador quando o celular bloqueia nele, e bloqueie o celular quando o relógio de cabeceira fica num celular desbloqueado (ao sair pelo início, pelos recentes ou pelas notificações). Ele não lê nem altera nada na sua tela, não vê o que você digita e não sabe nada dos outros apps.</string>
     <string name="media_listener_label">Minimalist tocando agora</string>
     <string name="search_hint">Buscar</string>
     <string name="search_only_hint">Digite o nome de um app</string>
@@ -161,8 +161,9 @@
     <string name="contacts">Contatos na busca</string>
     <string name="contacts_desc">Digite um nome para ligar, mandar mensagem ou abrir uma conversa no WhatsApp. A busca também faz contas (12*7), acha configurações (wifi, brilho) e a lanterna</string>
     <string name="grant_contacts">Toque para permitir os contatos</string>
-    <string name="standby_charging">Descanso ao carregar</string>
-    <string name="standby_charging_desc">Um relógio de cabeceira suave depois de 20 segundos na tela inicial carregando. Faça pinça com dois dedos na tela inicial para abrir quando quiser; toque para sair. Ele só fica aceso a noite toda sobre a tela de bloqueio, para ninguém chegar às suas notificações. Num celular com bloqueio de tela, ele precisa do Minimalist ligado em Acessibilidade, que é o que o mantém protegido: ele mesmo bloqueia o celular depois de 10 segundos sem toque e acende de novo, volta para a frente toda vez que a tela apaga no carregador, e sair dele pelo início, pelos recentes ou pelas notificações bloqueia o celular e traz o relógio de volta sobre a tela de bloqueio</string>
+    <string name="charger_waiting">Notificações esperando</string>
+    <string name="standby_charging">Relógio no carregador</string>
+    <string name="standby_charging_desc">Toda vez que o celular bloqueia no carregador, a tela acende com o relógio de cabeceira, o clima e, se houver notificação, três pontinhos que não dizem de qual app. Brilho baixo, aceso enquanto estiver conectado, e muda de lugar a cada minuto para não marcar a tela. Toque para desbloquear; o botão de energia apaga a tela. Precisa do Minimalist ligado em Acessibilidade, que é o que percebe o bloqueio</string>
     <string name="standby_needs_service">Ative o Minimalist em Acessibilidade (Configurações → Descanso) para usar o relógio de cabeceira com o celular desbloqueado</string>
     <string name="standby_wake">Descanso a cada despertar</string>
     <string name="standby_wake_desc">Sempre que a tela acende, o relógio de cabeceira aparece primeiro, sobre a tela de bloqueio. Toque para desbloquear, ou desbloqueie com a digital ou o rosto; você volta ao app em que estava. A mesma opção faz o início, os recentes ou puxar as notificações bloquearem o celular num relógio ainda desbloqueado, e ele volta sobre a tela de bloqueio</string>

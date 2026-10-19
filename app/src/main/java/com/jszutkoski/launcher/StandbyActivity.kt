@@ -20,7 +20,6 @@ import android.os.PowerManager
 import android.os.SystemClock
 import android.telecom.TelecomManager
 import android.view.WindowInsetsController
-import android.view.WindowManager
 import android.window.OnBackInvokedDispatcher
 import java.util.Calendar
 
@@ -28,7 +27,8 @@ import java.util.Calendar
  * The bedside clock as its own screen, allowed to show over the lock screen. When the phone
  * locks while it is open, pressing power brings it back instead of the lock screen. It shows
  * the time, the weather and which messages are waiting, nothing that can be opened:
- * tapping asks for the PIN or fingerprint first, and unlocking by any means closes it.
+ * tapping asks for the PIN or fingerprint first, and unlocking by any means closes it. On the
+ * charger, once the phone locks, [ChargerActivity] takes over for the night.
  */
 open class StandbyActivity : Activity() {
     private val prefs by lazy { Prefs(this) }
@@ -39,7 +39,6 @@ open class StandbyActivity : Activity() {
     private val secure get() = keyguard?.isDeviceSecure == true
 
     private lateinit var view: StandbyView
-    private var charging = false
     private var unlockAsked = false
     /** Our own fingerprint prompt while it is up, to take it down if standby closes first. */
     private var prompt: CancellationSignal? = null
@@ -57,24 +56,12 @@ open class StandbyActivity : Activity() {
             awakeSince = SystemClock.elapsedRealtime()
             view.ignoreTaps(WAKE_TAP_MS)
             view.refreshClock()
-            // Android may have locked while the screen was off: now standby may stay lit.
-            keepScreenOn()
-            scheduleLock()
             showWaiting()
         }
     }
 
-    /** Main-thread timers that must run while the screen is off, too. */
-    private val handler = Handler(Looper.getMainLooper())
-
-    /** Standby locked the phone to stay lit: the next return to the front turns the screen on. */
+    /** Standby locked the phone and comes back: the next return to the front turns the screen on. */
     private var relighting = false
-    private val lockOnCharger = Runnable { lockAndRelight() }
-    private val relight = Runnable {
-        // Brought to the front again, over the lock screen now; the activity's own request to
-        // turn the screen on is what lights it.
-        startActivity(Intent(this, javaClass).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP))
-    }
     private val notificationsChanged: () -> Unit = { showWaiting() }
 
     private val batteryReceiver = object : BroadcastReceiver() {
@@ -151,10 +138,8 @@ open class StandbyActivity : Activity() {
         view.ignoreTaps(WAKE_TAP_MS)
         applyBrightness()
         view.show()
-        keepScreenOn()
         showWaiting()
         showWeather()
-        scheduleLock()
     }
 
     /** The brightness chosen for standby, for its own window only: the phone's setting stays as it is. */
@@ -162,29 +147,6 @@ open class StandbyActivity : Activity() {
         val level = prefs.standbyBrightness.level(Calendar.getInstance().get(Calendar.HOUR_OF_DAY))
         if (window.attributes.screenBrightness == level) return
         window.attributes = window.attributes.apply { screenBrightness = level }
-    }
-
-    /**
-     * On the charger with the phone still unlocked, standby may not stay lit (anyone could pull
-     * down the notifications), so it would go dark at the screen timeout and leave the rest of
-     * the night to the lock screen. Instead, once the grace period passes untouched, it locks
-     * the phone itself and comes straight back on, over the lock screen, where it can stay lit.
-     * Needs Minimalist's accessibility service, which is what can lock.
-     */
-    private fun scheduleLock() {
-        handler.removeCallbacks(lockOnCharger)
-        // Only while in front: a copy left behind another app must never lock it mid-use.
-        if (inFrontNow && charging && screenOn && !locked && secure && LockService.isEnabled(this)) {
-            val left = GRACE_MS - (SystemClock.elapsedRealtime() - awakeSince)
-            handler.postDelayed(lockOnCharger, left.coerceAtLeast(0))
-        }
-    }
-
-    private fun lockAndRelight() {
-        if (!inFrontNow || !charging || !screenOn || locked || unlockAsked || isFinishing || LockService.inCall(this)) return
-        if (!LockService.lock()) return
-        relightOnResume()
-        handler.postDelayed(relight, RELIGHT_DELAY_MS)
     }
 
     /** The next return to the front turns the screen on, over the lock screen. */
@@ -208,7 +170,6 @@ open class StandbyActivity : Activity() {
     }
 
     override fun onDestroy() {
-        handler.removeCallbacksAndMessages(null)
         // Closed under its own prompt (home clears the home task): left like any other way.
         if (leftWhileAsking) left()
         prompt?.cancel()
@@ -271,10 +232,7 @@ open class StandbyActivity : Activity() {
 
     private fun leaveFront() {
         shown -= id
-        handler.removeCallbacks(lockOnCharger)
     }
-
-    private val inFrontNow get() = id in shown
 
     // Android 11 and 12 only: from 13 on, back reaches the OnBackInvokedCallback instead.
     @SuppressLint("GestureBackNavigation")
@@ -292,8 +250,8 @@ open class StandbyActivity : Activity() {
      * The phone has a PIN, pattern or password, nobody has given it yet, and the grace period is
      * over. For the first seconds after the screen comes on (or standby opens), a phone Android
      * has not locked yet goes straight in, as it would without standby: a screen that timed out
-     * a moment ago should not need the fingerprint. Kept awake longer, by the charger or by
-     * just sitting there, standby guards the phone itself.
+     * a moment ago should not need the fingerprint. Kept awake longer, standby guards the phone
+     * itself.
      */
     private fun needsUnlock(): Boolean {
         if (confirmed || !secure) return false
@@ -373,15 +331,8 @@ open class StandbyActivity : Activity() {
             view.showWaiting(emptyList()) { "" }
             return
         }
-        val muted = prefs.standbyMuted
         val dialer = getSystemService(TelecomManager::class.java)?.defaultDialerPackage
-        val apps = Notifications.waitingApps().filter { app ->
-            // Missed calls come from Android's call service: they belong to the phone app.
-            val call = app in Packages.CALLS
-            val owner = if (call) dialer ?: app else app
-            // Only apps with a home screen entry: not the system's own passing notes.
-            owner !in muted && (call || packageManager.getLaunchIntentForPackage(app) != null)
-        }
+        val apps = waitingApps(this, prefs)
         view.showWaiting(AppGlyphs.waiting(apps, AppGlyphs.lookup(this))) { icon ->
             icon.packages.joinToString(", ") { label(if (it in Packages.CALLS) dialer ?: it else it) }
         }
@@ -408,25 +359,7 @@ open class StandbyActivity : Activity() {
 
     private fun updateBattery(intent: Intent) {
         val battery = BatteryState.from(intent) ?: return
-        // On the charger, charging or holding: standby may stay lit either way.
-        charging = battery.plugged
         view.updateBattery(battery)
-        keepScreenOn()
-        scheduleLock()
-    }
-
-    /**
-     * Awake all night on the charger, but only over the lock screen (or on a phone with no
-     * screen lock). Kept lit while still unlocked, anyone could pull down the notification
-     * shade and read or answer messages; so an unlocked standby times out like any screen,
-     * Android locks, and from the next wake on it stays lit over the lock screen.
-     */
-    private fun keepScreenOn() {
-        if (charging && (locked || !secure)) {
-            window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        } else {
-            window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        }
     }
 
     companion object {
@@ -436,8 +369,24 @@ open class StandbyActivity : Activity() {
         /** After the screen comes on, how long a touch is taken for the end of the wake gesture. */
         private const val WAKE_TAP_MS = 700L
 
-        /** After locking on the charger, the moment for the lock screen to settle before lighting up again. */
-        private const val RELIGHT_DELAY_MS = 600L
+        /** After locking, the moment for the lock screen to settle before lighting up again. */
+        const val RELIGHT_DELAY_MS = 600L
+
+        /**
+         * The apps with notifications waiting that may show on the bedside clock, from the
+         * notification listener, leaving out the apps muted in settings.
+         */
+        fun waitingApps(context: Context, prefs: Prefs): List<String> {
+            val muted = prefs.standbyMuted
+            val dialer = context.getSystemService(TelecomManager::class.java)?.defaultDialerPackage
+            return Notifications.waitingApps().filter { app ->
+                // Missed calls come from Android's call service: they belong to the phone app.
+                val call = app in Packages.CALLS
+                val owner = if (call) dialer ?: app else app
+                // Only apps with a home screen entry: not the system's own passing notes.
+                owner !in muted && (call || context.packageManager.getLaunchIntentForPackage(app) != null)
+            }
+        }
 
         /** Brought back to the front with the screen lit, after standby locked the phone. */
         private const val EXTRA_RELIGHT = "relight"
@@ -466,6 +415,11 @@ open class StandbyActivity : Activity() {
             Handler(Looper.getMainLooper()).postDelayed({
                 returning = false
                 if (LockService.inCall(context)) return@postDelayed
+                // On the charger the night's clock is what comes over the lock screen.
+                if (ChargerActivity.wanted(context)) {
+                    ChargerActivity.startWhenLocked(context)
+                    return@postDelayed
+                }
                 try {
                     // Into its own task again: the home task for the one over home, where the
                     // screen still showing is brought forward rather than opened twice.
