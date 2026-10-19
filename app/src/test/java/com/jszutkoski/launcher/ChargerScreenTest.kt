@@ -4,7 +4,6 @@ import android.app.KeyguardManager
 import android.content.ComponentName
 import android.content.Intent
 import android.content.IntentFilter
-import android.content.pm.ActivityInfo
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageInfo
 import android.os.BatteryManager
@@ -222,15 +221,18 @@ class ChargerScreenTest {
         assertNull(startedClock())
     }
 
+    /** ActivityInfo's flag for android:turnScreenOn, hidden from the SDK. */
+    private val TURN_SCREEN_ON = 0x1000000
+
     @Test
     fun theScreenComesOnAsTheyOpen() {
         // Only the manifest's request reaches Android in time to light a dark screen.
         for (screen in listOf(ChargerActivity::class.java, StandbyLitActivity::class.java)) {
             val info = app.packageManager.getActivityInfo(ComponentName(app, screen), 0)
-            assertTrue(screen.simpleName, info.flags and ActivityInfo.FLAG_TURN_SCREEN_ON != 0)
+            assertTrue(screen.simpleName, info.flags and TURN_SCREEN_ON != 0)
         }
         // Standby itself opens at screen off and must wait for the wake.
         val standby = app.packageManager.getActivityInfo(ComponentName(app, StandbyOverAppsActivity::class.java), 0)
-        assertFalse(standby.flags and ActivityInfo.FLAG_TURN_SCREEN_ON != 0)
+        assertFalse(standby.flags and TURN_SCREEN_ON != 0)
     }
 }
