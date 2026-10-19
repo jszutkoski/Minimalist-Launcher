@@ -55,6 +55,8 @@ open class StandbyActivity : Activity() {
     private val screenOnReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             awakeSince = SystemClock.elapsedRealtime()
+            // Android's unlock went with the screen: the next tap asks again.
+            if (locked) unlockAsked = false
             view.ignoreTaps(WAKE_TAP_MS)
             view.refreshClock()
             showWaiting()
@@ -149,16 +151,19 @@ open class StandbyActivity : Activity() {
 
     /**
      * Off the charger, over the lock screen, standby goes dark after a few untouched seconds,
-     * as the lock screen itself does, rather than at the phone's longer screen timeout. Needs
+     * as the lock screen itself does, rather than at the phone's longer screen timeout; with
+     * Android's unlock up and left unanswered too, which goes with the screen. Needs
      * Minimalist's accessibility service, which turns the screen off by locking again.
      */
     private fun scheduleSleep() {
         handler.removeCallbacks(sleep)
-        if (id in shown && locked && screenOn && !plugged && !unlockAsked) handler.postDelayed(sleep, SLEEP_MS)
+        if (id in shown && locked && screenOn && !plugged) handler.postDelayed(sleep, SLEEP_MS)
     }
 
     private fun goDark() {
-        if (id !in shown || !locked || !screenOn || plugged || unlockAsked || isFinishing || LockService.inCall(this)) return
+        if (id !in shown || !locked || !screenOn || plugged || isFinishing || LockService.inCall(this)) return
+        note("dark")
+        unlockAsked = false
         LockService.lock()
     }
 
@@ -294,7 +299,8 @@ open class StandbyActivity : Activity() {
         if (unlockAsked) return
         unlockAsked = true
         note("unlock asked")
-        handler.removeCallbacks(sleep)
+        // Ten seconds for the fingerprint or PIN, then dark.
+        scheduleSleep()
         keyguard.requestDismissKeyguard(
             this,
             object : KeyguardManager.KeyguardDismissCallback() {

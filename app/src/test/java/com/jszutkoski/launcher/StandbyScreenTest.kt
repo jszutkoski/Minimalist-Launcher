@@ -360,4 +360,18 @@ class StandbyScreenTest {
         assertNull(shadowOf(app).nextStartedActivity)
         assertEquals(0, locks)
     }
+
+    @Test
+    fun anUnansweredUnlockGoesDarkTenSecondsAfterTheTap() {
+        // Off the charger: a tap brings up Android's unlock, then nothing.
+        phone(secure = true, locked = true)
+        battery(charging = false)
+        val standby = open()
+        idle(1_000)
+        standby.touch()
+        idle(9_500)
+        assertEquals(0, locks)
+        idle(1_000)
+        assertEquals(1, locks)
+    }
 }
