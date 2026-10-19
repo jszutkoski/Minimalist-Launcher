@@ -179,6 +179,45 @@ class StandbyScreenTest {
     }
 
     @Test
+    fun offTheChargerOverTheLockScreenItGoesDarkAfterTenSeconds() {
+        // Darkened by locking again, which only turns the screen off.
+        phone(secure = true, locked = true)
+        battery(charging = false)
+        open()
+        idle(9_000)
+        assertEquals(0, locks)
+        idle(2_000)
+        assertEquals(1, locks)
+    }
+
+    @Test
+    fun onTheChargerOverTheLockScreenItKeepsToTheScreenTimeout() {
+        phone(secure = true, locked = true)
+        battery(charging = true)
+        open()
+        idle(15_000)
+        assertEquals(0, locks)
+    }
+
+    @Test
+    fun homeOverAndroidsUnlockBringsStandbyBackAsking() {
+        phone(secure = true, locked = true)
+        battery(charging = false)
+        val controller = Robolectric.buildActivity(StandbyActivity::class.java).setup()
+        idle(1_000)
+        // A tap: Android's unlock comes up. Then a swipe home instead of the fingerprint.
+        controller.get().touch()
+        controller.userLeaving()
+        idle(1_000)
+        val back = shadowOf(app).nextStartedActivity
+        assertEquals(StandbyActivity::class.java.name, back?.component?.className)
+        assertTrue(back!!.getBooleanExtra(OverLock.EXTRA_ASK, false))
+        // With the unlock up, standby never goes dark under it.
+        idle(15_000)
+        assertEquals(0, locks)
+    }
+
+    @Test
     fun offTheChargerItNeverLocksOnItsOwn() {
         serviceOn()
         phone(secure = true, locked = false)

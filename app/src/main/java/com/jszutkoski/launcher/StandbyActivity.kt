@@ -40,6 +40,11 @@ open class StandbyActivity : Activity() {
 
     private lateinit var view: StandbyView
     private var unlockAsked = false
+    /** Android's own unlock is up over standby, asked for by a tap over the lock screen. */
+    private var dismissing = false
+    /** Brought back after home swiped Android's unlock away: asks again once it shows. */
+    private var askOnResume = false
+    private var plugged = false
     /** Our own fingerprint prompt while it is up, to take it down if standby closes first. */
     private var prompt: CancellationSignal? = null
     /** The fingerprint or PIN was given here, so leaving needs no lock behind it. */
@@ -57,8 +62,13 @@ open class StandbyActivity : Activity() {
             view.ignoreTaps(WAKE_TAP_MS)
             view.refreshClock()
             showWaiting()
+            scheduleSleep()
         }
     }
+
+    /** Main-thread timers that must run while the screen is off, too. */
+    private val handler = Handler(Looper.getMainLooper())
+    private val sleep = Runnable { goDark() }
 
     private val notificationsChanged: () -> Unit = { showWaiting() }
 
@@ -85,6 +95,7 @@ open class StandbyActivity : Activity() {
         edgeToEdge()
         view = StandbyView(this, ::leave)
         setContentView(view)
+        askOnResume = intent.getBooleanExtra(OverLock.EXTRA_ASK, false)
         Notifications.addListener(notificationsChanged)
         showWaiting()
 
@@ -133,6 +144,27 @@ open class StandbyActivity : Activity() {
         view.show()
         showWaiting()
         showWeather()
+        scheduleSleep()
+        if (askOnResume) {
+            askOnResume = false
+            // Once it is in front again, so Android's unlock opens over it.
+            view.postDelayed({ if (!isFinishing && locked) leave() }, ASK_DELAY_MS)
+        }
+    }
+
+    /**
+     * Off the charger, over the lock screen, standby goes dark after a few untouched seconds,
+     * as the lock screen itself does, rather than at the phone's longer screen timeout. Needs
+     * Minimalist's accessibility service, which turns the screen off by locking again.
+     */
+    private fun scheduleSleep() {
+        handler.removeCallbacks(sleep)
+        if (id in shown && locked && screenOn && !plugged && !unlockAsked) handler.postDelayed(sleep, SLEEP_MS)
+    }
+
+    private fun goDark() {
+        if (id !in shown || !locked || !screenOn || plugged || unlockAsked || isFinishing || LockService.inCall(this)) return
+        LockService.lock()
     }
 
     /** The brightness chosen for standby, for its own window only: the phone's setting stays as it is. */
@@ -148,6 +180,7 @@ open class StandbyActivity : Activity() {
         // notification): no longer in front, so the next screen off must bring it back on top.
         // Stopped by the screen going off, it is still what the wake will show.
         if (screenOn) leaveFront()
+        handler.removeCallbacks(sleep)
         stopped = true
         // Home or recents while our prompt was up, and the prompt already gone without the
         // fingerprint or PIN: left like any other way.
@@ -157,6 +190,7 @@ open class StandbyActivity : Activity() {
     }
 
     override fun onDestroy() {
+        handler.removeCallbacksAndMessages(null)
         // Closed under its own prompt (home clears the home task): left like any other way.
         if (leftWhileAsking) left()
         prompt?.cancel()
@@ -178,6 +212,11 @@ open class StandbyActivity : Activity() {
         super.onUserLeaveHint()
         // With the screen off this is just the launch at screen off, not the user leaving.
         if (!screenOn) return
+        // Swiped home over Android's unlock: as if nothing happened, standby comes back asking.
+        if (dismissing) {
+            OverLock.left(this)
+            return
+        }
         // Our own prompt is up, and the PIN pad opening over standby lands here too. Only if
         // the prompt then goes without the fingerprint or PIN, with standby out of sight, was
         // this home or recents.
@@ -230,6 +269,7 @@ open class StandbyActivity : Activity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         awakeSince = SystemClock.elapsedRealtime()
+        if (intent.getBooleanExtra(OverLock.EXTRA_ASK, false)) askOnResume = true
     }
 
     /**
@@ -257,6 +297,8 @@ open class StandbyActivity : Activity() {
         }
         if (unlockAsked) return
         unlockAsked = true
+        dismissing = true
+        handler.removeCallbacks(sleep)
         keyguard.requestDismissKeyguard(
             this,
             object : KeyguardManager.KeyguardDismissCallback() {
@@ -265,10 +307,15 @@ open class StandbyActivity : Activity() {
                 // Back out of the PIN pad: standby stays, and the next tap asks again.
                 override fun onDismissCancelled() {
                     unlockAsked = false
+                    dismissing = false
+                    OverLock.cancelled(this@StandbyActivity)
+                    scheduleSleep()
                 }
 
                 override fun onDismissError() {
                     unlockAsked = false
+                    dismissing = false
+                    scheduleSleep()
                 }
             },
         )
@@ -346,11 +393,19 @@ open class StandbyActivity : Activity() {
     private fun updateBattery(intent: Intent) {
         val battery = BatteryState.from(intent) ?: return
         view.updateBattery(battery)
+        plugged = battery.plugged
+        scheduleSleep()
     }
 
     companion object {
         /** How long after the screen comes on a still-unlocked phone opens without the fingerprint. */
         private const val GRACE_MS = 10_000L
+
+        /** Off the charger, over the lock screen: how long standby stays lit untouched. */
+        private const val SLEEP_MS = 10_000L
+
+        /** Back in front after home, the moment before Android's unlock is asked for again. */
+        private const val ASK_DELAY_MS = 300L
 
         /** After the screen comes on, how long a touch is taken for the end of the wake gesture. */
         private const val WAKE_TAP_MS = 700L

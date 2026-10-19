@@ -31,6 +31,8 @@ class ChargerActivity : Activity() {
 
     private lateinit var view: StandbyView
     private var unlockAsked = false
+    /** Brought back after home swiped Android's unlock away: asks again once it shows. */
+    private var askOnResume = false
     /** Plugged in at the last reading: unplugging after that closes it. */
     private var plugged = false
 
@@ -65,6 +67,7 @@ class ChargerActivity : Activity() {
         edgeToEdge()
         view = StandbyView(this, ::leave).apply { wanders = true }
         setContentView(view)
+        askOnResume = intent.getBooleanExtra(OverLock.EXTRA_ASK, false)
         Notifications.addListener(notificationsChanged)
 
         // Bars stay, with dark icons on black: nearly invisible.
@@ -98,6 +101,22 @@ class ChargerActivity : Activity() {
         view.show()
         showWaiting()
         showWeather()
+        if (askOnResume) {
+            askOnResume = false
+            // Once it is in front again, so Android's unlock opens over it.
+            view.postDelayed({ if (!isFinishing && keyguard?.isKeyguardLocked == true) leave() }, ASK_DELAY_MS)
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        if (intent.getBooleanExtra(OverLock.EXTRA_ASK, false)) askOnResume = true
+    }
+
+    /** Swiped home over Android's unlock: as if nothing happened, the clock comes back asking. */
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        if (screenOn && unlockAsked) OverLock.left(this)
     }
 
     override fun onStop() {
@@ -140,6 +159,7 @@ class ChargerActivity : Activity() {
                 // Back out of the PIN pad: the clock stays, and the next tap asks again.
                 override fun onDismissCancelled() {
                     unlockAsked = false
+                    OverLock.cancelled(this@ChargerActivity)
                 }
 
                 override fun onDismissError() {
@@ -186,6 +206,9 @@ class ChargerActivity : Activity() {
     companion object {
         /** The window's brightness: near the lowest the screen goes. */
         const val BRIGHTNESS = 0.02f
+
+        /** Back in front after home, the moment before Android's unlock is asked for again. */
+        private const val ASK_DELAY_MS = 300L
 
         /** After the screen comes on, how long a touch is taken for the end of the wake gesture. */
         private const val WAKE_TAP_MS = 700L
