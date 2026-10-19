@@ -23,6 +23,10 @@
     <string name="clock_timers">Timers</string>
     <string name="clock_alarms">Alarms</string>
     <string name="no_clock_app">No clock app here takes timers or alarms</string>
+    <string name="home_layout">Layout</string>
+    <string name="home_layout_desc">Classic: the clock as set up below, the weather and screen time on lines under it. Panel: the date in capitals, the digits, and one quiet row with the weather, screen time and battery.</string>
+    <string name="layout_classic">Classic</string>
+    <string name="layout_panel">Panel</string>
     <string name="clock_design">Design</string>
     <string name="clock_digital">Digital</string>
     <string name="date_position">Date</string>

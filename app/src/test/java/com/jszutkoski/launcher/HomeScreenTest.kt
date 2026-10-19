@@ -6,6 +6,7 @@ import android.view.View
 import android.view.accessibility.AccessibilityManager
 import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
+import android.widget.ImageView
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -65,6 +66,29 @@ class HomeScreenTest {
         controller.restart().resume()
         assertEquals(View.GONE, face.digital.visibility)
         assertEquals(View.VISIBLE, face.analog.visibility)
+    }
+
+    @Test
+    fun thePanelHasTheBatteryInItsRowAndNoLine() {
+        val controller = home()
+        val activity = controller.get()
+        val face = activity.content().views().filterIsInstance<ClockFace>().single()
+        val panel = activity.content().views().filterIsInstance<HomePanel>().single()
+        assertEquals(View.GONE, panel.visibility)
+        assertEquals(View.VISIBLE, face.battery.visibility)
+        controller.pause().stop()
+        // Even an analog clock: the panel is digital.
+        Prefs(app).setClockLook(ClockScreen.HOME, ClockLook(design = ClockDesign.ANALOG))
+        Prefs(app).homeLayout = HomeLayout.PANEL
+        controller.restart().resume()
+        idle()
+        assertEquals(View.VISIBLE, panel.visibility)
+        assertEquals(View.VISIBLE, face.digital.visibility)
+        assertEquals(View.GONE, face.battery.visibility)
+        // Weather and screen time are off: the battery alone, with no hairline beside it.
+        val shown = panel.views().filter { it.parent === panel && it.visibility == View.VISIBLE }
+        assertEquals(1, shown.size)
+        assertTrue(shown.single().views().any { it is ImageView && it.drawable is BatteryGlyph })
     }
 
     @Test

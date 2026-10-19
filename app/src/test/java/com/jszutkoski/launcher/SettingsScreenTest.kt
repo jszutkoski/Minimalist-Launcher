@@ -149,6 +149,22 @@ class SettingsScreenTest {
     }
 
     @Test
+    fun theHomeClockCanBeThePanel() {
+        val activity = controller.get()
+        activity.tap(R.string.page_clock)
+        fun previewHeight() = activity.content().views().filterIsInstance<FrameLayout>().single { it.layoutParams.height > 0 }.layoutParams.height
+        val before = previewHeight()
+        assertEquals(HomeLayout.CLASSIC, Prefs(activity).homeLayout)
+        activity.tap(R.string.home_layout)
+        assertEquals(HomeLayout.PANEL, Prefs(activity).homeLayout)
+        // Always digital, the date always above: those two choices go, and nothing moves.
+        val texts = activity.content().textViews().map { it.text.toString() }
+        assertFalse(activity.getString(R.string.clock_design) in texts)
+        assertFalse(activity.getString(R.string.date_position) in texts)
+        assertEquals(before, previewHeight())
+    }
+
+    @Test
     fun theBedsideClockIsOneOfTwoScreens() {
         val activity = controller.get()
         assertEquals(StandbyScreen.DIGITAL, Prefs(activity).standbyScreen)

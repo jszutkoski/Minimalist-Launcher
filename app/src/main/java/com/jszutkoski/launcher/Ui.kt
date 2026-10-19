@@ -19,6 +19,8 @@ object Palette {
     const val SURFACE = 0xFF141414.toInt()
     const val TEXT = 0xFFF2F2F2.toInt()
     const val SECONDARY = 0xFF8A8A8A.toInt()
+    /** The panel layout's date: quieter than the time, brighter than the row under it. */
+    const val DATE = 0xFFCFCFCF.toInt()
     /** The quietest text that still reads: 4.5:1 on black, the WCAG minimum for small text. */
     const val TERTIARY = 0xFF757575.toInt()
     const val HAIRLINE = 0xFF1F1F1F.toInt()

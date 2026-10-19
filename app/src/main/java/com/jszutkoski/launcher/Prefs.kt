@@ -180,6 +180,11 @@ class Prefs(context: Context) {
         get() = choice(KEY_STANDBY_BRIGHTNESS, StandbyBrightness.SYSTEM)
         set(value) = prefs.edit().putInt(KEY_STANDBY_BRIGHTNESS, value.ordinal).apply()
 
+    /** The home screen's clock: as set up in Settings → Clock, or the panel. */
+    var homeLayout: HomeLayout
+        get() = choice(KEY_HOME_LAYOUT, HomeLayout.CLASSIC)
+        set(value) = prefs.edit().putInt(KEY_HOME_LAYOUT, value.ordinal).apply()
+
     /** Which of the two bedside screens; at first, the design the bedside clock had before there were only two. */
     var standbyScreen: StandbyScreen
         get() = StandbyScreen.entries.getOrNull(prefs.getInt(KEY_STANDBY_SCREEN, -1))
@@ -287,5 +292,6 @@ class Prefs(context: Context) {
         private const val KEY_STANDBY_MUTED = "standby_muted"
         private const val KEY_STANDBY_BRIGHTNESS = "standby_brightness"
         private const val KEY_STANDBY_SCREEN = "standby_screen"
+        private const val KEY_HOME_LAYOUT = "home_layout"
     }
 }

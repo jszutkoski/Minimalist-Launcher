@@ -288,13 +288,16 @@ class SettingsActivity : Activity() {
     private fun renderClock() {
         val screen = ClockScreen.HOME
         val look = prefs.clockLook(screen)
+        val layout = prefs.homeLayout
 
-        val tallest = ClockDesign.entries.flatMap { design ->
-            listOf(DatePosition.ABOVE, DatePosition.BELOW).map { date ->
-                look.copy(design = design, weight = ClockWeight.BOLD, size = SizeStep.entries.last(), date = date)
+        val tallest = HomeLayout.entries.flatMap { candidateLayout ->
+            ClockDesign.entries.flatMap { design ->
+                listOf(DatePosition.ABOVE, DatePosition.BELOW).map { date ->
+                    candidateLayout to look.copy(design = design, weight = ClockWeight.BOLD, size = SizeStep.entries.last(), date = date)
+                }
             }
-        }.maxOf { candidate ->
-            preview(candidate, extras = true).run {
+        }.maxOf { (candidateLayout, candidate) ->
+            preview(candidateLayout, candidate, extras = true).run {
                 measure(
                     View.MeasureSpec.makeMeasureSpec(previewWidth, View.MeasureSpec.AT_MOST),
                     View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
@@ -304,7 +307,7 @@ class SettingsActivity : Activity() {
         }
         val box = FrameLayout(this).apply {
             addView(
-                preview(look, extras = false),
+                preview(layout, look, extras = false),
                 FrameLayout.LayoutParams(
                     ViewGroup.LayoutParams.WRAP_CONTENT,
                     ViewGroup.LayoutParams.WRAP_CONTENT,
@@ -321,7 +324,14 @@ class SettingsActivity : Activity() {
         )
 
         fun set(change: ClockLook) = prefs.setClockLook(screen, change)
-        row(getString(R.string.clock_design), getString(look.design.label)) { set(look.copy(design = next(look.design))) }
+        row(getString(R.string.home_layout), getString(layout.label), getString(R.string.home_layout_desc)) {
+            prefs.homeLayout = next(layout)
+        }
+        // The panel is always digital, with the date above.
+        val panel = layout == HomeLayout.PANEL
+        if (!panel) {
+            row(getString(R.string.clock_design), getString(look.design.label)) { set(look.copy(design = next(look.design))) }
+        }
         // Each weight's name is written in that weight.
         row(
             getString(R.string.clock_weight),
@@ -329,7 +339,9 @@ class SettingsActivity : Activity() {
             valueFace = ClockFont.at(this, look.weight.weight),
         ) { set(look.copy(weight = next(look.weight))) }
         row(getString(R.string.clock_size), getString(look.size.label)) { set(look.copy(size = next(look.size))) }
-        row(getString(R.string.date_position), getString(look.date.label)) { set(look.copy(date = next(look.date))) }
+        if (!panel) {
+            row(getString(R.string.date_position), getString(look.date.label)) { set(look.copy(date = next(look.date))) }
+        }
         weatherRow(screen)
         permissionRow(
             title = getString(R.string.screen_time),
@@ -363,54 +375,80 @@ class SettingsActivity : Activity() {
     private val previewWidth get() = resources.displayMetrics.widthPixels - 2 * dp(SIDE_MARGIN_DP)
 
     /**
-     * The date and [look] as the home screen shows them, at today's charge, with its weather and
-     * screen time lines when they are on, or with both anyway when [extras] (to measure the most room).
+     * The date and [look] as the home screen shows them in [layout], at today's charge, with its
+     * weather and screen time when they are on, or with both anyway when [extras] (to measure the
+     * most room).
      */
-    private fun preview(look: ClockLook, extras: Boolean): LinearLayout {
+    private fun preview(layout: HomeLayout, look: ClockLook, extras: Boolean): LinearLayout {
         val screen = ClockScreen.HOME
         val scale = prefs.textSize.scale
+        val panelLayout = layout == HomeLayout.PANEL
+        val shown = if (panelLayout) look.copy(design = ClockDesign.DIGITAL, date = DatePosition.ABOVE) else look
         fun line(value: String) = text(value, 17f * scale, Palette.SECONDARY, 400).apply { letterSpacing = 0.02f }
         val date = line(DateFormat.format(DateFormat.getBestDateTimePattern(Locale.getDefault(), "EEEEdMMMM"), Date()).toString())
+        styleDate(date, panelLayout, scale)
         date.setPadding(0, dp(10), 0, dp(10))
         val face = ClockFace(this, pressable = false)
         face.apply(
-            look,
+            shown,
             digitsSp = 100f * scale,
             analogDp = 220f * scale,
             labelSp = 13f * scale,
             gravity = Gravity.CENTER_HORIZONTAL,
             maxWidth = previewWidth,
             gap = dp(GAP_DP),
+            batteryLine = !panelLayout,
         )
         // The battery as it is now: a sticky broadcast answers at once, with no receiver kept.
         val battery = registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))?.let(BatteryState::from)
-        face.showBattery(battery ?: BatteryState(1f, charging = false), number = true)
-        val weather = if (extras || prefs.weather(screen)) {
-            line(Weather.cached(this)?.label(this) ?: getString(R.string.weather))
-        } else {
-            null
+            ?: BatteryState(1f, charging = false)
+        face.showBattery(battery, number = true)
+        val wantWeather = extras || prefs.weather(screen)
+        val wantScreenTime = extras || prefs.screenTime(screen)
+        val cached = Weather.cached(this)
+        val lines = mutableListOf<View>()
+        val spaced = mutableListOf<Spaced>()
+        fun add(view: View, element: Spaced) {
+            lines += view
+            spaced += element
         }
-        val screenTime = if (extras || prefs.screenTime(screen)) line(getString(R.string.screen_time)) else null
-        if (screenTime != null && !extras && ScreenTime.hasAccess(this)) {
-            thread(name = "screen-time") {
-                val label = getString(R.string.screen_time_today, ScreenTime.format(ScreenTime.today(this)))
-                runOnUiThread { if (!isDestroyed) screenTime.text = label }
+        if (shown.date == DatePosition.ABOVE) add(date, spacedText(date))
+        add(face, face.spaced())
+        if (shown.date == DatePosition.BELOW) add(date, spacedText(date))
+        if (panelLayout) {
+            val row = HomePanel(this, onScreenTime = {}, onBattery = {}).apply {
+                setTextScale(scale)
+                showBattery(battery)
+                if (wantWeather) showWeather(cached ?: Weather.Now(18, 3, System.currentTimeMillis()))
+                if (wantScreenTime) showScreenTime(ScreenTime.format(0))
+            }
+            if (wantScreenTime && !extras && ScreenTime.hasAccess(this)) {
+                thread(name = "screen-time") {
+                    val label = ScreenTime.format(ScreenTime.today(this))
+                    runOnUiThread { if (!isDestroyed) row.showScreenTime(label) }
+                }
+            }
+            add(row, row.spaced())
+        } else {
+            if (wantWeather) line(cached?.label(this) ?: getString(R.string.weather)).let { add(it, spacedText(it)) }
+            if (wantScreenTime) {
+                val screenTime = line(getString(R.string.screen_time))
+                if (!extras && ScreenTime.hasAccess(this)) {
+                    thread(name = "screen-time") {
+                        val label = getString(R.string.screen_time_today, ScreenTime.format(ScreenTime.today(this)))
+                        runOnUiThread { if (!isDestroyed) screenTime.text = label }
+                    }
+                }
+                add(screenTime, spacedText(screenTime))
             }
         }
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
             val wrap = ViewGroup.LayoutParams.WRAP_CONTENT
-            val lines = listOfNotNull(
-                date.takeIf { look.date == DatePosition.ABOVE },
-                face,
-                date.takeIf { look.date == DatePosition.BELOW },
-                weather,
-                screenTime,
-            )
             lines.forEach { addView(it, LinearLayout.LayoutParams(wrap, wrap)) }
-            // The same single gap as on the screen itself, glyph to glyph.
-            spaceGlyphs(lines.map { if (it === face) face.spaced() else spacedText(it as TextView) }, dp(GAP_DP))
+            // The same gaps as on the screen itself, glyph to glyph.
+            spaceGlyphs(spaced, dp(if (panelLayout) PANEL_GAP_DP else GAP_DP))
         }
     }
 

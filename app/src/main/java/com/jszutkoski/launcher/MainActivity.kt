@@ -77,6 +77,7 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
     private lateinit var appMenu: AppMenu
     private lateinit var searchActions: SearchActions
     private lateinit var player: PlayerView
+    private lateinit var panel: HomePanel
     private lateinit var nowPlaying: NowPlaying
     private val background = Executors.newSingleThreadExecutor()
     private var charging = false
@@ -89,6 +90,7 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
 
     /** The date's row goes above the clock, as chosen; otherwise under it. */
     private var dateAbove = true
+    private var panelLayout = false
     private var animator: ValueAnimator? = null
     private val emphasized = PathInterpolator(0.2f, 0f, 0f, 1f)
 
@@ -257,6 +259,11 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
             setOnClickListener { SystemActions.openDigitalWellbeing(this@MainActivity) }
         }
         player = PlayerView(this, ::openPlayer)
+        panel = HomePanel(
+            this,
+            onScreenTime = { SystemActions.openDigitalWellbeing(this@MainActivity) },
+            onBattery = { SystemActions.openBatteryUsage(this@MainActivity) },
+        ).apply { visibility = View.GONE }
 
         val wrap = ViewGroup.LayoutParams.WRAP_CONTENT
         dateRow = LinearLayout(this).apply {
@@ -270,6 +277,8 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         // Optional, each on its own line under the clock: the weather, then today's screen time.
         home.addView(weatherText, LinearLayout.LayoutParams(wrap, wrap))
         home.addView(screenTimeText, LinearLayout.LayoutParams(wrap, wrap))
+        // Or all of it in one row, with the battery, for the panel layout.
+        home.addView(panel, LinearLayout.LayoutParams(wrap, wrap))
         topSpace = Space(this)
         bottomSpace = Space(this)
         home.addView(topSpace, LinearLayout.LayoutParams(0, 0, 1f))
@@ -338,8 +347,12 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
     private fun render() {
         stale = false
         val scale = prefs.textSize.scale
-        date.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f * scale)
-        val look = prefs.clockLook(ClockScreen.HOME)
+        panelLayout = prefs.homeLayout == HomeLayout.PANEL
+        styleDate(date, panelLayout, scale)
+        // The panel keeps the digits' weight and size, always digital and with the date above.
+        val look = prefs.clockLook(ClockScreen.HOME).let {
+            if (panelLayout) it.copy(design = ClockDesign.DIGITAL, date = DatePosition.ABOVE) else it
+        }
         face.apply(
             look,
             digitsSp = 100f * scale,
@@ -348,7 +361,11 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
             gravity = if (prefs.centerFavorites) Gravity.CENTER_HORIZONTAL else Gravity.START,
             maxWidth = resources.displayMetrics.widthPixels - 2 * dp(SIDE_MARGIN_DP),
             gap = dp(GAP_DP),
+            // The battery is in the panel.
+            batteryLine = !panelLayout,
         )
+        panel.setTextScale(scale)
+        panel.visibility = if (panelLayout) View.VISIBLE else View.GONE
         // The date's row above the clock or below it; hidden, only the next alarm stays there.
         dateAbove = look.date == DatePosition.ABOVE
         val rowParams = dateRow.layoutParams
@@ -378,6 +395,7 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
     private fun updateBattery(intent: Intent) {
         val battery = BatteryState.from(intent) ?: return
         face.showBattery(battery, number = true)
+        panel.showBattery(battery)
         if (battery.charging != charging) {
             charging = battery.charging
             scheduleStandby()
@@ -451,6 +469,7 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
     private fun updateScreenTime() {
         if (!prefs.screenTime(ClockScreen.HOME) || !ScreenTime.hasAccess(this)) {
             screenTimeText.visibility = View.GONE
+            panel.showScreenTime(null)
             spaceHome()
             return
         }
@@ -458,7 +477,9 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
             val total = ScreenTime.today(this)
             runOnUiThread {
                 screenTimeText.text = getString(R.string.screen_time_today, ScreenTime.format(total))
-                screenTimeText.visibility = View.VISIBLE
+                // In the panel, the time alone: its glyph says what it is.
+                screenTimeText.visibility = if (panelLayout) View.GONE else View.VISIBLE
+                panel.showScreenTime(ScreenTime.format(total))
                 spaceHome()
             }
         }
@@ -470,16 +491,17 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
             showWeather(null)
             return
         }
-        showWeather(Weather.cached(this)?.label(this))
+        showWeather(Weather.cached(this))
         if (Weather.isFresh(this)) return
         Weather.refresh(this) { now ->
-            if (now != null) runOnUiThread { if (!isDestroyed) showWeather(now.label(this)) }
+            if (now != null) runOnUiThread { if (!isDestroyed) showWeather(now) }
         }
     }
 
-    private fun showWeather(label: String?) {
-        weatherText.text = label.orEmpty()
-        weatherText.visibility = if (label == null) View.GONE else View.VISIBLE
+    private fun showWeather(now: Weather.Now?) {
+        weatherText.text = now?.label(this).orEmpty()
+        weatherText.visibility = if (now == null || panelLayout) View.GONE else View.VISIBLE
+        panel.showWeather(now)
         spaceHome()
     }
 
@@ -493,8 +515,9 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
                 if (!dateAbove) add(row)
                 add(spacedText(weatherText))
                 add(spacedText(screenTimeText))
+                add(panel.spaced())
             },
-            dp(GAP_DP),
+            dp(if (panelLayout) PANEL_GAP_DP else GAP_DP),
         )
     }
 
@@ -537,6 +560,11 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         favorites.gravity = alignment
         (screenTimeText.layoutParams as LinearLayout.LayoutParams).gravity = alignment
         (weatherText.layoutParams as LinearLayout.LayoutParams).gravity = alignment
+        (panel.layoutParams as LinearLayout.LayoutParams).apply {
+            gravity = alignment
+            // Left aligned, the first glyph lines up with the text margin, not its padding.
+            leftMargin = if (center) 0 else -dp(16)
+        }
         player.setAlignment(alignment)
         // The clock widget follows the same alignment as the pinned apps.
         (face.layoutParams as LinearLayout.LayoutParams).gravity = alignment

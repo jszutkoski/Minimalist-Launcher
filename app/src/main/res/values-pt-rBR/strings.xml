@@ -23,6 +23,10 @@
     <string name="clock_timers">Timers</string>
     <string name="clock_alarms">Alarmes</string>
     <string name="no_clock_app">Nenhum app de relógio aceitou o timer ou o alarme</string>
+    <string name="home_layout">Disposição</string>
+    <string name="home_layout_desc">Clássico: o relógio como configurado abaixo, com clima e tempo de tela em linhas embaixo. Painel: a data em maiúsculas, a hora e uma linha discreta com clima, tempo de tela e bateria.</string>
+    <string name="layout_classic">Clássico</string>
+    <string name="layout_panel">Painel</string>
     <string name="clock_design">Design</string>
     <string name="clock_digital">Digital</string>
     <string name="date_position">Data</string>
