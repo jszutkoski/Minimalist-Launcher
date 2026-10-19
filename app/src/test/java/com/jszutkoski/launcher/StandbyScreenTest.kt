@@ -102,10 +102,10 @@ class StandbyScreenTest {
         assertEquals(1, locks)
     }
 
-    /** The standby started again after it locked the phone, or null. */
+    /** The standby started again, lit, after it locked the phone, or null. */
     private fun cameBack(): Intent? {
         idle(1_000)
-        return shadowOf(app).nextStartedActivity?.takeIf { it.getBooleanExtra("relight", false) }
+        return shadowOf(app).nextStartedActivity?.takeIf { it.component?.className == StandbyLitActivity::class.java.name }
     }
 
     @Test
@@ -114,7 +114,7 @@ class StandbyScreenTest {
         phone(secure = true, locked = false)
         battery(charging = false)
         shadeOver(seconds = 11)
-        assertEquals(StandbyActivity::class.java.name, cameBack()?.component?.className)
+        assertTrue(cameBack() != null)
     }
 
     @Test
@@ -128,7 +128,7 @@ class StandbyScreenTest {
         controller.userLeaving()
         assertEquals(1, locks)
         // Over the lock screen again, rather than Android's lock screen alone.
-        assertEquals(StandbyActivity::class.java.name, cameBack()?.component?.className)
+        assertTrue(cameBack() != null)
     }
 
     @Test

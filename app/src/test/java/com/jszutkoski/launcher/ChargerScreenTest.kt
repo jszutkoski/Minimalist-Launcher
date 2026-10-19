@@ -4,6 +4,7 @@ import android.app.KeyguardManager
 import android.content.ComponentName
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.ActivityInfo
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageInfo
 import android.os.BatteryManager
@@ -48,7 +49,7 @@ class ChargerScreenTest {
     fun tearDown() {
         LockService.lockAction = realLock
         Notifications.update(emptySet())
-        idle(1_000)
+        idle(4_000)
         // Gone, so the next test starts with no clock in front.
         opened.forEach { if (!it.get().isDestroyed) it.pause().stop().destroy() }
         idle()
@@ -90,7 +91,10 @@ class ChargerScreenTest {
         .map { it.contentDescription.toString() }
 
     private fun startedClock(): Intent? {
-        idle(1_000)
+        // A few seconds after the screen goes off.
+        idle(2_000)
+        assertNull(shadowOf(app).nextStartedActivity)
+        idle(1_500)
         return shadowOf(app).nextStartedActivity?.takeIf { it.component?.className == ChargerActivity::class.java.name }
     }
 
@@ -216,5 +220,17 @@ class ChargerScreenTest {
         ChargerActivity.startWhenLocked(app)
         assertEquals(0, locks)
         assertNull(startedClock())
+    }
+
+    @Test
+    fun theScreenComesOnAsTheyOpen() {
+        // Only the manifest's request reaches Android in time to light a dark screen.
+        for (screen in listOf(ChargerActivity::class.java, StandbyLitActivity::class.java)) {
+            val info = app.packageManager.getActivityInfo(ComponentName(app, screen), 0)
+            assertTrue(screen.simpleName, info.flags and ActivityInfo.FLAG_TURN_SCREEN_ON != 0)
+        }
+        // Standby itself opens at screen off and must wait for the wake.
+        val standby = app.packageManager.getActivityInfo(ComponentName(app, StandbyOverAppsActivity::class.java), 0)
+        assertFalse(standby.flags and ActivityInfo.FLAG_TURN_SCREEN_ON != 0)
     }
 }

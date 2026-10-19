@@ -60,8 +60,6 @@ open class StandbyActivity : Activity() {
         }
     }
 
-    /** Standby locked the phone and comes back: the next return to the front turns the screen on. */
-    private var relighting = false
     private val notificationsChanged: () -> Unit = { showWaiting() }
 
     private val batteryReceiver = object : BroadcastReceiver() {
@@ -87,7 +85,6 @@ open class StandbyActivity : Activity() {
         edgeToEdge()
         view = StandbyView(this, ::leave)
         setContentView(view)
-        if (intent.getBooleanExtra(EXTRA_RELIGHT, false)) relightOnResume()
         Notifications.addListener(notificationsChanged)
         showWaiting()
 
@@ -127,10 +124,6 @@ open class StandbyActivity : Activity() {
             finish()
             return
         }
-        if (relighting) {
-            relighting = false
-            setTurnScreenOn(false)
-        }
         shown += id
         // Kept behind other apps for days, so the screen chosen meanwhile is applied on each return.
         view.setScreen(prefs.standbyScreen)
@@ -147,12 +140,6 @@ open class StandbyActivity : Activity() {
         val level = prefs.standbyBrightness.level(Calendar.getInstance().get(Calendar.HOUR_OF_DAY))
         if (window.attributes.screenBrightness == level) return
         window.attributes = window.attributes.apply { screenBrightness = level }
-    }
-
-    /** The next return to the front turns the screen on, over the lock screen. */
-    private fun relightOnResume() {
-        relighting = true
-        setTurnScreenOn(true)
     }
 
     override fun onStop() {
@@ -243,7 +230,6 @@ open class StandbyActivity : Activity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         awakeSince = SystemClock.elapsedRealtime()
-        if (intent.getBooleanExtra(EXTRA_RELIGHT, false)) relightOnResume()
     }
 
     /**
@@ -370,7 +356,7 @@ open class StandbyActivity : Activity() {
         private const val WAKE_TAP_MS = 700L
 
         /** After locking, the moment for the lock screen to settle before lighting up again. */
-        const val RELIGHT_DELAY_MS = 600L
+        private const val RELIGHT_DELAY_MS = 600L
 
         /**
          * The apps with notifications waiting that may show on the bedside clock, from the
@@ -388,9 +374,6 @@ open class StandbyActivity : Activity() {
             }
         }
 
-        /** Brought back to the front with the screen lit, after standby locked the phone. */
-        private const val EXTRA_RELIGHT = "relight"
-
         /** The standby screens in front (or in front when the screen went off), by instance. */
         private val shown = mutableSetOf<Int>()
 
@@ -403,15 +386,14 @@ open class StandbyActivity : Activity() {
 
         /**
          * Someone left an unlocked standby without the fingerprint or PIN (home, recents, the
-         * shade): the phone locks, and the same standby comes straight back, lit, over the lock
-         * screen. Started from here rather than from the screen itself, which home may have
-         * closed by then.
+         * shade): the phone locks, and standby comes straight back, lit, over the lock screen, as
+         * [StandbyLitActivity]. Started from here rather than from the screen itself, which home
+         * may have closed by then.
          */
         private fun lockAndReturn(standby: StandbyActivity) {
             if (returning || !LockService.lock()) return
             returning = true
             val context = standby.applicationContext
-            val screen = standby.javaClass
             Handler(Looper.getMainLooper()).postDelayed({
                 returning = false
                 if (LockService.inCall(context)) return@postDelayed
@@ -421,12 +403,8 @@ open class StandbyActivity : Activity() {
                     return@postDelayed
                 }
                 try {
-                    // Into its own task again: the home task for the one over home, where the
-                    // screen still showing is brought forward rather than opened twice.
                     context.startActivity(
-                        Intent(context, screen)
-                            .putExtra(EXTRA_RELIGHT, true)
-                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP),
+                        Intent(context, StandbyLitActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
                     )
                 } catch (e: RuntimeException) {
                     warn("Standby could not come back over the lock screen", e)
@@ -487,3 +465,10 @@ open class StandbyActivity : Activity() {
 
 /** The same bedside clock in its own task, for when it covers another app at screen off. */
 class StandbyOverAppsActivity : StandbyActivity()
+
+/**
+ * The same bedside clock, back over the lock screen after standby locked the phone. Its own
+ * screen because it turns the screen on as it opens, which Android takes only from the manifest
+ * in time: asked for from the code, the request comes after the phone has decided to stay dark.
+ */
+class StandbyLitActivity : StandbyActivity()

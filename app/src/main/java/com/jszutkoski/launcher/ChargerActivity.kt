@@ -33,8 +33,6 @@ class ChargerActivity : Activity() {
     private var unlockAsked = false
     /** Plugged in at the last reading: unplugging after that closes it. */
     private var plugged = false
-    /** Started to light the screen: done once it shows, so pressing power later turns it off. */
-    private var lighting = true
 
     private val notificationsChanged: () -> Unit = { showWaiting() }
 
@@ -61,8 +59,9 @@ class ChargerActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // The screen comes on as it opens: turnScreenOn in the manifest, which Android reads in
+        // time, and only for an opening, so pressing power over it later just turns it off.
         setShowWhenLocked(true)
-        setTurnScreenOn(true)
         edgeToEdge()
         view = StandbyView(this, ::leave).apply { wanders = true }
         setContentView(view)
@@ -85,22 +84,12 @@ class ChargerActivity : Activity() {
         registerReceiver(minuteReceiver, IntentFilter(Intent.ACTION_TIME_TICK))
     }
 
-    override fun onNewIntent(intent: Intent) {
-        super.onNewIntent(intent)
-        lighting = true
-        setTurnScreenOn(true)
-    }
-
     override fun onResume() {
         super.onResume()
         // Never lit over an unlocked phone, where anyone could pull down the notifications.
         if (!canShow(this)) {
             finish()
             return
-        }
-        if (lighting) {
-            lighting = false
-            setTurnScreenOn(false)
         }
         showing = true
         view.setScreen(prefs.standbyScreen)
@@ -206,6 +195,9 @@ class ChargerActivity : Activity() {
         var showing = false
             private set
 
+        /** From the screen going off, or the phone locking, to the clock lighting it again. */
+        private const val DELAY_MS = 3_000L
+
         /** On its way: the screen just went off, and the clock follows once the phone is locked. */
         private var pending = false
 
@@ -224,7 +216,7 @@ class ChargerActivity : Activity() {
         /**
          * At screen off on the charger (Minimalist's accessibility service hears it): the phone
          * is locked at once if Android would wait a few seconds first, so the screen that comes
-         * straight back on is over the lock screen, with this clock. Nothing to do if it is
+         * back on a few seconds later is over the lock screen, with this clock. Nothing to do if it is
          * already there: pressing power over it just turns the screen off.
          */
         fun startWhenLocked(context: Context) {
@@ -244,7 +236,7 @@ class ChargerActivity : Activity() {
                 } catch (e: RuntimeException) {
                     warn("The charger's clock could not open", e)
                 }
-            }, StandbyActivity.RELIGHT_DELAY_MS)
+            }, DELAY_MS)
         }
 
         /** Plugged in while locked: the clock for the night, without waiting for the screen to go off. */
