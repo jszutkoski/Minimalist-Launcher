@@ -100,18 +100,6 @@
             android:showWhenLocked="true"
             android:taskAffinity="${applicationId}.standby" />
 
-        <!-- The same clock again, lit over the lock screen, after it locked a phone someone
-             left it on; the screen comes on as it opens. -->
-        <activity
-            android:name=".StandbyLitActivity"
-            android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenSize|screenLayout|smallestScreenSize|uiMode"
-            android:excludeFromRecents="true"
-            android:exported="false"
-            android:launchMode="singleTask"
-            android:showWhenLocked="true"
-            android:taskAffinity="${applicationId}.standbylit"
-            android:turnScreenOn="true" />
-
         <!-- The clock for the night, lit over the lock screen once the phone locks on the
              charger; in its own task, so that unlocking returns to whatever was open. -->
         <activity

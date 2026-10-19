@@ -37,7 +37,7 @@ class LockService : AccessibilityService() {
                 ChargerActivity.startWhenLocked(context)
                 return
             }
-            if (!Prefs(context).standbyOnWake || StandbyActivity.inFront || StandbyActivity.returning) return
+            if (!Prefs(context).standbyOnWake || StandbyActivity.inFront) return
             // Home was on screen: standby joins the home task, so unlocking fades back to home
             // instead of the system's sideways task animation.
             if (MainActivity.inFront) StandbyActivity.startOverHome(context) else StandbyActivity.startOnTop(context)

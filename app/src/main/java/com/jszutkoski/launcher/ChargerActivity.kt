@@ -12,7 +12,6 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.os.PowerManager
-import android.os.SystemClock
 import android.view.WindowInsetsController
 import android.view.WindowManager
 import android.window.OnBackInvokedDispatcher
@@ -32,24 +31,15 @@ class ChargerActivity : Activity() {
 
     private lateinit var view: StandbyView
     private var unlockAsked = false
-    /** Brought back after home swiped Android's unlock away: asks again once it shows. */
-    private var askOnResume = false
-    /** When Android's unlock last went away without the phone opening. */
-    private var answeredAt = 0L
-    /**
-     * Closed by itself (unlocked, unplugged): not the same as Android closing it because home
-     * came, which clears whatever is over the home screen.
-     */
-    private var closing = false
     private val locked get() = keyguard?.isKeyguardLocked == true
-
-    /** A step for the log, with the phone's state at that moment. */
-    private fun note(step: String) =
-        StandbyLog.note(this, "ChargerActivity $step screenOn=$screenOn locked=$locked asking=$unlockAsked")
     /** Plugged in at the last reading: unplugging after that closes it. */
     private var plugged = false
 
     private val notificationsChanged: () -> Unit = { showWaiting() }
+
+    /** A step for the log, with the phone's state at that moment. */
+    private fun note(step: String) =
+        StandbyLog.note(this, "ChargerActivity $step screenOn=$screenOn locked=$locked asking=$unlockAsked")
 
     private val screenOnReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
@@ -80,7 +70,6 @@ class ChargerActivity : Activity() {
         edgeToEdge()
         view = StandbyView(this, ::leave).apply { wanders = true }
         setContentView(view)
-        askOnResume = intent.getBooleanExtra(OverLock.EXTRA_ASK, false)
         Notifications.addListener(notificationsChanged)
 
         // Bars stay, with dark icons on black: nearly invisible.
@@ -102,7 +91,7 @@ class ChargerActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
-        note("resumed ask=$askOnResume")
+        note("resumed")
         // Never lit over an unlocked phone, where anyone could pull down the notifications.
         if (!canShow(this)) {
             finish()
@@ -115,24 +104,11 @@ class ChargerActivity : Activity() {
         view.show()
         showWaiting()
         showWeather()
-        if (askOnResume) {
-            askOnResume = false
-            // Once it is in front again, so Android's unlock opens over it.
-            view.postDelayed({ if (!isFinishing && keyguard?.isKeyguardLocked == true) leave() }, ASK_DELAY_MS)
-        }
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        if (intent.getBooleanExtra(OverLock.EXTRA_ASK, false)) askOnResume = true
-        note("new intent ask=$askOnResume")
-    }
-
-    /** Swiped home over the lock screen, the unlock up or not: the clock comes back asking. */
-    override fun onUserLeaveHint() {
-        super.onUserLeaveHint()
-        note("user leaving")
-        if (screenOn && (unlockAsked || locked)) OverLock.left(this)
+        note("new intent")
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
@@ -147,19 +123,11 @@ class ChargerActivity : Activity() {
 
     override fun onStop() {
         super.onStop()
-        note("stopped finishing=$isFinishing closing=$closing")
-        // Gone from sight over the lock screen with the unlock up: the home swipe put Android's
-        // lock screen in its place, so it comes back, asking again.
-        if (screenOn && locked && !closing && !LockService.inCall(this)) OverLock.covered(this, unlockAsked, answeredAt)
+        note("stopped")
         // Covered with the screen on (a call, an alarm): the next screen off brings it back.
         // Stopped by the screen going off, it is still what the wake will show.
         if (screenOn) showing = false
         view.hold()
-    }
-
-    override fun finish() {
-        closing = true
-        super.finish()
     }
 
     override fun onDestroy() {
@@ -199,14 +167,11 @@ class ChargerActivity : Activity() {
                 // Back out of the PIN pad: the clock stays, and the next tap asks again.
                 override fun onDismissCancelled() {
                     unlockAsked = false
-                    answeredAt = SystemClock.elapsedRealtime()
                     note("unlock cancelled")
-                    OverLock.cancelled(this@ChargerActivity)
                 }
 
                 override fun onDismissError() {
                     unlockAsked = false
-                    answeredAt = SystemClock.elapsedRealtime()
                     note("unlock error")
                 }
             },
@@ -250,9 +215,6 @@ class ChargerActivity : Activity() {
     companion object {
         /** The window's brightness: near the lowest the screen goes. */
         const val BRIGHTNESS = 0.02f
-
-        /** Back in front after home, the moment before Android's unlock is asked for again. */
-        private const val ASK_DELAY_MS = 300L
 
         /** After the screen comes on, how long a touch is taken for the end of the wake gesture. */
         private const val WAKE_TAP_MS = 700L

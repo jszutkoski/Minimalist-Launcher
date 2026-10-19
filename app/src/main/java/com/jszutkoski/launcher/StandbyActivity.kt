@@ -40,17 +40,6 @@ open class StandbyActivity : Activity() {
 
     private lateinit var view: StandbyView
     private var unlockAsked = false
-    /** Android's own unlock is up over standby, asked for by a tap over the lock screen. */
-    private var dismissing = false
-    /** Brought back after home swiped Android's unlock away: asks again once it shows. */
-    private var askOnResume = false
-    /** When Android's unlock last went away without the phone opening. */
-    private var answeredAt = 0L
-    /**
-     * Closed by itself (unlocked, unplugged): not the same as Android closing it because home
-     * came, which clears whatever is over the home screen.
-     */
-    private var closing = false
     private var plugged = false
     /** Our own fingerprint prompt while it is up, to take it down if standby closes first. */
     private var prompt: CancellationSignal? = null
@@ -102,7 +91,6 @@ open class StandbyActivity : Activity() {
         edgeToEdge()
         view = StandbyView(this, ::leave)
         setContentView(view)
-        askOnResume = intent.getBooleanExtra(OverLock.EXTRA_ASK, false)
         Notifications.addListener(notificationsChanged)
         showWaiting()
 
@@ -134,11 +122,11 @@ open class StandbyActivity : Activity() {
 
     /** A step for the log, with the phone's state at that moment. */
     private fun note(step: String) =
-        StandbyLog.note(this, "${javaClass.simpleName} $step screenOn=$screenOn locked=$locked asking=$dismissing")
+        StandbyLog.note(this, "${javaClass.simpleName} $step screenOn=$screenOn locked=$locked asking=$unlockAsked")
 
     override fun onResume() {
         super.onResume()
-        note("resumed ask=$askOnResume")
+        note("resumed")
         // Back in front: whatever came over it (our own PIN pad) was not someone leaving.
         leftWhileAsking = false
         // Unlocked, only Minimalist's accessibility service can keep the way in guarded (by
@@ -157,11 +145,6 @@ open class StandbyActivity : Activity() {
         showWaiting()
         showWeather()
         scheduleSleep()
-        if (askOnResume) {
-            askOnResume = false
-            // Once it is in front again, so Android's unlock opens over it.
-            view.postDelayed({ if (!isFinishing && locked) leave() }, ASK_DELAY_MS)
-        }
     }
 
     /**
@@ -193,10 +176,7 @@ open class StandbyActivity : Activity() {
 
     override fun onStop() {
         super.onStop()
-        note("stopped finishing=$isFinishing closing=$closing")
-        // Gone from sight over the lock screen with the unlock up: the home swipe put Android's
-        // lock screen in its place, so it comes back, asking again.
-        if (screenOn && locked && !closing && !LockService.inCall(this)) OverLock.covered(this, dismissing, answeredAt)
+        note("stopped")
         // Covered by something else with the screen on (a call, an alarm, an app opened from a
         // notification): no longer in front, so the next screen off must bring it back on top.
         // Stopped by the screen going off, it is still what the wake will show.
@@ -208,11 +188,6 @@ open class StandbyActivity : Activity() {
         if (leftWhileAsking && !unlockAsked && screenOn) left()
         // Nobody sees it drift; it starts again on the way back.
         view.hold()
-    }
-
-    override fun finish() {
-        closing = true
-        super.finish()
     }
 
     override fun onDestroy() {
@@ -240,12 +215,6 @@ open class StandbyActivity : Activity() {
         note("user leaving")
         // With the screen off this is just the launch at screen off, not the user leaving.
         if (!screenOn) return
-        // Swiped home over the lock screen, the unlock up or not: standby comes back asking, as
-        // the lock screen's own swipe up would.
-        if (dismissing || locked) {
-            OverLock.left(this)
-            return
-        }
         // Our own prompt is up, and the PIN pad opening over standby lands here too. Only if
         // the prompt then goes without the fingerprint or PIN, with standby out of sight, was
         // this home or recents.
@@ -257,15 +226,13 @@ open class StandbyActivity : Activity() {
     }
 
     /**
-     * Home or recents. On a phone that was never locked (the charger keeps the screen on, so it
-     * never locks by itself), past the grace period, the phone locks now, or that swipe would
-     * get straight in; and standby comes straight back over the lock screen, so the swipe lands
-     * on the clock again rather than on Android's lock screen.
+     * Home or recents. On a phone that was never locked, past the grace period, the phone locks
+     * now, or that swipe would get straight in.
      */
     private fun left() {
         leftWhileAsking = false
         leaveFront()
-        if (!locked && needsUnlock()) lockAndReturn(this)
+        if (!locked && needsUnlock()) LockService.lock()
         if (this !is StandbyOverAppsActivity) finish()
     }
 
@@ -273,8 +240,7 @@ open class StandbyActivity : Activity() {
      * Something of the system's came over standby: the notification shade, quick settings or the
      * power menu (a call or an alarm too, but those are left alone). On a phone that is still
      * unlocked, past the grace period, the shade would hand anyone the messages and their reply
-     * boxes; so the phone locks there and then, as pressing home does, and standby lights up again
-     * over the lock screen. Over the lock screen the
+     * boxes; so the phone locks there and then, as pressing home does. Over the lock screen the
      * shade is Android's own, as it is without standby, and shows what Android's lock-screen
      * settings allow.
      */
@@ -283,7 +249,7 @@ open class StandbyActivity : Activity() {
         note("focus=$hasFocus")
         // Our own fingerprint prompt or PIN pad, standby closing, or the screen going off.
         if (hasFocus || unlockAsked || isFinishing || !screenOn || LockService.inCall(this)) return
-        if (!locked && needsUnlock()) lockAndReturn(this)
+        if (!locked && needsUnlock()) LockService.lock()
     }
 
     private fun leaveFront() {
@@ -299,8 +265,7 @@ open class StandbyActivity : Activity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         awakeSince = SystemClock.elapsedRealtime()
-        if (intent.getBooleanExtra(OverLock.EXTRA_ASK, false)) askOnResume = true
-        note("new intent ask=$askOnResume")
+        note("new intent")
     }
 
     /**
@@ -328,7 +293,6 @@ open class StandbyActivity : Activity() {
         }
         if (unlockAsked) return
         unlockAsked = true
-        dismissing = true
         note("unlock asked")
         handler.removeCallbacks(sleep)
         keyguard.requestDismissKeyguard(
@@ -342,17 +306,12 @@ open class StandbyActivity : Activity() {
                 // Back out of the PIN pad: standby stays, and the next tap asks again.
                 override fun onDismissCancelled() {
                     unlockAsked = false
-                    dismissing = false
-                    answeredAt = SystemClock.elapsedRealtime()
                     note("unlock cancelled")
-                    OverLock.cancelled(this@StandbyActivity)
                     scheduleSleep()
                 }
 
                 override fun onDismissError() {
                     unlockAsked = false
-                    dismissing = false
-                    answeredAt = SystemClock.elapsedRealtime()
                     note("unlock error")
                     scheduleSleep()
                 }
@@ -443,14 +402,8 @@ open class StandbyActivity : Activity() {
         /** Off the charger, over the lock screen: how long standby stays lit untouched. */
         private const val SLEEP_MS = 10_000L
 
-        /** Back in front after home, the moment before Android's unlock is asked for again. */
-        private const val ASK_DELAY_MS = 300L
-
         /** After the screen comes on, how long a touch is taken for the end of the wake gesture. */
         private const val WAKE_TAP_MS = 700L
-
-        /** After locking, the moment for the lock screen to settle before lighting up again. */
-        private const val RELIGHT_DELAY_MS = 600L
 
         /**
          * The apps with notifications waiting that may show on the bedside clock, from the
@@ -473,38 +426,6 @@ open class StandbyActivity : Activity() {
 
         /** A standby screen is showing, or was when the screen went off. */
         val inFront get() = shown.isNotEmpty()
-
-        /** Standby locked the phone and is on its way back: the screen off is its own. */
-        var returning = false
-            private set
-
-        /**
-         * Someone left an unlocked standby without the fingerprint or PIN (home, recents, the
-         * shade): the phone locks, and standby comes straight back, lit, over the lock screen, as
-         * [StandbyLitActivity]. Started from here rather than from the screen itself, which home
-         * may have closed by then.
-         */
-        private fun lockAndReturn(standby: StandbyActivity) {
-            if (returning || !LockService.lock()) return
-            returning = true
-            val context = standby.applicationContext
-            Handler(Looper.getMainLooper()).postDelayed({
-                returning = false
-                if (LockService.inCall(context)) return@postDelayed
-                // On the charger the night's clock is what comes over the lock screen.
-                if (ChargerActivity.wanted(context)) {
-                    ChargerActivity.startWhenLocked(context)
-                    return@postDelayed
-                }
-                try {
-                    context.startActivity(
-                        Intent(context, StandbyLitActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-                    )
-                } catch (e: RuntimeException) {
-                    warn("Standby could not come back over the lock screen", e)
-                }
-            }, RELIGHT_DELAY_MS)
-        }
 
         /**
          * Standby may show: over the lock screen, on a phone with no screen lock, or with
@@ -559,10 +480,3 @@ open class StandbyActivity : Activity() {
 
 /** The same bedside clock in its own task, for when it covers another app at screen off. */
 class StandbyOverAppsActivity : StandbyActivity()
-
-/**
- * The same bedside clock, back over the lock screen after standby locked the phone. Its own
- * screen because it turns the screen on as it opens, which Android takes only from the manifest
- * in time: asked for from the code, the request comes after the phone has decided to stay dark.
- */
-class StandbyLitActivity : StandbyActivity()
