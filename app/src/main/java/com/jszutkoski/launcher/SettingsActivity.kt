@@ -628,6 +628,16 @@ class SettingsActivity : Activity() {
             if (paused.isEmpty()) getString(R.string.off) else paused.joinToString(", "),
             getString(R.string.pause_desc),
         ) { pickPauseApps() }
+        val limits = prefs.dailyLimits.mapNotNull { (key, minutes) -> repo.find(key)?.let { it.label to minutes } }.sortedBy { it.first }
+        row(
+            getString(R.string.daily_limits),
+            when {
+                limits.isEmpty() -> getString(R.string.off)
+                !ScreenTime.hasAccess(this) -> getString(R.string.grant_usage)
+                else -> limits.joinToString(", ") { (label, minutes) -> "$label ${DailyLimit.format(minutes)}" }
+            },
+            getString(R.string.daily_limits_desc),
+        ) { if (limits.isNotEmpty() && !ScreenTime.hasAccess(this)) SystemActions.openUsageAccess(this) else pickLimitedApp() }
         // Uninstalled apps stay listed in the sheet, to be cleared, but aren't counted here.
         val hiddenCount = if (repo.loaded) prefs.hidden.count { repo.find(it) != null } else prefs.hidden.size
         row(
@@ -836,6 +846,17 @@ class SettingsActivity : Activity() {
             prefs.pauseApps = chosen.toSet()
         }
         sheet.onDismiss = { render() }
+        sheet.show()
+    }
+
+    /** Every visible app, those with a limit bright; tapping one chooses its limit. */
+    private fun pickLimitedApp() {
+        val limits = prefs.dailyLimits
+        val sheet = Sheet(this, getString(R.string.daily_limits))
+        sheet.appList(repo.visibleApps(), chosen = { it.key in limits }) { app ->
+            sheet.dialog.dismiss()
+            DailyLimit.choose(this, prefs, app) { render() }
+        }
         sheet.show()
     }
 

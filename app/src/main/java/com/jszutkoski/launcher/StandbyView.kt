@@ -71,6 +71,13 @@ enum class StandbyScreen(
  */
 class StandbyView(context: Context, private val onExit: () -> Unit) : FrameLayout(context) {
     private val weather = WeatherRow(context)
+    /** The next alarm under the weather, on the charger's clock. */
+    private val alarm = context.text("", 16f, Palette.SECONDARY, 400).apply {
+        includeFontPadding = false
+        letterSpacing = 0.02f
+        visibility = GONE
+        compoundDrawableTintList = ColorStateList.valueOf(Palette.SECONDARY)
+    }
     private val content = LinearLayout(context)
     private val waiting = LinearLayout(context).apply {
         orientation = LinearLayout.HORIZONTAL
@@ -101,6 +108,7 @@ class StandbyView(context: Context, private val onExit: () -> Unit) : FrameLayou
             gravity = Gravity.CENTER_HORIZONTAL
             addView(face, LinearLayout.LayoutParams(wrap, wrap))
             addView(weather, LinearLayout.LayoutParams(wrap, wrap))
+            addView(alarm, LinearLayout.LayoutParams(wrap, wrap))
             addView(waiting, LinearLayout.LayoutParams(wrap, wrap))
         }
         addView(content, LayoutParams(wrap, wrap))
@@ -122,6 +130,11 @@ class StandbyView(context: Context, private val onExit: () -> Unit) : FrameLayou
         )
         face.analog.outlined = true
         weather.style(screen.weatherSp, screen.skyIconDp)
+        alarm.textSize = screen.weatherSp
+        // The bell as tall as the digits, a space before the time.
+        val bell = context.getDrawable(R.drawable.ic_alarm)?.apply { dp((screen.weatherSp * 1.15f).roundToInt()).let { setBounds(0, 0, it, it) } }
+        alarm.setCompoundDrawablesRelative(bell, null, null, null)
+        alarm.compoundDrawablePadding = dp((screen.weatherSp * 0.45f).roundToInt())
         layoutIcons()
         space()
     }
@@ -129,21 +142,28 @@ class StandbyView(context: Context, private val onExit: () -> Unit) : FrameLayou
     /** The gaps of the chosen screen, glyph to glyph, with the clock's glyphs at the top of the group. */
     private fun space() {
         val weatherShown = weather.visibility != GONE
+        val alarmShown = alarm.visibility != GONE
         val iconsShown = waiting.visibility != GONE
         val clock = face.spaced()
         (face.layoutParams as LinearLayout.LayoutParams).apply {
             topMargin = -clock.top.roundToInt()
             // Trimmed to the glyphs only where something follows: the last line keeps its
             // descent (the tail of a y, the bottom of the sky's glyph), or the group cuts it off.
-            bottomMargin = if (weatherShown || iconsShown) -clock.bottom.roundToInt() else 0
+            bottomMargin = if (weatherShown || alarmShown || iconsShown) -clock.bottom.roundToInt() else 0
         }
         val sky = weather.spaced()
         (weather.layoutParams as LinearLayout.LayoutParams).apply {
             topMargin = (dp(screen.weatherGapDp) - sky.top).roundToInt()
-            bottomMargin = if (iconsShown) -sky.bottom.roundToInt() else 0
+            bottomMargin = if (alarmShown || iconsShown) -sky.bottom.roundToInt() else 0
+        }
+        // Close under the weather, as one block with it; in the weather's place without it.
+        val bell = spacedText(alarm)
+        (alarm.layoutParams as LinearLayout.LayoutParams).apply {
+            topMargin = (dp(if (weatherShown) ALARM_GAP_DP else screen.weatherGapDp) - bell.top).roundToInt()
+            bottomMargin = if (iconsShown) -bell.bottom.roundToInt() else 0
         }
         (waiting.layoutParams as LinearLayout.LayoutParams).topMargin =
-            dp(if (weatherShown) screen.iconsGapDp else screen.weatherGapDp) - glyphInset()
+            dp(if (weatherShown || alarmShown) screen.iconsGapDp else screen.weatherGapDp) - glyphInset()
         content.requestLayout()
     }
 
@@ -203,6 +223,15 @@ class StandbyView(context: Context, private val onExit: () -> Unit) : FrameLayou
     }
 
     fun updateBattery(state: BatteryState) = face.showBattery(state, number = false)
+
+    /** The next alarm, as "6:30", under the weather; nothing for none. */
+    fun showAlarm(time: String?) {
+        if (alarm.text.toString() == time.orEmpty() && (alarm.visibility == VISIBLE) == (time != null)) return
+        alarm.text = time.orEmpty()
+        alarm.contentDescription = time?.let { context.getString(R.string.next_alarm, it) }
+        alarm.visibility = if (time != null) VISIBLE else GONE
+        space()
+    }
 
     /** "18° Drizzle" under the clock, or nothing. */
     fun showWeather(now: Weather.Now?) {
@@ -329,6 +358,9 @@ class StandbyView(context: Context, private val onExit: () -> Unit) : FrameLayou
 
         /** Between two notification glyphs, line to line. */
         const val ICON_GAP_DP = 48
+
+        /** From the weather's baseline to the alarm's digits. */
+        const val ALARM_GAP_DP = 24
     }
 }
 

@@ -216,6 +216,16 @@ class Prefs(context: Context) {
         get() = prefs.getStringSet(KEY_PAUSE_APPS, null)?.toSet().orEmpty()
         set(value) = prefs.edit().putStringSet(KEY_PAUSE_APPS, value).apply()
 
+    /** Minutes a day in an app, by app key, past which its pause is longer and asks to leave it. */
+    var dailyLimits: Map<String, Int>
+        get() = prefs.getStringSet(KEY_DAILY_LIMITS, null).orEmpty().mapNotNull { entry ->
+            // "30 key": the minutes, then the app.
+            val space = entry.indexOf(' ')
+            val minutes = entry.take(space.coerceAtLeast(0)).toIntOrNull() ?: return@mapNotNull null
+            entry.substring(space + 1) to minutes
+        }.toMap()
+        set(value) = prefs.edit().putStringSet(KEY_DAILY_LIMITS, value.map { (key, minutes) -> "$minutes $key" }.toSet()).apply()
+
     /**
      * The bottom icons, left to right, as app keys or [DOCK_CAMERA], including those past
      * [dockCount] kept for when it grows again; null until first changed.
@@ -278,6 +288,7 @@ class Prefs(context: Context) {
         private const val KEY_NOTIFICATION_DOTS = "notification_dots"
         private const val KEY_LOCK_SCREEN_GLYPHS = "lock_screen_glyphs"
         private const val KEY_PAUSE_APPS = "pause_apps"
+        private const val KEY_DAILY_LIMITS = "daily_limits"
         // Not "clock_design": that held three designs, of which two are gone.
         private const val KEY_CLOCK_DESIGN = "clock_layout"
         private const val KEY_CLOCK_WEIGHT = "clock_weight"

@@ -2,6 +2,7 @@ package com.jszutkoski.launcher
 
 import android.annotation.SuppressLint
 import android.app.Activity
+import android.app.AlarmManager
 import android.app.KeyguardManager
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -18,8 +19,8 @@ import android.window.OnBackInvokedDispatcher
 
 /**
  * The clock for the night on the charger: once the phone locks there, the screen comes on with
- * the bedside clock, the weather and, when anything is waiting, three dots that never say from
- * which app. Dim, lit for as long as the phone is plugged in, and somewhere new on the screen
+ * the bedside clock, the weather, the next alarm and, when anything is waiting, three dots that
+ * never say from which app. Dim, lit for as long as the phone is plugged in, and somewhere new on the screen
  * every minute. Only over the lock screen (or on a phone with no screen lock): tapping goes to
  * Android's own unlock, unlocking by any means closes it, and so does unplugging.
  */
@@ -59,8 +60,16 @@ class ChargerActivity : Activity() {
         override fun onReceive(context: Context, intent: Intent) = updateBattery(intent)
     }
 
+    /** Each minute, the time; and the alarm, which drops its weekday once it is less than a day away. */
     private val minuteReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context, intent: Intent) = view.refreshClock()
+        override fun onReceive(context: Context, intent: Intent) {
+            view.refreshClock()
+            showAlarm()
+        }
+    }
+
+    private val alarmReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) = showAlarm()
     }
 
     /** Unlocked with the fingerprint or face: the phone is wanted, so step aside. */
@@ -93,6 +102,7 @@ class ChargerActivity : Activity() {
         registerReceiver(unlockReceiver, IntentFilter(Intent.ACTION_USER_PRESENT))
         registerReceiver(screenOnReceiver, IntentFilter(Intent.ACTION_SCREEN_ON))
         registerReceiver(minuteReceiver, IntentFilter(Intent.ACTION_TIME_TICK))
+        registerReceiver(alarmReceiver, IntentFilter(AlarmManager.ACTION_NEXT_ALARM_CLOCK_CHANGED))
     }
 
     override fun onResume() {
@@ -110,7 +120,11 @@ class ChargerActivity : Activity() {
         view.show()
         showWaiting()
         showWeather()
+        showAlarm()
     }
+
+    /** The next alarm under the weather, so the night's end is there at a glance. */
+    private fun showAlarm() = view.showAlarm(nextAlarmTime(this)?.let { alarmLabel(this, it) })
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
@@ -145,6 +159,7 @@ class ChargerActivity : Activity() {
         unregisterReceiver(unlockReceiver)
         unregisterReceiver(screenOnReceiver)
         unregisterReceiver(minuteReceiver)
+        unregisterReceiver(alarmReceiver)
         super.onDestroy()
     }
 

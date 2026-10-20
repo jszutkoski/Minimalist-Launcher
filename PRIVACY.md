@@ -16,7 +16,7 @@ configurações do sistema, e que você pode retirar quando quiser.
 |---|---|---|
 | **Lista de apps instalados** | Mostrar e buscar seus apps. | Só no aparelho. |
 | **Contatos** (opcional) | Mostrar contatos na busca. | Lidos no aparelho na hora da busca. Não são salvos pelo app nem enviados. |
-| **Acesso ao uso** (opcional) | Mostrar o tempo de tela do dia e o tempo num app antes da pausa consciente. | Só no aparelho. |
+| **Acesso ao uso** (opcional) | Mostrar o tempo de tela do dia e, antes da pausa consciente, o tempo num app e quantas vezes ele foi aberto hoje; conferir o limite diário de um app ao tocá-lo. | Só no aparelho; os limites escolhidos ficam nas configurações do app. |
 | **Acesso às notificações** (opcional) | Saber *quais apps* têm notificações esperando (os pontinhos e os ícones do relógio de cabeceira) e mostrar a música tocando (título, artista e controles). O texto das notificações não é lido. | Só no aparelho, na memória. |
 | **Localização aproximada** (opcional) | Mostrar o clima. | A última posição (já arredondada a cerca de 1 km) e a última leitura ficam no aparelho e são apagadas quando você desliga o Clima nas duas telas. A posição arredondada é enviada à Open-Meteo (veja abaixo). |
 | **País da rede ou do chip** | Escrever números e contas do jeito do seu país (vírgula ou ponto decimal). | Só no aparelho. |
@@ -78,7 +78,7 @@ settings, and that you can take back at any time.
 |---|---|---|
 | **Installed apps** | Showing and searching your apps. | On the phone only. |
 | **Contacts** (optional) | Contacts in the search. | Read on the phone while you search. Not saved by the app, never sent. |
-| **Usage access** (optional) | Today's screen time, and the time in an app before the mindful pause. | On the phone only. |
+| **Usage access** (optional) | Today's screen time and, before the mindful pause, the time in an app and how many times it was opened today; checking an app's daily limit as it is tapped. | On the phone only; the limits chosen stay in the app's settings. |
 | **Notification access** (optional) | Knowing *which apps* have notifications waiting (the dots and the bedside clock's icons), and showing what is playing (title, artist and controls). The text of notifications is not read. | On the phone only, in memory. |
 | **Approximate location** (optional) | The weather. | The last place (already rounded to about 1 km) and reading stay on the phone, and are deleted when you turn Weather off on both screens. The rounded place goes to Open-Meteo (see below). |
 | **Network or SIM country** | Writing numbers and sums your country's way (decimal comma or point). | On the phone only. |

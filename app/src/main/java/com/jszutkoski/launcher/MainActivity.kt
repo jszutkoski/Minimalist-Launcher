@@ -645,7 +645,7 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
     /** "6:30" within a day, "Sat 6:30" further out, gone when no alarm is set. */
     private fun updateAlarm() {
         root.removeCallbacks(alarmRefresh)
-        val next = getSystemService(AlarmManager::class.java)?.nextAlarmClock?.triggerTime
+        val next = nextAlarmTime(this)
         val visible = if (next != null) View.VISIBLE else View.GONE
         // The dot only parts the alarm from a date beside it.
         alarmDot.visibility = if (date.visibility == View.VISIBLE) visible else View.GONE
@@ -656,22 +656,26 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         val untilWithinDay = next - System.currentTimeMillis() - DAY_MS
         // Drop the weekday once the alarm is less than a day away, even if home stays open.
         if (untilWithinDay > 0) root.postDelayed(alarmRefresh, untilWithinDay + 1000)
-        val skeleton = (if (untilWithinDay > 0) "EEE" else "") +
-            (if (DateFormat.is24HourFormat(this)) "Hm" else "hm")
-        alarmText.text = DateFormat.format(DateFormat.getBestDateTimePattern(Locale.getDefault(), skeleton), next)
+        alarmText.text = alarmLabel(this, next)
     }
 
     // Mindful pause ------------------------------------------------------------------
 
-    private fun showPause(app: App, open: () -> Unit) {
+    /**
+     * The breath before [app]. With its day so far already read ([day], for a daily [limit]),
+     * the long pause once past the limit; otherwise today's use fills in as soon as it is read,
+     * when screen time shows on home.
+     */
+    private fun showPause(app: App, open: () -> Unit, day: ScreenTime.AppDay? = null, limit: Int? = null) {
         root.gesturesEnabled = false
         // Typing must not go on underneath: the hidden search could open something else.
         drawer.hideKeyboard()
-        pause.show(app, null, open)
-        if (!prefs.screenTime(ClockScreen.HOME) || !ScreenTime.hasAccess(this)) return
+        val past = if (day != null && limit != null && DailyLimit.isPast(day, limit)) DailyLimit.format(limit) else null
+        pause.show(app, day?.let { DailyLimit.usageLine(this, it) }, past, open)
+        if (day != null || !prefs.screenTime(ClockScreen.HOME) || !ScreenTime.hasAccess(this)) return
         background.execute {
-            val spent = ScreenTime.today(this, app.component.packageName)
-            runOnUiThread { if (pause.isShowing) pause.setUsage(ScreenTime.format(spent)) }
+            val today = ScreenTime.appToday(this, app.component.packageName)
+            runOnUiThread { if (pause.isShowing) pause.setUsage(DailyLimit.usageLine(this, today)) }
         }
     }
 
@@ -804,20 +808,44 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
     private fun openShortcut(app: App, shortcut: ShortcutInfo) =
         throughPause(app) { Shortcuts.start(this, shortcut, null) }
 
-    /** Runs [open] now, or after the breathing pause for the apps on its list. */
+    /**
+     * Runs [open] now, or after the breathing pause for the apps on its list. An app with a
+     * daily limit first has its day read (off the main thread, a moment): past the limit, the
+     * long pause, whether or not it pauses otherwise.
+     */
     private fun throughPause(app: App, open: () -> Unit) {
-        if (app.key in prefs.pauseApps) showPause(app, open) else open()
+        val paused = app.key in prefs.pauseApps
+        val limit = prefs.dailyLimits[app.key]?.takeIf { ScreenTime.hasAccess(this) }
+        if (limit == null) {
+            if (paused) showPause(app, open) else open()
+            return
+        }
+        // A second tap while the day is read opens nothing twice.
+        if (checkingLimit) return
+        checkingLimit = true
+        background.execute {
+            val day = ScreenTime.appToday(this, app.component.packageName)
+            runOnUiThread {
+                checkingLimit = false
+                // Left meanwhile: nothing opens behind the user's back.
+                if (!resumed) return@runOnUiThread
+                if (paused || DailyLimit.isPast(day, limit)) showPause(app, open, day, limit) else open()
+            }
+        }
     }
+
+    private var checkingLimit = false
 
     /**
      * The same for a way into an app known only by its package (a search in YouTube, a WhatsApp
      * chat, the browser): paused if any of that package's entries is.
      */
     private fun throughPauseFor(packageName: String?, open: () -> Unit) {
-        val paused = packageName?.let { pkg ->
-            repo.apps.firstOrNull { it.component.packageName == pkg && it.key in prefs.pauseApps }
+        val limits = prefs.dailyLimits
+        val held = packageName?.let { pkg ->
+            repo.apps.firstOrNull { it.component.packageName == pkg && (it.key in prefs.pauseApps || it.key in limits) }
         }
-        if (paused != null) showPause(paused, open) else open()
+        if (held != null) throughPause(held, open) else open()
     }
 
     private fun launchNow(app: App, source: View) {

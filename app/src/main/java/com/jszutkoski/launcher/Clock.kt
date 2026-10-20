@@ -1,5 +1,6 @@
 package com.jszutkoski.launcher
 
+import android.app.AlarmManager
 import android.content.Context
 import android.content.res.ColorStateList
 import android.graphics.Canvas
@@ -17,6 +18,7 @@ import android.widget.TextClock
 import android.widget.TextView
 import java.text.NumberFormat
 import java.util.Calendar
+import java.util.Locale
 import kotlin.math.cos
 import kotlin.math.roundToInt
 import kotlin.math.sin
@@ -451,3 +453,15 @@ class AnalogClock(context: Context, private val pressable: Boolean) : View(conte
         const val EMPTY_SEGMENT = 0xFF5C5C5C.toInt()
     }
 }
+
+/** The next alarm's time, or null with none set. */
+fun nextAlarmTime(context: Context): Long? = context.getSystemService(AlarmManager::class.java)?.nextAlarmClock?.triggerTime
+
+/** "6:30" for an alarm within a day, "Mon 6:30" for one further off. */
+fun alarmLabel(context: Context, time: Long): String {
+    val withinDay = time - System.currentTimeMillis() <= ALARM_DAY_MS
+    val skeleton = (if (withinDay) "" else "EEE") + (if (DateFormat.is24HourFormat(context)) "Hm" else "hm")
+    return DateFormat.format(DateFormat.getBestDateTimePattern(Locale.getDefault(), skeleton), time).toString()
+}
+
+private const val ALARM_DAY_MS = 24 * 60 * 60 * 1000L

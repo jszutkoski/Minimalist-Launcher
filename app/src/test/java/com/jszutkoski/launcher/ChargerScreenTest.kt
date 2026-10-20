@@ -258,4 +258,24 @@ class ChargerScreenTest {
         assertEquals(1, locks)
         assertTrue(startedClock() != null)
     }
+
+    @Test
+    fun theNextAlarmShowsUnderTheClock() {
+        phone(secure = true, locked = true)
+        charging()
+        val time = System.currentTimeMillis() + 7 * 60 * 60 * 1000L
+        val operation = android.app.PendingIntent.getBroadcast(app, 0, Intent("alarm"), android.app.PendingIntent.FLAG_IMMUTABLE)
+        app.getSystemService(android.app.AlarmManager::class.java)
+            .setAlarmClock(android.app.AlarmManager.AlarmClockInfo(time, null), operation)
+        val clock = open()
+        assertTrue(clock.content().textViews().any { it.text == alarmLabel(app, time) && it.visibility == View.VISIBLE })
+    }
+
+    @Test
+    fun withNoAlarmThereIsNoLine() {
+        phone(secure = true, locked = true)
+        charging()
+        val clock = open()
+        assertTrue(clock.content().textViews().none { it.contentDescription?.startsWith(app.getString(R.string.next_alarm, "")) == true && it.visibility == View.VISIBLE })
+    }
 }

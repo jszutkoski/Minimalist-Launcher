@@ -101,7 +101,16 @@
     <string name="pause_open">Open %1$s</string>
     <string name="pause_still">Still want it?</string>
     <string name="pause_not_now">Not now</string>
-    <string name="pause_usage">%1$s today so far</string>
+    <string name="pause_usage">%1$s today, opened %2$s</string>
+    <string name="opened_once">once</string>
+    <string name="opened_times">%1$d times</string>
+    <string name="pause_past_limit">past %1$s a day in %2$s</string>
+    <string name="menu_daily_limit">Daily limit</string>
+    <string name="menu_daily_limit_set">Daily limit: %1$s</string>
+    <string name="limit_title">Daily limit for %1$s</string>
+    <string name="limit_none">No limit</string>
+    <string name="daily_limits">Daily limits</string>
+    <string name="daily_limits_desc">Once an app is past its time for the day, its pause lasts 15 seconds instead of 5, says so, and puts Not now first; opening is still there after it. Choose here, or long-press an app → Daily limit. Needs usage access</string>
     <string name="player_previous">Previous</string>
     <string name="player_play">Play</string>
     <string name="player_pause">Pause</string>
@@ -166,6 +175,7 @@
     <string name="standby_log_value">Tap to copy</string>
     <string name="standby_log_desc">The bedside clock\'s last steps (shown, covered, unlock asked for, brought back) and whether the screen was on and the phone locked, to find out what your phone\'s Android does around it. Nothing on the screen is kept, and it stays on the phone until you copy it</string>
     <string name="standby_log_copied">Log copied</string>
+    <string name="next_alarm">Next alarm %1$s</string>
     <string name="charger_waiting">Notifications waiting</string>
     <string name="standby_charging">Clock on the charger</string>
     <string name="standby_charging_desc">Each time the phone locks on the charger, the screen comes on with the bedside clock, the weather and, when anything is waiting, three dots that don\'t say from which app. Dim, lit for as long as it is plugged in, and somewhere new on the screen every minute so nothing marks it. Tap to unlock; the power button turns the screen off. Needs Minimalist on in Accessibility, which is what hears the phone lock</string>

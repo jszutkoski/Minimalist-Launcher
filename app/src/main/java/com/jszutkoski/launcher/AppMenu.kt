@@ -15,7 +15,8 @@ import android.widget.Toast
 
 /**
  * The long-press menu of an app on home or in the list: its shortcuts, then pinning to home
- * or to the bottom icons, renaming, the pause, hiding, app info and uninstalling. [render]
+ * or to the bottom icons, renaming, the pause and the daily limit, hiding, app info and
+ * uninstalling. [render]
  * redraws home afterwards.
  */
 class AppMenu(
@@ -57,6 +58,10 @@ class AppMenu(
             } else {
                 option(activity.getString(R.string.menu_pause_before)) { prefs.pauseApps = prefs.pauseApps + app.key }
             }
+            val limit = prefs.dailyLimits[app.key]
+            option(
+                if (limit == null) activity.getString(R.string.menu_daily_limit) else activity.getString(R.string.menu_daily_limit_set, DailyLimit.format(limit)),
+            ) { DailyLimit.choose(activity, prefs, app) }
             if (index < 0) option(activity.getString(R.string.menu_hide)) { hide(app) }
             option(activity.getString(R.string.menu_app_info)) { SystemActions.openAppDetails(activity, app) }
             if (!app.isSystem) option(activity.getString(R.string.menu_uninstall), Palette.SECONDARY) { uninstall(app) }

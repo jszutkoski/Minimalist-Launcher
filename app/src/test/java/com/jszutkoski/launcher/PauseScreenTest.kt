@@ -74,4 +74,28 @@ class PauseScreenTest {
         open.performClick()
         assertFalse(opened)
     }
+
+    @Test
+    fun pastTheDailyLimitThePauseIsLongerAndNotNowComesFirst() {
+        pause.show(testApp("Instagram"), "45 min", pastLimit = "30 min") { opened = true }
+        assertTrue(pause.textViews().any { it.text == context.getString(R.string.pause_past_limit, "30 min", "Instagram") })
+        val notNow = button(context.getString(R.string.pause_not_now))
+        val choices = pause.textViews().filter { it === notNow || it === open }
+        assertTrue(choices.first() === notNow)
+        idle(6_000)
+        assertEquals(View.INVISIBLE, open.visibility)
+        idle(10_000)
+        assertEquals(View.VISIBLE, open.visibility)
+    }
+
+    @Test
+    fun theNextOrdinaryPauseIsShortAgain() {
+        pause.show(testApp("Instagram"), null, pastLimit = "30 min") { opened = true }
+        pause.hide(animate = false)
+        show()
+        val notNow = button(context.getString(R.string.pause_not_now))
+        assertTrue(pause.textViews().filter { it === notNow || it === open }.first() === open)
+        idle(6_000)
+        assertEquals(View.VISIBLE, open.visibility)
+    }
 }

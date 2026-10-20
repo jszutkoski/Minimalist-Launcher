@@ -28,6 +28,9 @@ object ScreenTime {
     private const val LOOKBACK_MS = 6 * 60 * 60 * 1000L
     private const val CACHE_MS = 60 * 1000L
 
+    /** Back in the same app within this, after a moment with none of its screens: the same visit. */
+    private const val REOPEN_MS = 3_000L
+
     @Volatile
     private var cached: Pair<Long, Long>? = null // when it was worked out, and the total
 
@@ -38,15 +41,34 @@ object ScreenTime {
      */
     fun today(context: Context, only: String? = null): Long {
         val now = System.currentTimeMillis()
-        val midnight = Calendar.getInstance().apply {
-            set(Calendar.HOUR_OF_DAY, 0)
-            set(Calendar.MINUTE, 0)
-            set(Calendar.SECOND, 0)
-            set(Calendar.MILLISECOND, 0)
-        }.timeInMillis
+        val midnight = midnight()
         if (only == null) cached?.let { (at, total) -> if (now - at < CACHE_MS && at >= midnight) return total }
-        val usage = context.getSystemService(UsageStatsManager::class.java) ?: return 0
-        val events = usage.queryEvents(midnight - LOOKBACK_MS, now) ?: return 0
+        val total = foreground(changes(context, midnight, now, only) ?: return 0, midnight, now)
+        if (only == null) cached = now to total
+        return total
+    }
+
+    /** One app's day so far: its time in the foreground, and how many times it was opened. */
+    class AppDay(val time: Long, val opens: Int)
+
+    fun appToday(context: Context, packageName: String): AppDay {
+        val now = System.currentTimeMillis()
+        val midnight = midnight()
+        val changes = changes(context, midnight, now, packageName) ?: return AppDay(0, 0)
+        return AppDay(foreground(changes, midnight, now), opens(changes, midnight))
+    }
+
+    private fun midnight() = Calendar.getInstance().apply {
+        set(Calendar.HOUR_OF_DAY, 0)
+        set(Calendar.MINUTE, 0)
+        set(Calendar.SECOND, 0)
+        set(Calendar.MILLISECOND, 0)
+    }.timeInMillis
+
+    /** Every activity coming and going since a while before [midnight], for [only] one app or all. */
+    private fun changes(context: Context, midnight: Long, now: Long, only: String?): List<Change>? {
+        val usage = context.getSystemService(UsageStatsManager::class.java) ?: return null
+        val events = usage.queryEvents(midnight - LOOKBACK_MS, now) ?: return null
         val event = UsageEvents.Event()
         val changes = ArrayList<Change>()
         while (events.hasNextEvent()) {
@@ -63,9 +85,31 @@ object ScreenTime {
             }
             changes += Change("${event.packageName}/${event.className}", resumed, event.timeStamp)
         }
-        val total = foreground(changes, midnight, now)
-        if (only == null) cached = now to total
-        return total
+        return changes
+    }
+
+    /**
+     * How many times, since [from], the app was opened: none of its activities in the
+     * foreground, then one. Moving from screen to screen inside it leaves a moment with none,
+     * so a return within [REOPEN_MS] is the same visit, unless home came in between.
+     */
+    fun opens(changes: List<Change>, from: Long): Int {
+        val open = HashSet<String>()
+        var closedAt = Long.MIN_VALUE
+        var count = 0
+        for (change in changes.sortedBy { it.time }) {
+            if (change.home) {
+                open.clear()
+                closedAt = Long.MIN_VALUE
+            } else if (change.resumed) {
+                val returning = closedAt != Long.MIN_VALUE && change.time - closedAt < REOPEN_MS
+                if (open.isEmpty() && !returning && change.time >= from) count++
+                open += change.activity
+            } else if (open.remove(change.activity) && open.isEmpty()) {
+                closedAt = change.time
+            }
+        }
+        return count
     }
 
     /**

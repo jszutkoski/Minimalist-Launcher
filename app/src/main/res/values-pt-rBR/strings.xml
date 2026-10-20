@@ -100,7 +100,16 @@
     <string name="pause_open">Abrir %1$s</string>
     <string name="pause_still">Ainda quer?</string>
     <string name="pause_not_now">Agora não</string>
-    <string name="pause_usage">%1$s hoje até agora</string>
+    <string name="pause_usage">%1$s hoje, aberto %2$s</string>
+    <string name="opened_once">1 vez</string>
+    <string name="opened_times">%1$d vezes</string>
+    <string name="pause_past_limit">passou de %1$s por dia em %2$s</string>
+    <string name="menu_daily_limit">Limite diário</string>
+    <string name="menu_daily_limit_set">Limite diário: %1$s</string>
+    <string name="limit_title">Limite diário: %1$s</string>
+    <string name="limit_none">Sem limite</string>
+    <string name="daily_limits">Limites diários</string>
+    <string name="daily_limits_desc">Quando um app passa do tempo do dia, a pausa dele dura 15 segundos em vez de 5, avisa e põe Agora não primeiro; abrir continua possível depois. Escolha aqui, ou toque e segure um app → Limite diário. Precisa do acesso ao uso</string>
     <string name="player_previous">Anterior</string>
     <string name="player_play">Tocar</string>
     <string name="player_pause">Pausar</string>
@@ -165,6 +174,7 @@
     <string name="standby_log_value">Toque para copiar</string>
     <string name="standby_log_desc">Os últimos passos do relógio de cabeceira (apareceu, foi coberto, pediu o desbloqueio, voltou) e se a tela estava acesa e o celular bloqueado, para descobrir o que o Android do seu celular faz com ele. Nada do que está na tela é guardado, e fica no celular até você copiar</string>
     <string name="standby_log_copied">Registro copiado</string>
+    <string name="next_alarm">Próximo alarme %1$s</string>
     <string name="charger_waiting">Notificações esperando</string>
     <string name="standby_charging">Relógio no carregador</string>
     <string name="standby_charging_desc">Toda vez que o celular bloqueia no carregador, a tela acende com o relógio de cabeceira, o clima e, se houver notificação, três pontinhos que não dizem de qual app. Brilho baixo, aceso enquanto estiver conectado, e muda de lugar a cada minuto para não marcar a tela. Toque para desbloquear; o botão de energia apaga a tela. Precisa do Minimalist ligado em Acessibilidade, que é o que percebe o bloqueio</string>
