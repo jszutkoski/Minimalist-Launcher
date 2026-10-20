@@ -77,17 +77,24 @@ class PauseScreenTest {
 
     @Test
     fun pastTheDailyLimitThePauseIsLongerAndNotNowComesFirst() {
-        pause.show(testApp("Instagram"), "45 min", pastLimit = "30 min") { opened = true }
-        assertTrue(pause.textViews().any { it.text == context.getString(R.string.pause_past_limit, "30 min", "Instagram") })
-        val notNow = button(context.getString(R.string.pause_not_now))
-        val choices = pause.textViews().filter { it === notNow || it === open }
-        assertTrue(choices.first() === notNow)
-        for (second in 1..14) {
-            idle(1_000)
-            assertEquals("at ${second}s: ${shown()}", View.INVISIBLE, open.visibility)
+        // The line's animator would carry Robolectric's clock to its end; the pause runs on the
+        // clock alone, so it is timed with animations off, as Android's setting can have them.
+        animatorScale(0f)
+        try {
+            pause.show(testApp("Instagram"), "45 min", pastLimit = "30 min") { opened = true }
+            assertTrue(pause.textViews().any { it.text == context.getString(R.string.pause_past_limit, "30 min", "Instagram") })
+            val notNow = button(context.getString(R.string.pause_not_now))
+            val choices = pause.textViews().filter { it === notNow || it === open }
+            assertTrue(choices.first() === notNow)
+            for (second in 1..14) {
+                idle(1_000)
+                assertEquals("at ${second}s: ${shown()}", View.INVISIBLE, open.visibility)
+            }
+            idle(1_500)
+            assertEquals(View.VISIBLE, open.visibility)
+        } finally {
+            animatorScale(1f)
         }
-        idle(1_500)
-        assertEquals(View.VISIBLE, open.visibility)
     }
 
     /** What the pause says, for a failing check to tell. */
