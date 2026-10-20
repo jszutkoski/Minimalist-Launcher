@@ -82,11 +82,16 @@ class PauseScreenTest {
         val notNow = button(context.getString(R.string.pause_not_now))
         val choices = pause.textViews().filter { it === notNow || it === open }
         assertTrue(choices.first() === notNow)
-        idle(6_000)
-        assertEquals(View.INVISIBLE, open.visibility)
-        idle(10_000)
+        for (second in 1..14) {
+            idle(1_000)
+            assertEquals("at ${second}s: ${shown()}", View.INVISIBLE, open.visibility)
+        }
+        idle(1_500)
         assertEquals(View.VISIBLE, open.visibility)
     }
+
+    /** What the pause says, for a failing check to tell. */
+    private fun shown() = pause.textViews().filter { it.visibility == View.VISIBLE }.joinToString(" | ") { it.text }
 
     @Test
     fun theNextOrdinaryPauseIsShortAgain() {
