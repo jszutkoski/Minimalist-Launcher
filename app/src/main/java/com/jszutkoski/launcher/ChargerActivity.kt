@@ -8,6 +8,10 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -16,12 +20,13 @@ import android.os.PowerManager
 import android.view.WindowInsetsController
 import android.view.WindowManager
 import android.window.OnBackInvokedDispatcher
+import kotlin.math.abs
 
 /**
  * The clock for the night on the charger: once the phone locks there, the screen comes on with
  * the bedside clock, the weather, the next alarm and, when anything is waiting, three dots that
- * never say from which app. Dim, lit for as long as the phone is plugged in, and somewhere new on the screen
- * every minute. Only over the lock screen (or on a phone with no screen lock): tapping goes to
+ * never say from which app. Only as bright as the light around it calls for, lit for as long
+ * as the phone is plugged in, and somewhere new on the screen every minute. Only over the lock screen (or on a phone with no screen lock): tapping goes to
  * Android's own unlock, unlocking by any means closes it, and so does unplugging.
  */
 class ChargerActivity : Activity() {
@@ -37,6 +42,16 @@ class ChargerActivity : Activity() {
     private var plugged = false
 
     private val notificationsChanged: () -> Unit = { showWaiting() }
+
+    private val sensors by lazy { getSystemService(SensorManager::class.java) }
+    private val light by lazy { sensors?.getDefaultSensor(Sensor.TYPE_LIGHT) }
+
+    /** The light around the phone, as the sensor reports a change in it. */
+    private val lightListener = object : SensorEventListener {
+        override fun onSensorChanged(event: SensorEvent) = followLight(ChargerLight.brightness(event.values[0]))
+
+        override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
+    }
 
     private val handler = Handler(Looper.getMainLooper())
     private val unlockUnanswered = Runnable { closeUnlock() }
@@ -91,8 +106,10 @@ class ChargerActivity : Activity() {
         val dark = WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS or
             WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS
         window.insetsController?.setSystemBarsAppearance(dark, dark)
-        // Low, whatever the phone's brightness is set to: a glow on the bedside table.
-        window.attributes = window.attributes.apply { screenBrightness = BRIGHTNESS }
+        // Dark until the light sensor says otherwise: a glow on the bedside table. With no
+        // sensor to tell, the phone's own brightness.
+        val start = if (light != null) ChargerLight.DARK else WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+        window.attributes = window.attributes.apply { screenBrightness = start }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             onBackInvokedDispatcher.registerOnBackInvokedCallback(OnBackInvokedDispatcher.PRIORITY_DEFAULT) { leave() }
         }
@@ -103,6 +120,11 @@ class ChargerActivity : Activity() {
         registerReceiver(screenOnReceiver, IntentFilter(Intent.ACTION_SCREEN_ON))
         registerReceiver(minuteReceiver, IntentFilter(Intent.ACTION_TIME_TICK))
         registerReceiver(alarmReceiver, IntentFilter(AlarmManager.ACTION_NEXT_ALARM_CLOCK_CHANGED))
+    }
+
+    override fun onStart() {
+        super.onStart()
+        light?.let { sensors?.registerListener(lightListener, it, SensorManager.SENSOR_DELAY_NORMAL) }
     }
 
     override fun onResume() {
@@ -121,6 +143,17 @@ class ChargerActivity : Activity() {
         showWaiting()
         showWeather()
         showAlarm()
+    }
+
+    /**
+     * The window brightness for the light now. Small changes are let go, so a shadow passing
+     * doesn't keep nudging it; Android eases the screen from one level to the next.
+     */
+    private fun followLight(level: Float) {
+        val now = window.attributes.screenBrightness
+        if (now >= 0f && abs(now - level) < LIGHT_STEP && level != ChargerLight.DARK) return
+        if (now == level) return
+        window.attributes = window.attributes.apply { screenBrightness = level }
     }
 
     /** The next alarm under the weather, so the night's end is there at a glance. */
@@ -148,6 +181,8 @@ class ChargerActivity : Activity() {
         // Stopped by the screen going off, it is still what the wake will show.
         if (screenOn) showing = false
         view.hold()
+        // Nobody sees it: no need to follow the light.
+        sensors?.unregisterListener(lightListener)
     }
 
     override fun onDestroy() {
@@ -251,8 +286,8 @@ class ChargerActivity : Activity() {
     }
 
     companion object {
-        /** The window's brightness: near the lowest the screen goes. */
-        const val BRIGHTNESS = 0.02f
+        /** The least change in brightness worth making as the light changes. */
+        private const val LIGHT_STEP = 0.04f
 
         /** After the screen comes on, how long a touch is taken for the end of the wake gesture. */
         private const val WAKE_TAP_MS = 700L

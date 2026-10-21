@@ -6,6 +6,8 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageInfo
+import android.hardware.Sensor
+import android.hardware.SensorManager
 import android.os.BatteryManager
 import android.os.Process
 import android.os.SystemClock
@@ -26,6 +28,8 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.android.controller.ActivityController
+import org.robolectric.shadows.SensorEventBuilder
+import org.robolectric.shadows.ShadowSensor
 
 /** The clock for the night on the charger: when it comes, how it shows, and when it goes. */
 @RunWith(RobolectricTestRunner::class)
@@ -99,14 +103,52 @@ class ChargerScreenTest {
         return shadowOf(app).nextStartedActivity?.takeIf { it.component?.className == ChargerActivity::class.java.name }
     }
 
+    /** A light sensor on the phone, and a way to say how much light it sees. */
+    private fun lightSensor(): (Float) -> Unit {
+        val manager = app.getSystemService(SensorManager::class.java)
+        val sensor = ShadowSensor.newInstance(Sensor.TYPE_LIGHT)
+        shadowOf(manager).addSensor(sensor)
+        return { lux ->
+            shadowOf(manager).sendSensorEventToListeners(
+                SensorEventBuilder.newBuilder().setSensor(sensor).setValues(floatArrayOf(lux)).setTimestamp(SystemClock.elapsedRealtimeNanos()).build(),
+            )
+        }
+    }
+
+    private fun ChargerActivity.brightness() = window.attributes.screenBrightness
+
     @Test
-    fun overTheLockScreenItStaysLitAndDim() {
+    fun overTheLockScreenItStaysLitAndDimInTheDark() {
+        val light = lightSensor()
         phone(secure = true, locked = true)
         charging()
         val clock = open()
         assertFalse(clock.isFinishing)
         assertTrue(clock.lit())
-        assertEquals(ChargerActivity.BRIGHTNESS, clock.window.attributes.screenBrightness)
+        assertEquals(ChargerLight.DARK, clock.brightness())
+        light(1f)
+        assertEquals(ChargerLight.DARK, clock.brightness())
+    }
+
+    @Test
+    fun inDaylightItIsReadable() {
+        // On the charger in a car by day.
+        val light = lightSensor()
+        phone(secure = true, locked = true)
+        charging()
+        val clock = open()
+        light(20_000f)
+        assertEquals(ChargerLight.BRIGHT, clock.brightness())
+        // Back in the dark, down again.
+        light(0f)
+        assertEquals(ChargerLight.DARK, clock.brightness())
+    }
+
+    @Test
+    fun withNoLightSensorItKeepsToThePhonesBrightness() {
+        phone(secure = true, locked = true)
+        charging()
+        assertEquals(WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE, open().brightness())
     }
 
     @Test
