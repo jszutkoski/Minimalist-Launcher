@@ -153,7 +153,7 @@
     <string name="layout_left">Left aligned</string>
     <string name="layout_desc">Clock and pinned apps</string>
     <string name="status_bar">Status bar</string>
-    <string name="status_bar_desc">Dimmed: dark icons on black, almost invisible and never jumps. Hidden: gone, but Android slides it in and out with the notifications</string>
+    <string name="status_bar_desc">Dimmed: dark icons on black, almost invisible and never jumps; with a low battery it goes, so Android\'s orange battery doesn\'t show. Hidden: gone, but Android slides it in and out with the notifications</string>
     <string name="screen_time">Screen time</string>
     <string name="screen_time_desc">Today\'s time in apps, under the clock</string>
     <string name="grant_usage">Tap to allow usage access</string>

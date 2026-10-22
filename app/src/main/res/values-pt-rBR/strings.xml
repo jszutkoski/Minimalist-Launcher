@@ -152,7 +152,7 @@
     <string name="layout_left">Alinhado à esquerda</string>
     <string name="layout_desc">Relógio e apps fixados</string>
     <string name="status_bar">Barra de status</string>
-    <string name="status_bar_desc">Escurecida: ícones escuros no preto, quase invisível e nunca pula. Oculta: some, mas o Android a mostra e esconde junto com as notificações</string>
+    <string name="status_bar_desc">Escurecida: ícones escuros no preto, quase invisível e nunca pula; com bateria fraca, some para não mostrar a bateria laranja do Android. Oculta: some, mas o Android a mostra e esconde junto com as notificações</string>
     <string name="screen_time">Tempo de tela</string>
     <string name="screen_time_desc">O tempo de hoje nos apps, abaixo do relógio</string>
     <string name="grant_usage">Toque para permitir o acesso ao uso</string>

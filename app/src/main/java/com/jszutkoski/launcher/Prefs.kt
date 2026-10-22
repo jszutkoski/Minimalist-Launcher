@@ -18,6 +18,13 @@ enum class StatusBarMode(val label: Int) {
 
     /** Gone; Android slides it back briefly with the notification shade or a swipe from the top. */
     HIDDEN(R.string.bar_hidden),
+    ;
+
+    /**
+     * Whether the bar steps out now. Dark icons hide nothing Android colors itself: a low or
+     * saving battery would show in orange on the black, so the dimmed bar goes until it is back.
+     */
+    fun hides(batteryColored: Boolean) = this == HIDDEN || (this == DIMMED && batteryColored)
 }
 
 /**

@@ -122,6 +122,14 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         override fun onReceive(context: Context, intent: Intent) = updateBattery(intent)
     }
 
+    /** Battery saver on or off: Android may color the battery in the status bar. */
+    private val powerSaveReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) = applyStatusBar()
+    }
+
+    /** Low enough that Android paints the battery in the status bar orange or red. */
+    private var batteryTinted = false
+
     private val alarmReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) = updateAlarm()
     }
@@ -141,6 +149,7 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         super.onStart()
         // A sticky broadcast: registering returns the current state right away.
         registerReceiver(batteryReceiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED))?.let(::updateBattery)
+        registerReceiver(powerSaveReceiver, IntentFilter(PowerManager.ACTION_POWER_SAVE_MODE_CHANGED))
         registerReceiver(alarmReceiver, IntentFilter(AlarmManager.ACTION_NEXT_ALARM_CLOCK_CHANGED))
         registerReceiver(
             timeReceiver,
@@ -187,6 +196,7 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         // Stopped because the screen went off: home is still what the user was looking at.
         inFront = getSystemService(PowerManager::class.java)?.isInteractive == false
         unregisterReceiver(batteryReceiver)
+        unregisterReceiver(powerSaveReceiver)
         unregisterReceiver(alarmReceiver)
         unregisterReceiver(timeReceiver)
         root.removeCallbacks(alarmRefresh)
@@ -418,6 +428,10 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         val battery = BatteryState.from(intent) ?: return
         face.showBattery(battery, number = true)
         panel.showBattery(battery)
+        if (battery.tintsStatusBar != batteryTinted) {
+            batteryTinted = battery.tintsStatusBar
+            applyStatusBar()
+        }
     }
 
     // Standby ------------------------------------------------------------------
@@ -450,7 +464,8 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         val mode = prefs.statusBar
         val darkIcons = if (mode == StatusBarMode.DIMMED) WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS else 0
         controller.setSystemBarsAppearance(darkIcons, WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS)
-        if (mode == StatusBarMode.HIDDEN) {
+        val colored = batteryTinted || getSystemService(PowerManager::class.java)?.isPowerSaveMode == true
+        if (mode.hides(colored)) {
             controller.systemBarsBehavior = WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
             controller.hide(WindowInsets.Type.statusBars())
         } else {

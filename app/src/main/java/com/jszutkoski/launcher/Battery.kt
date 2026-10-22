@@ -10,12 +10,21 @@ import kotlin.math.cos
 const val LOW_BATTERY = 0.15f
 
 /**
+ * Where most phones start coloring the battery in their status bar. Android has no public
+ * setting for it: AOSP warns at 15%, many makers at 20%.
+ */
+const val TINTED_BATTERY = 0.20f
+
+/**
  * The charge as the battery broadcast reports it, shared by home and standby. [plugged] is on
  * the charger whether or not it charges: a phone holding at 80% to spare the battery reports
  * "not charging" while it is plugged in all night.
  */
 class BatteryState(val fraction: Float, val charging: Boolean, val plugged: Boolean = charging) {
     val low get() = !charging && fraction <= LOW_BATTERY
+
+    /** Android's own battery icon is likely orange or red now. */
+    val tintsStatusBar get() = !charging && fraction <= TINTED_BATTERY
 
     companion object {
         /** Null when the broadcast carries no usable level. */
