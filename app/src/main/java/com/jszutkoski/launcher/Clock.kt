@@ -199,6 +199,16 @@ class ClockFace(context: Context, pressable: Boolean) : LinearLayout(context) {
         else -> Spaced(this, glyphInset(digital), digital.paint.fontMetrics.descent + digital.paddingBottom)
     }
 
+    /**
+     * Half the height of the digits' glyphs, or of the whole face for the analog one, whether
+     * or not the battery line is under the digits: standby hangs the clock from its middle.
+     */
+    fun glyphHalf(): Float {
+        if (digital.visibility != VISIBLE) return measuredHeight / 2f
+        val bottom = digital.paint.fontMetrics.descent + digital.paddingBottom
+        return (digital.measuredHeight - glyphInset(digital) - bottom) / 2f
+    }
+
     /** The digits in the chosen weight and size, or smaller when they would not fit in [maxWidth]. */
     private fun showDigits(look: ClockLook, digitsSp: Float, maxWidth: Int) {
         digital.typeface = ClockFont.at(context, look.weight.weight)

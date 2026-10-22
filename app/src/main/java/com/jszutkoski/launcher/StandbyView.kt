@@ -33,8 +33,10 @@ enum class StandbyScreen(
     val skyIconDp: Int,
     /** The notification glyphs' size. */
     val glyphDp: Int,
+    /** The battery line under the digits, halfway to what follows; the analog face has its arc. */
+    val batteryLine: Boolean,
 ) {
-    /** Large thin digits with no battery line, a little above the middle. */
+    /** Large thin digits, the battery line under them, a little above the middle. */
     DIGITAL(
         R.string.clock_digital,
         ClockLook(design = ClockDesign.DIGITAL, weight = ClockWeight.ULTRA_THIN, date = DatePosition.HIDDEN),
@@ -46,6 +48,7 @@ enum class StandbyScreen(
         weatherSp = 17f,
         skyIconDp = 34,
         glyphDp = 30,
+        batteryLine = true,
     ),
 
     /** The outlined face with its battery in the ring, a little above the middle. */
@@ -60,6 +63,7 @@ enum class StandbyScreen(
         weatherSp = 15f,
         skyIconDp = 30,
         glyphDp = 26,
+        batteryLine = false,
     ),
 }
 
@@ -125,8 +129,9 @@ class StandbyView(context: Context, private val onExit: () -> Unit) : FrameLayou
             labelSp = 13f,
             gravity = Gravity.CENTER_HORIZONTAL,
             maxWidth = resources.displayMetrics.widthPixels - 2 * dp(SIDE_MARGIN_DP),
-            gap = dp(GAP_DP),
-            batteryLine = false,
+            // Its centre halfway between the digits and the weather's capitals.
+            gap = dp(screen.weatherGapDp / 2),
+            batteryLine = screen.batteryLine,
         )
         face.analog.outlined = true
         weather.style(screen.weatherSp, screen.skyIconDp)
@@ -151,30 +156,29 @@ class StandbyView(context: Context, private val onExit: () -> Unit) : FrameLayou
             // descent (the tail of a y, the bottom of the sky's glyph), or the group cuts it off.
             bottomMargin = if (weatherShown || alarmShown || iconsShown) -clock.bottom.roundToInt() else 0
         }
+        // From the clock to what follows; from the battery line, halfway, when it is under the digits.
+        val firstGap = if (screen.batteryLine) screen.weatherGapDp / 2 else screen.weatherGapDp
         val sky = weather.spaced()
         (weather.layoutParams as LinearLayout.LayoutParams).apply {
-            topMargin = (dp(screen.weatherGapDp) - sky.top).roundToInt()
+            topMargin = (dp(firstGap) - sky.top).roundToInt()
             bottomMargin = if (alarmShown || iconsShown) -sky.bottom.roundToInt() else 0
         }
         // Close under the weather, as one block with it; in the weather's place without it.
         val bell = spacedText(alarm)
         (alarm.layoutParams as LinearLayout.LayoutParams).apply {
-            topMargin = (dp(if (weatherShown) ALARM_GAP_DP else screen.weatherGapDp) - bell.top).roundToInt()
+            topMargin = (dp(if (weatherShown) ALARM_GAP_DP else firstGap) - bell.top).roundToInt()
             bottomMargin = if (iconsShown) -bell.bottom.roundToInt() else 0
         }
         (waiting.layoutParams as LinearLayout.LayoutParams).topMargin =
-            dp(if (weatherShown || alarmShown) screen.iconsGapDp else screen.weatherGapDp) - glyphInset()
+            dp(if (weatherShown || alarmShown) screen.iconsGapDp else firstGap) - glyphInset()
         content.requestLayout()
     }
 
     /** The time read again now, rather than at the clock's own next tick. */
     fun refreshClock() = face.refresh()
 
-    /** Where the glyphs of the clock itself sit, from the top of [face]: their middle. */
-    private fun clockMiddle(): Float {
-        val clock = face.spaced()
-        return (face.measuredHeight - clock.top - clock.bottom) / 2f
-    }
+    /** Where the clock hangs from, for its place on the screen: the same with the battery line or without. */
+    private fun clockMiddle(): Float = face.glyphHalf()
 
     override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
         // The group hangs from the clock: its middle at the screen's chosen height, whatever
