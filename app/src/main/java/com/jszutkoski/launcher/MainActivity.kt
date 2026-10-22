@@ -98,6 +98,8 @@ class MainActivity : Activity(), SwipeLayout.Listener, AppDrawerView.Callbacks {
         super.onCreate(savedInstanceState)
         prefs = Prefs(this)
         launcherApps = getSystemService(LauncherApps::class.java)
+        // Without the accessibility service, home is what hears the screen go off.
+        ScreenEvents.listenFromHome(this)
         edgeToEdge()
 
         buildViews()

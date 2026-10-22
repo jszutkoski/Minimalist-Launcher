@@ -561,12 +561,12 @@ class SettingsActivity : Activity() {
             },
         )
         weatherRow(ClockScreen.STANDBY)
-        // The service is what hears the phone lock on the charger, and lights the clock.
+        // The service, or home without it, is what hears the phone lock and lights the clock.
         permissionRow(
             title = getString(R.string.standby_charging),
             description = getString(R.string.standby_charging_desc),
             enabled = prefs.standbyWhenCharging,
-            granted = LockService.isEnabled(this),
+            granted = ScreenEvents.canCome(this),
             missing = getString(R.string.grant_accessibility),
             setEnabled = { prefs.standbyWhenCharging = it },
             grant = { askForAccessibility { prefs.standbyWhenCharging = false } },
@@ -575,7 +575,7 @@ class SettingsActivity : Activity() {
             title = getString(R.string.standby_wake),
             description = getString(R.string.standby_wake_desc),
             enabled = prefs.standbyOnWake,
-            granted = LockService.isEnabled(this),
+            granted = ScreenEvents.canCome(this),
             missing = getString(R.string.grant_accessibility),
             setEnabled = { prefs.standbyOnWake = it },
             grant = { askForAccessibility { prefs.standbyOnWake = false } },
